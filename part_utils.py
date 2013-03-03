@@ -9,6 +9,7 @@ import PS
 class ParticleFilteringBase(object):
     """ Base class for particles to be used with particle filtering """
     def sample_input_noise(self, u):
+        """ Return a noise perturbed input vector u """
         raise NotImplementedError( "Should have implemented this" )
     
     def update(self, data):
@@ -22,13 +23,15 @@ class ParticleFilteringBase(object):
 class ParticleSmoothingBase(ParticleFilteringBase):
     """ Base class for particles to be used with particle smoothing """
     def next_pdf(self, next, u):
+        """ Return the probability density value for the possible future state 'next' given input u """
         raise NotImplementedError( "Should have implemented this" )
     
     def sample_smooth(self, filt_traj, ind, next_cpart):
+        """ Return a collapsed particle with the rao-blackwellized states sampled """
         raise NotImplementedError( "Should have implemented this" )
     
     def collapse(self):
-        """ Return a sample of the particle where the linear states
+        """ Return a sample of the particle where the rao-blackwellized states
         are drawn from the MVN that results from CLGSS structure """
         
         raise NotImplementedError( "Should have implemented this" )
@@ -36,21 +39,27 @@ class ParticleSmoothingBase(ParticleFilteringBase):
 class ParticleSmoothingBaseRB(ParticleSmoothingBase):
     
     def clin_update(self, u):
+        """ Kalman update of the linear states conditioned on the non-linear trajectory estimate """
         raise NotImplementedError( "Should have implemented this" )
     
     def clin_measure(self, y):
+        """ Kalman measuement of the linear states conditioned on the non-linear trajectory estimate """
         raise NotImplementedError( "Should have implemented this" )
 
     def clin_smooth(self, z_next, u):
+        """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
         raise NotImplementedError( "Should have implemented this" )
 
     def set_nonlin_state(self, eta):
+        """ Set the non-linear state estimates """
         raise NotImplementedError( "Should have implemented this" )
     
     def set_lin_est(self, lest):
+        """ Set the estimate of the rao-blackwellized states """
         raise NotImplementedError( "Should have implemented this" )
  
     def linear_input(self, u):
+        """ Extract the part of u affect the conditionally rao-blackwellized states """
         raise NotImplementedError( "Should have implemented this" )    
     
     
@@ -65,6 +74,7 @@ class MixedNLGaussianCollapsed(object):
 class MixedNLGaussian(ParticleSmoothingBaseRB):
     """ Base class for particles of the type mixed linear/non-linear with gaussian noise """
     def next_pdf(self, next, u):
+        """ Implements the next_pdf function for MixedNLGaussian models """
         (lin_est,lin_P) = self.get_lin_est()
         z_mean = numpy.reshape(lin_est,(-1,1))
         lin_cov = self.get_lin_Q()
@@ -82,6 +92,7 @@ class MixedNLGaussian(ParticleSmoothingBaseRB):
         return prob
     
     def sample_smooth(self, filt_traj, ind, next_cpart):
+        """ Implements the sample_smooth function for MixedNLGaussian models """
         # Create sample particle
         cpart = self.collapse()
         # Extract needed input signal from trajectory  
@@ -121,15 +132,18 @@ class MixedNLGaussian(ParticleSmoothingBaseRB):
         return Sigma
     
     def fwd_peak_density(self, u):
+        """ Implements the fwd_peak_density function for MixedNLGaussian models """
         Sigma = self.calc_sigma(self.get_lin_est()[1])
         nx = len(Sigma)
         tmp = math.pow(2*math.pi, nx)*numpy.linalg.det(Sigma)
         return 1.0 / math.sqrt(tmp)
     
     def collapse(self):
+        """ collapse the object by sampling all the states """
         return MixedNLGaussianCollapsed(self)
     
     def clin_update(self, u):
+        """ Implements the clin_update function for MixedNLGaussian models """
         A = self.get_lin_A()
         B = self.get_lin_B()
         C = self.get_lin_C()
@@ -143,6 +157,7 @@ class MixedNLGaussian(ParticleSmoothingBaseRB):
         return (kf.x_new.reshape((-1,1)), kf.P)
     
     def clin_measure(self, y):
+        """ Implements the clin_measure function for MixedNLGaussian models """
         A = self.get_lin_A()
         B = self.get_lin_B()
         C = self.get_lin_C()
@@ -156,6 +171,7 @@ class MixedNLGaussian(ParticleSmoothingBaseRB):
         return (kf.x_new.reshape((-1,1)), kf.P)
 
     def clin_smooth(self, z_next, u):
+        """ Implements the clin_smooth function for MixedNLGaussian models """
         A = self.get_lin_A()
         B = self.get_lin_B()
         C = self.get_lin_C()
@@ -170,6 +186,7 @@ class MixedNLGaussian(ParticleSmoothingBaseRB):
 
     
     def normpdf(self,x,mu,sigma):
+        """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
         Sinv = numpy.linalg.solve(sigma,numpy.eye(sigma.shape[0]))
         u = (x-mu).transpose().dot(Sinv)
         e = numpy.dot(u,x-mu)

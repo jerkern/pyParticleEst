@@ -1,26 +1,43 @@
 #! /usr/bin/python
-""" A module for handling kalman filtering """
+""" A module for handling Kalman filtering.
+    Uses scipy.sparse for handling sparse matrices, works with dense matrices aswell """
 import numpy as np
 import math
 import scipy.sparse as sp
 import scipy.sparse.linalg as spln
 
 class KalmanFilter(object):
-    """ A Kalman filter class """
+    """ A Kalman filter class, does filtering for systems of the type:
+        x_{k+1} = A*x_{k}+B*u_k + v_k
+        y_k = C*x_k + e_k 
+        v_k ~ N(0,Q)
+        e_k ~ N(0,R)
+        """
+        
     def __init__(self, A, B, C, x0, P0, Q, R):
+        """ x_{k+1} = A*x_{k}+B*u_k + v_k
+        y_k = C*x_k + e_k 
+        v_k ~ N(0,Q)
+        e_k ~ N(0,R)
+        x0 = x_0, P0 = P_0
+        P is the variance of the estimate
+        
+        x0 and P0 are mandatory, the matrices can be overriden at each time instant
+        if desired, for instance if the system dynamics are time-varying
+        """
         self.A = A
         self.B = B
         self.C = C
-        self.P = P0
-        #self.I = np.zeros(np.shape)
-        self.R = R
-        self.Q = Q
-        self.x_new = x0
-        self.K = None #np.zeros([np.shape(P0)[0],np.shape(C)[0]])
+        
+        self.R = R      # Measurement noise covariance
+        self.Q = Q      # Process noise covariance
+        self.x_new = x0 # Estimated state
+        self.P = P0     # Estimated covariance
+        self.K = None   # Define self.K for later use
         
         
     def time_update(self, A = None, B = None, Q = None, u = None):
-        """ A method for performing the Kalman filter time update """
+        """ Do a time update, i.e. predict one step forward in time using the input u """
         if (Q == None):
             Q = self.Q
         if (A == None):
@@ -31,35 +48,26 @@ class KalmanFilter(object):
             #k-diag is ones, but outside, so this is zero matrix
             u = (sp.eye(B.shape[1], 1, k=2)).tocsr()
         
-        tmp = self.predict(A, B, Q, u)
+        tmp = self.predict(A, B, Q, u)  # Calculate next state
         self.x_new = tmp[0]
         self.P = tmp[1]
         
     def predict(self, A, B, Q, u):
-        tmp = B.dot(u)
-        x = A.dot(self.x_new) + tmp
-        P = A.dot(self.P).dot(A.T) + Q
+        """ Calculate next state estimate without actually updating the internal variables """
+        tmp = B.dot(u)                  # Calcate how u affects the states
+        x = A.dot(self.x_new) + tmp     # Calculate the next state
+        P = A.dot(self.P).dot(A.T) + Q  # Calucate the estimated variane  
         return (x, P)
     
     def meas_update(self, y, C = None, R = None):
-        """ A method for handling the Kalman filter meas update """
+        """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
         if (C == None):
             C = self.C
         if (R == None):
             R = self.R
-        #S = np.dot(np.dot(C, self.P), C.T)+R
-        S = C.dot(self.P).dot(C.T)+R
-        #if (len(R) == 1):
-        #    Sinv = 1./S
-        #else:
-        #    Sinv = ln.solve(S, np.eye(C.shape[0]))
 
-        #self.K = np.dot(self.P , np.dot(C.T, Sinv) )
-        #self.K = self.P.dot(spln.spsolve(S.T, C).T)
-#        self.K = np.zeros([self.P.shape[0],C.shape[0]])
-#        for i in range(self.K.shape[1]):
-#            tmp = C[i,:]
-#            self.K[:,i] = self.P.dot(spln.spsolve(S.T, tmp).T)
+        S = C.dot(self.P).dot(C.T)+R
+
         if (sp.issparse(S)):
             Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
             Sinv = np.linalg.inv(Sd)
@@ -70,30 +78,29 @@ class KalmanFilter(object):
             self.K = self.P.dot(C.T).dot(Sinv)
             norm_coeff = math.sqrt(np.linalg.det(S)*math.pow(2*math.pi,len(S)))
             
-#        tmp = np.zeros(C.shape)
-#        for i in range(tmp.shape[1]):
-#            tmp[:,i] = spln.spsolve(S.T, C[:,i])http://sites.google.com/site/wayneholder/gps-vs-barometric-altitude
-        
-        #err = y-np.dot(C, self.x_new)
         err = y-C.dot(self.x_new)
         self.x_new = self.x_new + self.K.dot(err)  
-        #self.P = np.dot((np.eye(len(self.x_new))-np.dot(self.K, C)), self.P)
-        #self.P = (sp.identity(len(self.x_new))-self.K.dot(C)).dot(self.P)
         self.P = (sp.identity(len(self.x_new))-C.T.dot(self.K.T).T).dot(self.P)
-        #return np.dot(err.T, np.linalg.solve(np.dot( np.dot(C, self.P), C.T), err))
 
         if (sp.issparse(S)):
             numerator = spln.spsolve(S, err).T.dot(err)
         else:
             numerator = np.linalg.solve(S, err).T.dot(err)
+
+        # Return the probability of the received measurement
         return math.exp(-0.5*numerator)/norm_coeff
 
 
 
 class KalmanSmoother(KalmanFilter):
-    """ Forward/backward Kalman smoother """
+    """ Forward/backward Kalman smoother
+    
+        Extends the KalmanFilter class and provides an additional method for smoothing
+        backwards in time """
     def smooth(self, x_next, P_next, u=None, A=None, B=None, Q=None):
-        """ Create smoothed estimate """
+        """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
+            the relation x_{k+1} = A*x_k + B*u_k +v_k
+            v_k ~ (0,Q)"""
         if (Q == None):
             Q = self.Q
         if (A == None):
@@ -104,7 +111,7 @@ class KalmanSmoother(KalmanFilter):
             #k-diag is ones, but outside, so this is zero matrix
             u = (sp.eye(B.shape[1], 1, k=2)).tocsr()
         
-        (x_np, P_np) = self.predict(A, B, Q, u)    
+        (x_np, P_np) = self.predict(A, B, Q, u)
         tmp = self.P.dot(A.T.dot(np.linalg.inv(P_np)))
         x_smooth = self.x_new + tmp.dot(x_next-x_np)
         P_smooth = self.P + tmp.dot(P_next - P_np).dot(tmp.T)
