@@ -2,10 +2,8 @@
 
 import PF
 import PS
-import math
 import numpy
-import copy
-import part_utils
+
 import matplotlib.pyplot as plt
 from simple_particle import SimpleParticle
 

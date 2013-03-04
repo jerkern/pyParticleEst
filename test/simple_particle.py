@@ -1,10 +1,11 @@
 import numpy
 import math
 import copy
-import part_utils
+import mixed_nl_gaussian
 import kalman
 
-class SimpleParticle(part_utils.MixedNLGaussian):
+class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
+    """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, x0, c):
         
         A = numpy.array([[1.0, 1.0], [0.0, 1.0]])
@@ -28,7 +29,9 @@ class SimpleParticle(part_utils.MixedNLGaussian):
         return numpy.vstack((u[:2], numpy.random.normal(u[2],math.sqrt(self.Q[0,0])))) 
     
     def update(self, data):
-        self.kf.time_update(u=data[:2,:],Q=self.get_lin_Q())
+        # Update linear states
+        self.kf.time_update(u=self.linear_input(data),Q=self.get_lin_Q())
+        # Update non-linear state
         self.c += data[2,0]
         
     def measure(self, y):
