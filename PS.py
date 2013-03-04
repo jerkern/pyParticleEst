@@ -2,11 +2,7 @@
 
 import numpy
 import copy
-import math
 import PF
-import kalman
-
-from multiprocessing import Pool
 
 class SmoothTrajectory(object):
     """ Store smoothed trajectory """
@@ -88,6 +84,7 @@ class SmoothTrajectory(object):
     def __len__(self):
         return len(self.traj)
 
+
 class SmoothTrajectoryRB(object):
     def __init__(self, st):
         """ Do constrained filtering of linear states
@@ -133,14 +130,6 @@ class SmoothTrajectoryRB(object):
         return len(self.traj)
 
 
-#g_pt = None
-#            
-#def doit(x):
-#    global g_pt
-#    print x
-#    tmp = SmoothTrajectory(g_pt, rej_sampling=True)
-#    return SmoothTrajectoryRB(g_pt[0].pa.part[0], tmp)            
-
 def do_smoothing(pt, M, rej_sampling=True, callback=None):
     """ return an array of smoothed trajectories 
         M - number of smoothed trajectories """
@@ -157,6 +146,7 @@ def do_smoothing(pt, M, rej_sampling=True, callback=None):
         
     return straj
 
+
 def do_rb_smoothing(straj):
     """ Calculate rao-blackwellized smoothing of regular smoothed trajectories  """
     
@@ -167,6 +157,7 @@ def do_rb_smoothing(straj):
         straj[i] = SmoothTrajectoryRB(straj[i])
     
     return straj
+
 
 def extract_smooth_approx(straj, ind):
     """ Create particle approximation from collection of trajectories """

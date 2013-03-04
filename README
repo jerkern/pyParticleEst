@@ -4,3 +4,9 @@ It is currently under development being broken out from an existing application.
 
 Current status is probably unusable for anyone but the authors.
 
+Structure:
+models/ - This subdirectory contains helper classes for common models, e.g Mixed Linear/Non-linear Gaussian models.
+
+test/ - This subdirectory contains test cases/examples 
+
+

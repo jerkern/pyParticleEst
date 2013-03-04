@@ -21,11 +21,11 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         self.Q_in = numpy.diag([ 0.12, 0.12])
 
         self.kf = kalman.KalmanSmoother(A,B,C, numpy.reshape(x0,(-1,1)), P0=P, Q=None, R=R)
-        self.c = c
+        # Non-linear state, measurement matrix C depends on the value of c
+        self.c = c 
         
     def sample_input_noise(self, u):
-        #return numpy.vstack((numpy.random.multivariate_normal(u[:2].reshape(-1),self.linQ).reshape((-1,1)), 
-        #                     numpy.random.normal(u[2],math.sqrt(self.nonlinQ))))
+        """ Return a perturbed vector u by adding guassian noise to the u[2] component """ 
         return numpy.vstack((u[:2], numpy.random.normal(u[2],math.sqrt(self.Q[0,0])))) 
     
     def update(self, data):
@@ -35,6 +35,7 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         self.c += data[2,0]
         
     def measure(self, y):
+        # measurement matrix C depends on the value of c
         return self.kf.meas_update(y, C=numpy.array([[self.c, 0.0]]))
     
     def get_R(self):

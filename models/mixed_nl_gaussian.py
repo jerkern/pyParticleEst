@@ -15,7 +15,11 @@ class MixedNLGaussianCollapsed(object):
 
 
 class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
-    """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise """
+    """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
+    
+        Implement this type of system by extending this class and provide the methods for returning 
+        the system matrices at each time instant  """
+        
     def next_pdf(self, next, u):
         """ Implements the next_pdf function for MixedNLGaussian models """
         (lin_est,lin_P) = self.get_lin_est()
@@ -136,4 +140,32 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
         y = numpy.exp(-0.5*e) 
         return y
 
+    def get_R(self):
+        raise NotImplementedError( "Should have implemented this" )
+    
+    def get_lin_A(self):
+        raise NotImplementedError( "Should have implemented this" )
+    
+    def get_lin_B(self):
+        raise NotImplementedError( "Should have implemented this" )
 
+    def get_lin_C(self):
+        raise NotImplementedError( "Should have implemented this" )
+
+    def get_nonlin_B(self):
+        raise NotImplementedError( "Should have implemented this" )
+    
+    def get_full_B(self):
+        raise NotImplementedError( "Should have implemented this" )
+
+    def get_nonlin_A(self):
+        raise NotImplementedError( "Should have implemented this" )
+    
+    def get_full_A(self):
+        raise NotImplementedError( "Should have implemented this" )
+    
+    def get_lin_Q(self):
+        raise NotImplementedError( "Should have implemented this" )
+    
+    def get_Q(self):
+        raise NotImplementedError( "Should have implemented this" )
