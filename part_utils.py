@@ -17,7 +17,7 @@ class ParticleFilteringBase(object):
 
 class ParticleSmoothingBase(ParticleFilteringBase):
     """ Base class for particles to be used with particle smoothing """
-    def next_pdf(self, next, u):
+    def next_pdf(self, next_cpart, u):
         """ Return the probability density value for the possible future state 'next' given input u """
         raise NotImplementedError( "Should have implemented this" )
     

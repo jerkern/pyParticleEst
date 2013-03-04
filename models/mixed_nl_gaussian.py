@@ -20,14 +20,15 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
         
-    def next_pdf(self, next, u):
+    def next_pdf(self, next_cpart, u):
         """ Implements the next_pdf function for MixedNLGaussian models """
         (lin_est,lin_P) = self.get_lin_est()
         z_mean = numpy.reshape(lin_est,(-1,1))
-        lin_cov = self.get_lin_Q()
+        
+        _lin_cov = self.get_lin_Q()
         nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
         
-        x = numpy.hstack((next.eta,next.z)).reshape((-1,1))
+        x = numpy.hstack((next_cpart.eta,next_cpart.z)).reshape((-1,1))
         A = self.get_lin_A() 
         B = self.get_lin_B()
         
@@ -45,10 +46,10 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
         # Extract needed input signal from trajectory  
         u = filt_traj[ind].u
         # Smooth linear states
-        etaj = cpart.eta
-        (lin_est,P) = self.get_lin_est()
+        _etaj = cpart.eta
+        (_lin_est,P) = self.get_lin_est()
         A_ext = self.get_full_A()
-        lin_cov = self.get_lin_Q()
+        _lin_cov = self.get_lin_Q()
         Q = self.get_Q()
         QPinv = numpy.linalg.solve(Q+A_ext.dot(P.dot(A_ext.transpose())),
                                    numpy.eye(len(cpart.eta)+len(cpart.z)))
