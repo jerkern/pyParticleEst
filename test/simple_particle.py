@@ -7,7 +7,7 @@ import kalman
 class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, x0, c):
-        
+        """ Define all model variables """
         A = numpy.array([[1.0, 1.0], [0.0, 1.0]])
         B = numpy.array([[0.0, 0.0], [1.0, -1.0]])
         C = numpy.array([[c, 0.0]])
@@ -24,17 +24,19 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         # Non-linear state, measurement matrix C depends on the value of c
         self.c = c 
         
-    def sample_input_noise(self, u):
+    def sample_input_noise(self, u): 
         """ Return a perturbed vector u by adding guassian noise to the u[2] component """ 
         return numpy.vstack((u[:2], numpy.random.normal(u[2],math.sqrt(self.Q[0,0])))) 
     
     def update(self, data):
+        """ Perform a time update of all states """
         # Update linear states
         self.kf.time_update(u=self.linear_input(data),Q=self.get_lin_Q())
         # Update non-linear state
         self.c += data[2,0]
         
     def measure(self, y):
+        """ Perform a measurement update """
         # measurement matrix C depends on the value of c
         return self.kf.meas_update(y, C=numpy.array([[self.c, 0.0]]))
     

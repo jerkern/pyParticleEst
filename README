@@ -1,8 +1,9 @@
-This is a library to assist with calculations for estimation problems using particle based methods, especially Rao-Blackwellized Particle Filter and Smoothing.
+This is a library to assist with calculations for estimation problems using particle based methods, 
+especially Rao-Blackwellized Particle Filter and Smoothing.
 
 It is currently under development being broken out from an existing application.
 
-Current status is probably unusable for anyone but the authors.
+Currently there is no documentation other than the fairly well commented "test/simple_test.py" example.
 
 Structure:
 models/ - This subdirectory contains helper classes for common models, e.g Mixed Linear/Non-linear Gaussian models.

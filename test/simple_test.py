@@ -5,73 +5,87 @@ import PS
 import numpy
 
 import matplotlib.pyplot as plt
-from simple_particle import SimpleParticle
+from simple_particle import SimpleParticle # Our model definition
 
 if __name__ == '__main__':
     
     num = 50
     
+    # Create a reference which we will try to estimate using a RBPS
     correct = SimpleParticle(numpy.array([1.0, 0.0]),2.5)
     
+    # Create an array for our particles 
     particles = numpy.empty(num, type(correct))
     
     # Initialize particles
     for k in range(len(particles)):
+        # Let the initial state of the linear states be N(0,1) and the non-linear U(2,3)
         particles[k] = SimpleParticle(numpy.random.normal(numpy.array([[0.0], [0.0]])),
                                       numpy.random.uniform(2, 3))
     
+    # Create a particle approximation object from our particles
     pa = PF.ParticleApproximation(particles=particles)
     
+    # Initialise a particle filter with our particle approximation of the initial state,
+    # set the resampling threshold to 0.67 (effective particles / total particles )
     pt = PF.ParticleTrajectory(pa,0.67)
     
+    # How many steps forward in time should our simulation run
     steps = 20
     
+    # Create a random input vector to drive our "correct state"
     mean = -numpy.hstack((-1.0*numpy.ones(steps/4), 1.0*numpy.ones(steps/2),-1.0*numpy.ones(steps/4) ))
     diff_vec = numpy.random.normal(mean, .1, steps)
     uvec = numpy.vstack((1.0-diff_vec/2, 1.0+diff_vec/2, numpy.zeros(steps)))
     
-    
-    #uvec = numpy.random.normal(0.0, 0.1, [2, steps])
+
     
     fig1 = plt.figure()
-    
+
+    # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((3, num+1, steps+1))
-    
     yvec = []
     
     # Create reference
     for i in range(steps):
         
+        # Extract linear states
         vals[:2,num,i]=correct.kf.x_new.reshape(-1)
+        # Extract non-linear state
         vals[2,num,i]=correct.c
-    
-        #u = numpy.reshape(uvec[:,i],(-1,1))
-        #u = numpy.vstack((u, numpy.array([[0,],])))
+
+        # Extract u for this time-step    
         u = uvec[:,i].reshape(-1,1)
+        # Drive the correct particle using the true input
         correct.update(u)
     
+        # use the correct particle to generate the true measurement
         y = correct.kf.C.dot(correct.kf.x_new)
         yvec.append(y)
-        
+    
+    # Store values for last time-step aswell    
     vals[:2,num,steps]=correct.kf.x_new.reshape(-1)
     vals[2,num,steps]=correct.c
     
         
-    # Create PF trajectory
+    # Run particle filter using the above generated data
     for i in range(steps):
         
-        #u = numpy.reshape(uvec[:,i],(-1,1))
-        #u = numpy.vstack((u, numpy.array([[0,],])))
+        
         u = uvec[:,i].reshape(-1,1)
         tmp = numpy.random.normal((0.0,0.0,0.0),(0.1,0.1,0.0000000001)).reshape((-1,1))
+        
+        # Run PF using noise corrupted input signal
         pt.update(u+tmp)
         
+        # Use noise corrupted measurements
         pt.measure(yvec[i]+numpy.random.normal(0.0,1.))
         
-    # Perform smoothing
-    nums = 10
-    straj = PS.do_smoothing(pt, nums)
-    straj = PS.do_rb_smoothing(straj)
+    # Use the filtered estimates above to created smoothed estimates
+    nums = 10 # Number of backward trajectories to generate
+    straj = PS.do_smoothing(pt, nums)   # Do sampled smoothing
+    straj = PS.do_rb_smoothing(straj)   # Use the non-linear smoothed trajectory from the previous
+                                        # step to do constrained smoothing of the linear states
     
     # Extract data from trajectories for plotting
     i=0
