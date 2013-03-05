@@ -6,8 +6,12 @@ import PF
 
 class SmoothTrajectory(object):
     """ Store smoothed trajectory """
-    def __init__(self, pt, rej_sampling=True, callback=None):
-        """ Create smoothed trajectory from filtered trajectory """ 
+    def __init__(self, pt, rej_sampling=True):
+        """ Create smoothed trajectory from filtered trajectory
+            pt - particle trajectory to be smoothed
+            rej_sampling - Use rejection sampling instead of evaluating all 
+                           weights (reduces time complexity to M*N from M*N^2
+            """
         # Initialise from end time estimates
         part = pt[-1].pa.sample()
         # Collapse particle which is conditionally linear gaussian
@@ -22,7 +26,6 @@ class SmoothTrajectory(object):
 
         for step in reversed(pt[:-1]):
             cur_ind -= 1
-#            print "%d/%d" %(cur_ind, len(pt)-1)
             pa = step.pa
             ind = None
             p_next = -1.0*numpy.ones(numpy.shape(pa.w))
@@ -37,7 +40,6 @@ class SmoothTrajectory(object):
                         
                     if (accept <= p_acc):
                         ind = tmp_ind
-                        #print "Rej sampling accept!"
                         break
                     else:
                         p_next[tmp_ind] = p
@@ -77,9 +79,7 @@ class SmoothTrajectory(object):
         self.y.reverse()
         self.t.reverse()
         self.part0 = copy.deepcopy(prev_part)
-        
-        if (callback):
-            callback(self.traj)
+
         
     def __len__(self):
         return len(self.traj)
@@ -88,7 +88,7 @@ class SmoothTrajectory(object):
 class SmoothTrajectoryRB(object):
     def __init__(self, st):
         """ Do constrained filtering of linear states
-            st - smoothed trajectory """
+            st - smoothed (non-RB) trajectory """
         
         self.traj = numpy.empty(len(st), type(st.part0))
         self.u = copy.deepcopy(st.u)
@@ -104,8 +104,6 @@ class SmoothTrajectoryRB(object):
 
         for i in range(len(self.traj)-1):
             
-#            print "RBFwd: %d" % i
-            
             if (self.y[i] != None):
                 tmp = self.traj[i].clin_measure(self.y[i])
                 self.traj[i].set_lin_est(tmp)
@@ -115,10 +113,8 @@ class SmoothTrajectoryRB(object):
             self.traj[i+1].set_nonlin_state(st.traj[i+1].eta)
             self.traj[i+1].set_lin_est(tmp)
         
-        # Backard smoothing
+        # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
-            
-#            print "RBBack: %d" % i
             
             tmp = self.traj[i].clin_smooth(self.traj[i+1].get_lin_est(),
                                            self.traj[i].linear_input(self.u[i]))
@@ -130,7 +126,7 @@ class SmoothTrajectoryRB(object):
         return len(self.traj)
 
 
-def do_smoothing(pt, M, rej_sampling=True, callback=None):
+def do_smoothing(pt, M, rej_sampling=True):
     """ return an array of smoothed trajectories 
         M - number of smoothed trajectories """
     
@@ -142,7 +138,7 @@ def do_smoothing(pt, M, rej_sampling=True, callback=None):
     print "smoothing"
     for i in range(M):
         print "%d/%d" % (i,M)
-        straj[i] = SmoothTrajectory(pt, rej_sampling=rej_sampling, callback=callback)
+        straj[i] = SmoothTrajectory(pt, rej_sampling=rej_sampling)
         
     return straj
 
@@ -175,6 +171,9 @@ def extract_smooth_approx(straj, ind):
         
     
 def replay(pt, signals, ind, callback=None):
+    """ Run a particle filter with signals extracted from another filter,
+        useful to e.g. have one filter which (partially) overlapps with another
+        """
     print "len(pt)=%d. len(signals)=%d, ind=%d" % (len(pt), len(signals), ind)
     if (ind == len(signals)-1):
         # Nothing to do, all measurements already used

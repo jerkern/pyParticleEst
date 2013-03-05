@@ -135,17 +135,14 @@ class ParticleTrajectory(object):
     def update(self, u):
         """ Use input u to move the system one step forward in time """
         pa_nxt = self.pf.update(u, self.traj[-1].pa, False)
-        if self.traj[-1].u != None:
-            print "Warning, multiple inputs for the same timeindex is not supported!"
+        assert self.traj[-1].u == None # Only on input per time instance
         self.traj[-1].u = u
         self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1))
         self.len = len(self.traj)
                 
     def measure(self, y):
         """ Update the current time index with measurement y """
-        if self.traj[-1].y != None:
-            print "Warning, multiple measurements for the same timeindex is not supported!"
-        
+        assert self.traj[-1].y == None# Only one measurement per time instance
         (_pa, resampled) = self.pf.measure(y, self.traj[-1].pa, True)
         self.traj[-1].y = y
         return resampled

@@ -10,4 +10,5 @@ models/ - This subdirectory contains helper classes for common models, e.g Mixed
 
 test/ - This subdirectory contains test cases/examples 
 
-
+Project homepage:
+http://www.control.lth.se/Staff/JerkerNordh/pyparticle.html
