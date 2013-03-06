@@ -49,8 +49,16 @@ class ParticleSmoothingBaseRB(ParticleSmoothingBase):
         """ Set the non-linear state estimates """
         raise NotImplementedError( "Should have implemented this" )
     
+    def get_nonlin_state(self):
+        """ Return the non-linear state estimates """
+        raise NotImplementedError( "Should have implemented this" )
+    
     def set_lin_est(self, lest):
         """ Set the estimate of the rao-blackwellized states """
+        raise NotImplementedError( "Should have implemented this" )
+ 
+    def get_lin_est(self):
+        """ Return the estimate of the rao-blackwellized states """
         raise NotImplementedError( "Should have implemented this" )
  
     def linear_input(self, u):
