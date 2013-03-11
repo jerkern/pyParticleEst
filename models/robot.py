@@ -119,8 +119,8 @@ class ExactDifferentialRobot(object):
 class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
     """ Differential drive robot """
 
-    def __init__(self, l, d, enc_noise, enc_noise_lin,
-                 theta_noise, theta_noise_lin, ticks=1000, state=(0.0, 0.0, math.pi/2),
+    def __init__(self, l, d, enc_noise, theta_noise, enc_noise_lin=0.0,
+                 theta_noise_lin=0.0, ticks=1000, state=(0.0, 0.0, math.pi/2),
                  wp=(0.0, 0.0)):
         """ Create robot object which can be used to simulate movement 
         
