@@ -149,22 +149,24 @@ class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
         """ Move robot according to kinematics """
         
         motion = self.robot.kinematic(u[:2])
+        theta_noise = numpy.random.normal(0,self.cur_theta_noise)
+        
         self.cur_enc_noise = self.enc_noise + numpy.abs(motion[0])*self.enc_noise_lin
         self.cur_theta_noise = self.theta_noise + numpy.abs(motion[1])*self.theta_noise_lin
-        
-        self.robot.add_state_noise((0, 0, u[3]))
+            
+        # Process internal noise
+        self.robot.add_state_noise((0, 0, theta_noise))
         
         
     def sample_input_noise(self, w):
         
         w = numpy.asarray(w)
         
+        # Noise corrupted input
         wn = numpy.random.uniform(w[:2,:]-self.cur_enc_noise/2.0, 
                                w[:2,:]+self.cur_enc_noise/2.0, (2,1))
         
-        theta_noise = numpy.random.normal(0,self.cur_theta_noise)
-        
-        return numpy.hstack((wn.ravel(), w[2,:], theta_noise))
+        return wn.ravel()
         
    
     def get_state(self):
@@ -172,6 +174,13 @@ class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
     
     def set_state(self, state):
         self.robot.set_state(state)
+        
+    def set_pos(self, x, y, theta):
+        state = self.get_state()
+        state[0] = x
+        state[1] = y
+        state[2] = theta
+        self.set_state(state)
     
     def calc_pdfs(self, u, theta_n=None):
         
