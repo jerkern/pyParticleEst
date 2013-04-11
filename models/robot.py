@@ -4,7 +4,6 @@ from __future__ import division
 import math
 import numpy
 import scipy.stats
-import pdfutils
 import part_utils
 
 

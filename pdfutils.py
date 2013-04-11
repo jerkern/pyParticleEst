@@ -1,5 +1,4 @@
 """ Utilities for evalutating probability density functions """
-import numpy;
 
 class unifsum(object):
     
