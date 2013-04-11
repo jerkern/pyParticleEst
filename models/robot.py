@@ -181,35 +181,11 @@ class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
         state[1] = y
         state[2] = theta
         self.set_state(state)
+        
+    def get_pos(self):
+        state = self.get_state()
+        return state[:3] # x, y, theta
     
-    def calc_pdfs(self, u, theta_n=None):
-        
-        # Calc prob. of next theta
-        if (theta_n == None):
-            theta_n = self.robot.calc_next_theta(u[:2])
-        
-        enc_noise = self.enc_noise + numpy.abs(self.motion[0])*self.enc_noise_lin
-        
-        a = numpy.asarray((-0.5, 0.5))*enc_noise/(2.0*self.robot.l)
-        #b = numpy.asarray((-0.5, 0.5))*self.enc_noise/(-2.0*self.robot.l)
-        b = -a
-        
-        theta_pdf = pdfutils.unifsum(a,b)
-       
-        # Calc prob of x and y given theta
-        #next_xy = self.robot.calc_next_xy(u[:2], theta_n)
-        tmp = numpy.asarray((-0.5, 0.5))*enc_noise*self.robot.C/4.0
-        a = tmp*math.cos(theta_n)
-        #b = numpy.asarray((-0.5, 0.5))*self.enc_noise*self.robot.C/4.0*cmath.cos(theta_n)
-        x_pdf = pdfutils.unifsum(a,a)
-
-        a = tmp*math.sin(theta_n)
-        #b = numpy.asarray((-0.5, 0.5))*self.enc_noise*self.robot.C/4.0*math.sin(theta_n)
-        
-        y_pdf = pdfutils.unifsum(a,a)
-        
-        return (theta_pdf, x_pdf, y_pdf)
-
 
     def next_pdf(self, next_state, u):
         theta_n = next_state.eta[2]
