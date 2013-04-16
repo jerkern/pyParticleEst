@@ -99,12 +99,15 @@ class ParticleFilter(object):
             s = sum(numpy.exp(new_weights))
             if (s != 0.0):
                 new_weights = new_weights/s
-                pa.w = (1-self.lp_hack)*pa.w + self.lp_hack*new_weights
+                pa.w = numpy.log((1-self.lp_hack)*numpy.exp(pa.w) + self.lp_hack*numpy.exp(new_weights))
 
         #pa.w /= sum(pa.w)
+        # Keep the weights from going to -Inf
+        pa.w -= numpy.max(pa.w)
         
         # Calc N_eff
-        w = pa.w / sum(pa.w)
+        w = numpy.exp(pa.w)
+        w /= sum(w)
         pa.N_eff = 1 / sum(w ** 2)
         
         resampled = False

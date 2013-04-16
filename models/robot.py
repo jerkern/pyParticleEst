@@ -115,7 +115,7 @@ class ExactDifferentialRobot(object):
         self.state[2] = self.state[2] + os[2]
         
 
-class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
+class DifferentialRobot(part_utils.ParticleFilteringBase):
     """ Differential drive robot """
 
     def __init__(self, l, d, enc_noise, theta_noise, enc_noise_lin=0.0,
@@ -130,7 +130,7 @@ class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
         wp - initial positions for the wheel positions (l,r)
         
         """
-            
+        
         self.robot = ExactDifferentialRobot(l=l, d=d, ticks=ticks, state=state, wp=wp)
 
         self.enc_noise = enc_noise
@@ -167,6 +167,8 @@ class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
         
         return wn.ravel()
         
+    def measure(self, y):
+        return NotImplemented
    
     def get_state(self):
         return self.robot.get_state()
