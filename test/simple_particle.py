@@ -38,7 +38,7 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
     def measure(self, y):
         """ Perform a measurement update """
         # measurement matrix C depends on the value of c
-        return self.kf.meas_update(y, C=numpy.array([[self.c, 0.0]]))
+        return numpy.log(self.kf.meas_update(y, C=numpy.array([[self.c, 0.0]])))
     
     def get_R(self):
         return self.kf.R

@@ -237,8 +237,12 @@ class DifferentialRobot(part_utils.ParticleSmoothingBaseRB):
             prob_theta1 = 0.0
             prob_theta2 = 0.0
             
-        return max(prob_Pr1*prob_Pl1*prob_theta1,prob_Pr2*prob_Pl2*prob_theta2)
+        try:
+            return math.log(max(prob_Pr1*prob_Pl1*prob_theta1,prob_Pr2*prob_Pl2*prob_theta2))
+        except ValueError:
+            return -numpy.Inf
     
     def fwd_peak_density(self, u):
-        return ((1.0/self.cur_enc_noise)**2 *
-                scipy.stats.norm.pdf(0, loc=0, shape=self.cur_theta_noise))
+#        return ((1.0/self.cur_enc_noise)**2 *
+#                scipy.stats.norm.pdf(0, loc=0, shape=self.cur_theta_noise))
+        return -2.0*math.log(self.cur_enc_noise)+scipy.stats.norm.logpdf(0, loc=0, shape=self.cur_theta_noise)

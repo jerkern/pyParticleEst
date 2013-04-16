@@ -75,13 +75,17 @@ class ParticleFilter(object):
 
         if (self.lp_hack == None):
             # Check so that the approximation hasn't degenerated
-            s = sum(new_weights)
+            s = sum(numpy.exp(new_weights))
     #        assert s != 0.0
             
             if (s != 0.0):
-                new_weights /= s
-                tmp = pa.w * new_weights
-                if (sum(tmp) != 0.0):
+                #new_weights /= s
+                
+                tmp = pa.w + new_weights
+                
+                # Scale all values so the biggest is equal to log(1) = 0 
+                tmp -= max(tmp)
+                if (sum(numpy.exp(tmp)) != 0.0):
                     pa.w = tmp
                 else:
                     print "Filter has degenerated completely!"
@@ -92,13 +96,16 @@ class ParticleFilter(object):
 
         else:
             # lowpass filter hack work-around, not mathematically correct
-            s = sum(new_weights)
+            s = sum(numpy.exp(new_weights))
             if (s != 0.0):
                 new_weights = new_weights/s
                 pa.w = (1-self.lp_hack)*pa.w + self.lp_hack*new_weights
 
-        pa.w /= sum(pa.w)
-        pa.N_eff = 1 / sum(pa.w ** 2)
+        #pa.w /= sum(pa.w)
+        
+        # Calc N_eff
+        w = pa.w / sum(pa.w)
+        pa.N_eff = 1 / sum(w ** 2)
         
         resampled = False
         if (self.res and pa.N_eff < self.res*pa.num):
@@ -201,7 +208,7 @@ class ParticleApproximation(object):
         else:
             weights = numpy.ones(num, numpy.float) / num
         
-        self.w = weights
+        self.w = numpy.log(weights)
         self.num = num
         n_eff = 1 / sum(weights ** 2)
         self.N_eff = n_eff
@@ -220,19 +227,19 @@ class ParticleApproximation(object):
         if (N  == None):
             N = self.num
         
-        new_ind = sample(self.w, N)
+        new_ind = sample(numpy.exp(self.w), N)
         new_part = numpy.empty(N, type(self.part[0]))
         for k in range(numpy.shape(new_ind)[0]):
             new_part[k] = copy.deepcopy(self.part[new_ind[k]])
 
-        self.w = numpy.ones(N, dtype=numpy.float) / N
+        self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
         self.part = new_part
         self.num = N
-        self.N_eff = 1 / sum(self.w ** 2)
+        self.N_eff = 1 / sum(numpy.exp(self.w) ** 2)
         
     def sample(self):
         """ Draw one particle at random with probability corresponding to its weight """
-        return self.part[sample(self.w,1)[0]]
+        return self.part[sample(numpy.exp(self.w),1)[0]]
     
     def find_best_particles(self, n=1):
         """ Find n-best particles """

@@ -24,6 +24,7 @@ class ParticleFilteringBase(object):
 
 class ParticleSmoothingBase(ParticleFilteringBase):
     """ Base class for particles to be used with particle smoothing """
+    __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
     def next_pdf(self, next_cpart, u):
@@ -42,6 +43,7 @@ class ParticleSmoothingBase(ParticleFilteringBase):
         return
     
 class ParticleSmoothingBaseRB(ParticleSmoothingBase):
+    __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
     def clin_update(self, u):

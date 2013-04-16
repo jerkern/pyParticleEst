@@ -1,6 +1,7 @@
 """ Rao-Blackwellized Particle smoother implementation """
 
 import numpy
+import math
 import copy
 import PF
 
@@ -28,17 +29,18 @@ class SmoothTrajectory(object):
             cur_ind -= 1
             pa = step.pa
             ind = None
-            p_next = -1.0*numpy.ones(numpy.shape(pa.w))
+            p_next = -numpy.Inf*numpy.ones(numpy.shape(pa.w))
             
             if (rej_sampling and step.peak_fwd_density > 0.0):
                 cnt = 0
+                w = numpy.exp(pa.w)
                 while (cnt < len(p_next)/2.0): # Time-out limit
-                    tmp_ind = PF.sample(pa.w,1)[0]
+                    tmp_ind = PF.sample(w,1)[0]
                     p = pa.part[tmp_ind].next_pdf(spart, step.u)
                     accept = numpy.random.uniform()
-                    p_acc = p / step.peak_fwd_density
+                    p_acc = p - step.peak_fwd_density
                         
-                    if (accept <= p_acc):
+                    if (math.log(accept) <= p_acc):
                         ind = tmp_ind
                         break
                     else:
@@ -49,16 +51,18 @@ class SmoothTrajectory(object):
             if (ind == None): # No index found, do exhaustive search
                 w = numpy.copy(pa.w)
                 for i in range(len(pa)):
-                    if (p_next[i] < 0.0):
+                    if (p_next[i] == -numpy.Inf):
                         p_next[i] = pa.part[i].next_pdf(spart, step.u)
                     
-                w *= p_next
+                numpy.seterr(all='raise')
+                w += p_next
                 # Normalize
                 try:
-                    w_norm = w / numpy.sum(w)
+                    w_norm = numpy.exp(w)
+                    w_norm /= numpy.sum(w_norm)
                 except FloatingPointError:
                     # All weights zero, for robustness just draw a random sample
-                    w_norm  = (0.0*w + 1.0)/len(w)
+                    w_norm  = (0.0*numpy.exp(w) + 1.0)/len(w)
                      
                 ind = PF.sample(w_norm,1)[0]
 
