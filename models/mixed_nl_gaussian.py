@@ -36,7 +36,7 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
         lin_est = A.dot(z_mean) + B.dot(self.linear_input(u))
         st = numpy.vstack((nonlin_est,lin_est))
         Sigma = self.calc_sigma(lin_P)
-        return self.lognormpdf(x,st,Sigma)
+        return kalman.lognormpdf(x,mu=st,S=Sigma)
     
     def sample_smooth(self, filt_traj, ind, next_cpart):
         """ Implements the sample_smooth function for MixedNLGaussian models """
@@ -81,12 +81,8 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
     def fwd_peak_density(self, u):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
         Sigma = self.calc_sigma(self.get_lin_est()[1])
-        nx = len(Sigma)
-#        tmp = math.pow(2*math.pi, nx)*numpy.linalg.det(Sigma)
-#        return numpy.log(1.0 / math.sqrt(tmp))
-        
-        tmp = -0.5*(nx*math.log(2*math.pi)+numpy.linalg.slogdet(Sigma)[1])
-        return tmp
+        zero = numpy.zeros((Sigma.shape[0],1))
+        return kalman.lognormpdf(zero, zero, Sigma)
     
     def collapse(self):
         """ collapse the object by sampling all the states """
@@ -133,18 +129,6 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
         kf.smooth(z_next[0], z_next[1], u)
         
         return (kf.x_new.reshape((-1,1)), kf.P)
-
-    
-    def lognormpdf(self,x,mu,sigma):
-        """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
-        Sinv = numpy.linalg.solve(sigma,numpy.eye(sigma.shape[0]))
-        nx = len(sigma)
-        tmp = -0.5*(nx*math.log(2*math.pi)+numpy.linalg.slogdet(sigma)[1])
-        u = (x-mu).transpose().dot(Sinv)
-        e = numpy.dot(u,x-mu)
-        #y = numpy.exp(-0.5*e) 
-        #return y
-        return tmp-0.5*e
 
     def get_R(self):
         raise NotImplementedError( "Should have implemented this" )

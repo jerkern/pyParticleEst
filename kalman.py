@@ -6,6 +6,19 @@ import math
 import scipy.sparse as sp
 import scipy.sparse.linalg as spln
 
+def lognormpdf(x,mu,S):
+    """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
+    nx = len(S)
+    tmp = -0.5*(nx*math.log(2*math.pi)+np.linalg.slogdet(S)[1])
+    
+    err = x-mu
+    if (sp.issparse(S)):
+        numerator = spln.spsolve(S, err).T.dot(err)
+    else:
+        numerator = np.linalg.solve(S, err).T.dot(err)
+
+    return tmp-numerator
+
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
         x_{k+1} = A*x_{k}+B*u_k + v_k
@@ -72,24 +85,17 @@ class KalmanFilter(object):
             Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
             Sinv = np.linalg.inv(Sd)
             self.K = self.P.dot(C.T).dot(sp.csr_matrix(Sinv))
-            norm_coeff = math.sqrt(np.linalg.det(Sd)*math.pow(2*math.pi,len(Sd)))
         else:
             Sinv = np.linalg.inv(S)
             self.K = self.P.dot(C.T).dot(Sinv)
-            norm_coeff = math.sqrt(np.linalg.det(S)*math.pow(2*math.pi,len(S)))
             
         err = y-C.dot(self.x_new)
         self.x_new = self.x_new + self.K.dot(err)  
         self.P = (sp.identity(len(self.x_new))-C.T.dot(self.K.T).T).dot(self.P)
 
-        if (sp.issparse(S)):
-            numerator = spln.spsolve(S, err).T.dot(err)
-        else:
-            numerator = np.linalg.solve(S, err).T.dot(err)
-
         # Return the probability of the received measurement
-        return math.exp(-0.5*numerator)/norm_coeff
-
+        return lognormpdf(y, C.dot(self.x_new), S)
+    
 
 
 class KalmanSmoother(KalmanFilter):

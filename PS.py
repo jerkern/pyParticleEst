@@ -54,7 +54,6 @@ class SmoothTrajectory(object):
                     if (p_next[i] == -numpy.Inf):
                         p_next[i] = pa.part[i].next_pdf(spart, step.u)
                     
-                numpy.seterr(all='raise')
                 w += p_next
                 # Normalize
                 try:
@@ -62,7 +61,7 @@ class SmoothTrajectory(object):
                     w_norm /= numpy.sum(w_norm)
                 except FloatingPointError:
                     # All weights zero, for robustness just draw a random sample
-                    w_norm  = (0.0*numpy.exp(w) + 1.0)/len(w)
+                    w_norm  = (0.0*w + 1.0)/len(w)
                      
                 ind = PF.sample(w_norm,1)[0]
 
