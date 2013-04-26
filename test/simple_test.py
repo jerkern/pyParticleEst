@@ -12,15 +12,15 @@ if __name__ == '__main__':
     num = 50
     
     # Create a reference which we will try to estimate using a RBPS
-    correct = SimpleParticle(numpy.array([1.0, 0.0]),2.5)
+    correct = SimpleParticle(numpy.array([1.0, -0.5]),2.5)
     
     # Create an array for our particles 
     particles = numpy.empty(num, type(correct))
     
     # Initialize particles
     for k in range(len(particles)):
-        # Let the initial state of the linear states be N(0,1) and the non-linear U(2,3)
-        particles[k] = SimpleParticle(numpy.random.normal(numpy.array([[0.0], [0.0]])),
+        # Let the initial value of the non-linear state be U(2,3)
+        particles[k] = SimpleParticle(numpy.array([[0.0], [0.0]]),
                                       numpy.random.uniform(2, 3))
     
     # Create a particle approximation object from our particles

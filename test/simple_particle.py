@@ -12,7 +12,7 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         B = numpy.array([[0.0, 0.0], [1.0, -1.0]])
         C = numpy.array([[c, 0.0]])
         
-        P = numpy.diag([1.0, 1.0])
+        P = 100000*numpy.diag([1.0, 1.0])
         
         R = numpy.array([[1.]])
         
