@@ -1,7 +1,6 @@
 """ Class for mixed linear/non-linear models with additive gaussian noise """
 
 import numpy
-import math
 import kalman
 import part_utils
 
@@ -9,34 +8,75 @@ class MixedNLGaussianCollapsed(object):
     """ Stores collapsed sample of MixedNLGaussian object """
     def __init__(self, parent):
         self.eta = parent.get_nonlin_state().ravel()            
-        (lin_est,lin_P) = parent.get_lin_est()
-        tmpp = numpy.random.multivariate_normal(numpy.ravel(lin_est),lin_P)
+        tmpp = numpy.random.multivariate_normal(numpy.ravel(parent.kf.x_new),
+                                                parent.kf.P)
         self.z = tmpp.ravel()   
 
 
-class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
+class MixedNLGaussian(part_utils.RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
+    def __init__(self, z0, P0, e0, Az=None, Bz=None, C=None, D=None, Qz=None, R=None,
+                 Ae=None, Be=None, Qe=None, Qez=None):
+        super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
+                                              Az=Az, Bz=Bz,C=C, D=D, 
+                                              Qz=Qz, R=R)
+        self.Ae = Ae
+        self.Be = Be
+        self.Qe = Qe
+        self.Qez = Qez
+        self.eta = e0
+            
+    def update(self, data):
+        super(MixedNLGaussian, self).update(data)
         
     def next_pdf(self, next_cpart, u):
         """ Implements the next_pdf function for MixedNLGaussian models """
-        (lin_est,lin_P) = self.get_lin_est()
-        z_mean = numpy.reshape(lin_est,(-1,1))
+        lin_P = self.kf.P
+        z_mean = numpy.reshape(self.kf.x_new,(-1,1))
         
-        _lin_cov = self.get_lin_Q()
+        _lin_cov = self.kf.Q
         nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
         
         x = numpy.hstack((next_cpart.eta,next_cpart.z)).reshape((-1,1))
-        A = self.get_lin_A() 
-        B = self.get_lin_B()
+        A = self.kf.A
+        B = self.kf.B
         
         # TODO, handle non-linear dependence!
-        lin_est = A.dot(z_mean) + B.dot(self.linear_input(u))
+        lin_est = A.dot(z_mean) + B.dot(u)
         st = numpy.vstack((nonlin_est,lin_est))
         Sigma = self.calc_sigma(lin_P)
         return kalman.lognormpdf(x,mu=st,S=Sigma)
+    
+    def get_Q(self):
+        return numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
+                             numpy.hstack((self.Qez.T, self.kf.Q))))
+    
+    def set_dynamics(self, Az=None, Bz=None, C=None, D=None, Qz=None, R=None,
+                     Ae=None, Be=None, Qe=None, Qez=None):
+        if (Az != None):
+            self.kf.A = Az
+        if (Bz != None):
+            self.kf.B = Bz
+        if (C != None):
+            self.kf.C = C
+        if (D != None):
+            self.kf.D = D
+        if (Qz != None):
+            self.kf.Q = Qz
+        if (R != None):
+            self.kf.R = R
+        if (Ae != None):
+            self.Ae = Ae
+        if (Be != None):
+            self.Be = Be
+        if (Qe != None):
+            self.Qe = Qe
+        if (Qez != None):
+            self.Qez = Qez
+            
     
     def sample_smooth(self, filt_traj, ind, next_cpart):
         """ Implements the sample_smooth function for MixedNLGaussian models """
@@ -46,116 +86,52 @@ class MixedNLGaussian(part_utils.ParticleSmoothingBaseRB):
         u = filt_traj[ind].u
         # Smooth linear states
         _etaj = cpart.eta
-        (_lin_est,P) = self.get_lin_est()
-        A_ext = self.get_full_A()
-        _lin_cov = self.get_lin_Q()
+        
+        _lin_est = self.kf.x_new
+        P = self.kf.P
+        A_ext = numpy.vstack((self.Ae, self.kf.A))
+        _lin_cov = self.kf.Q
         Q = self.get_Q()
         QPinv = numpy.linalg.solve(Q+A_ext.dot(P.dot(A_ext.transpose())),
                                    numpy.eye(len(cpart.eta)+len(cpart.z)))
         Hi = P.dot(A_ext.transpose().dot(QPinv))
-        self.PI = P-Hi.dot(A_ext.dot(P))
+        PI = P-Hi.dot(A_ext.dot(P))
         z_mean = cpart.z
         
-        B = self.get_lin_B()
+        B = self.kf.B
 
         # TODO, handle non-linear dependence!
-        lin_est = self.get_lin_A().dot(z_mean)
+        lin_est = self.kf.A.dot(z_mean)
         if (u != None):
             lin_est += B.dot(self.linear_input(u)).ravel()
         ytmp = numpy.hstack((cpart.eta,lin_est))
         
         mu = z_mean + numpy.ravel(Hi.dot(numpy.hstack((next_cpart.eta,next_cpart.z)) - ytmp))
         
-        cpart.z = numpy.random.multivariate_normal(mu,self.PI).ravel()
+        cpart.z = numpy.random.multivariate_normal(mu,PI).ravel()
 
         return cpart
     
     def calc_sigma(self, P):
         cov = self.get_Q()
-        A_ext = self.get_full_A()
-        #B_ext = self.get_full_B()
+        A_ext = numpy.vstack((self.Ae, self.kf.A))
         lin_P_ext = A_ext.dot(P.dot(A_ext.transpose()))
         Sigma = cov + lin_P_ext
         return Sigma
     
     def fwd_peak_density(self, u):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
-        Sigma = self.calc_sigma(self.get_lin_est()[1])
+        Sigma = self.calc_sigma(self.kf.P)
         zero = numpy.zeros((Sigma.shape[0],1))
         return kalman.lognormpdf(zero, zero, Sigma)
     
     def collapse(self):
         """ collapse the object by sampling all the states """
         return MixedNLGaussianCollapsed(self)
-    
-    def clin_update(self, u):
-        """ Implements the clin_update function for MixedNLGaussian models """
-        A = self.get_lin_A()
-        B = self.get_lin_B()
-        C = self.get_lin_C()
-        Q = self.get_lin_Q()
-        R = self.get_R()
-        (x0, P) = self.get_lin_est()
 
-        kf = kalman.KalmanFilter(A,B,C, numpy.reshape(x0,(-1,1)), P, Q, R)
-        kf.time_update(u=u)
+    def set_lin_est(self, est):
+        self.kf.x_new = est[0]
+        self.kf.P = est[1]
         
-        return (kf.x_new.reshape((-1,1)), kf.P)
-    
-    def clin_measure(self, y):
-        """ Implements the clin_measure function for MixedNLGaussian models """
-        A = self.get_lin_A()
-        B = self.get_lin_B()
-        C = self.get_lin_C()
-        Q = self.get_lin_Q()
-        R = self.get_R()
-        (x0, P) = self.get_lin_est()
-
-        kf = kalman.KalmanFilter(A,B,C, numpy.reshape(x0,(-1,1)), P, Q, R)
-        kf.meas_update(y)
-        
-        return (kf.x_new.reshape((-1,1)), kf.P)
-
-    def clin_smooth(self, z_next, u):
-        """ Implements the clin_smooth function for MixedNLGaussian models """
-        A = self.get_lin_A()
-        B = self.get_lin_B()
-        C = self.get_lin_C()
-        Q = self.get_lin_Q()
-        R = self.get_R()
-        (x0, P) = self.get_lin_est()
-
-        kf = kalman.KalmanSmoother(A,B,C, numpy.reshape(x0,(-1,1)), P, Q, R)
-        kf.smooth(z_next[0], z_next[1], u)
-        
-        return (kf.x_new.reshape((-1,1)), kf.P)
-
-    def get_R(self):
-        raise NotImplementedError( "Should have implemented this" )
-    
-    def get_lin_A(self):
-        raise NotImplementedError( "Should have implemented this" )
-    
-    def get_lin_B(self):
-        raise NotImplementedError( "Should have implemented this" )
-
-    def get_lin_C(self):
-        raise NotImplementedError( "Should have implemented this" )
-
-    def get_nonlin_B(self):
-        raise NotImplementedError( "Should have implemented this" )
-    
-    def get_full_B(self):
-        raise NotImplementedError( "Should have implemented this" )
-
-    def get_nonlin_A(self):
-        raise NotImplementedError( "Should have implemented this" )
-    
-    def get_full_A(self):
-        raise NotImplementedError( "Should have implemented this" )
-    
-    def get_lin_Q(self):
-        raise NotImplementedError( "Should have implemented this" )
-    
-    def get_Q(self):
-        raise NotImplementedError( "Should have implemented this" )
+    def get_lin_est(self):
+        return (self.kf.x_new, self.kf.P)

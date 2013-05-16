@@ -27,7 +27,7 @@ class KalmanFilter(object):
         e_k ~ N(0,R)
         """
         
-    def __init__(self, A, B, C, x0, P0, Q, R):
+    def __init__(self, x0, P0, A=None, B=None, C=None, D=None, Q=None, R=None):
         """ x_{k+1} = A*x_{k}+B*u_k + v_k
         y_k = C*x_k + e_k 
         v_k ~ N(0,Q)

@@ -1,8 +1,6 @@
 import numpy
 import math
-import copy
 import mixed_nl_gaussian
-import kalman
 
 class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
@@ -16,74 +14,52 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         
         R = numpy.array([[1.]])
         
+        Ae = numpy.zeros((1,2))
+        Be = numpy.zeros((1,2))
+        
         # These could be made time-varying or otherwise dependent on the nonlinear states
-        self.Q = numpy.diag([ 0.01, 0.0, 0.0])
         self.Q_in = numpy.diag([ 0.12, 0.12])
+        Qe= numpy.diag([ 0.01,])
+        Qz = B.dot(self.Q_in.dot(B.T)) # Noise is acting on input
+        Qez = numpy.zeros((1,2))
+                   
+        # Linear states handled by base-class
+        super(SimpleParticle,self).__init__(z0=numpy.reshape(x0,(-1,1)),
+                                            P0=P,
+                                            e0 = c,
+                                            Az=A, Bz=B, C=C,
+                                            Ae=Ae, Be=Be,
+                                            R=R, Qe=Qe, Qz=Qz, Qez=Qez)
 
-        self.kf = kalman.KalmanSmoother(A,B,C, numpy.reshape(x0,(-1,1)), P0=P, Q=None, R=R)
         # Non-linear state, measurement matrix C depends on the value of c
         self.c = c 
         
     def sample_input_noise(self, u): 
-        """ Return a perturbed vector u by adding guassian noise to the u[2] component """ 
-        return numpy.vstack((u[:2], numpy.random.normal(u[2],math.sqrt(self.Q[0,0])))) 
+        """ Return a perturbed vector u by adding Gaussian noise to the u[2] component """ 
+        return numpy.vstack((u[:2], 
+                             numpy.random.normal(u[2],math.sqrt(self.Qe)))) 
     
     def update(self, data):
         """ Perform a time update of all states """
         # Update linear states
-        self.kf.time_update(u=self.linear_input(data),Q=self.get_lin_Q())
+        super(SimpleParticle, self).update(data=data[:2].reshape((-1,1)))
         # Update non-linear state
         self.c += data[2,0]
         
     def measure(self, y):
         """ Perform a measurement update """
         # measurement matrix C depends on the value of c
-        return self.kf.meas_update(y, C=numpy.array([[self.c, 0.0]]))
+        self.set_dynamics(C=numpy.array([[self.c, 0.0]]))
+        return super(SimpleParticle,self).measure(y)
     
-    def get_R(self):
-        return self.kf.R
-    
-    def get_lin_A(self):
-        return self.kf.A
-    
-    def get_lin_B(self):
-        return self.kf.B
-
-    def get_lin_C(self):
-        return numpy.array([[self.c, 0.0]])
-
-    def get_nonlin_B(self):
-        return numpy.zeros((1,2))
-    
-    def get_full_B(self):
-        return numpy.vstack((self.get_nonlin_B(),self.kf.B))
-
-    def get_nonlin_A(self):
-        return numpy.zeros((1,2))
-    
-    def get_full_A(self):
-        return numpy.vstack((self.get_nonlin_A(),self.get_lin_A()))
-    
-    def get_lin_Q(self):
-        return self.get_Q()[1:,1:]
-    
-    def get_Q(self):
-        B = self.get_full_B()
-        return self.Q+B.dot(self.Q_in.dot(B.T))
+    def next_pdf(self, next_cpart, u):
+        return super(SimpleParticle,self).next_pdf(next_cpart, u[:2].reshape((-1,1)))
     
     def get_nonlin_state(self):
         return numpy.array([[self.c]])
 
     def set_nonlin_state(self,inp):
         self.c = inp[0]
-
-    def get_lin_est(self):
-        return (self.kf.x_new, self.kf.P)
-
-    def set_lin_est(self, est):
-        (inp,Pin) = est
-        self.kf.x_new = copy.copy(inp)
-        self.kf.P = copy.copy(Pin)
         
     def linear_input(self, u):
         return u[:2].reshape((-1,1))
