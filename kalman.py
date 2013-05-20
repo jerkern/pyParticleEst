@@ -94,7 +94,7 @@ class KalmanFilter(object):
         yhat = C.dot(self.x_new)
         err = y-yhat
         self.x_new = self.x_new + self.K.dot(err)  
-        self.P -= self.K.dot(C)
+        self.P -= self.K.dot(C).dot(self.P)
 
         # Return the probability of the received measurement
         return lognormpdf(y, yhat, S)
