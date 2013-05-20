@@ -94,9 +94,9 @@ class SmoothTrajectoryRB(object):
             st - smoothed (non-RB) trajectory """
         
         self.traj = numpy.empty(len(st), type(st.part0))
-        self.u = copy.deepcopy(st.u)
-        self.y = copy.deepcopy(st.y)
-        self.t = copy.deepcopy(st.t)
+        self.u = tuple(st.u)
+        self.y = tuple(st.y)
+        self.t = tuple(st.t)
         
         # Initialise trajectory to contain objects of the correct type
         for i in range(len(self.traj)):
@@ -108,8 +108,7 @@ class SmoothTrajectoryRB(object):
         for i in range(len(self.traj)-1):
             
             if (self.y[i] != None):
-                tmp = self.traj[i].clin_measure(self.y[i])
-                self.traj[i].set_lin_est(tmp)
+                self.traj[i].clin_measure(self.y[i])
             
             tmp = self.traj[i].clin_update(self.traj[i].linear_input(self.u[i]))
 
@@ -118,11 +117,8 @@ class SmoothTrajectoryRB(object):
         
         # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
-            
-            tmp = self.traj[i].clin_smooth(self.traj[i+1].get_lin_est(),
-                                           self.traj[i].linear_input(self.u[i]))
-
-            self.traj[i].set_lin_est(tmp)
+            self.traj[i].clin_smooth(self.traj[i+1].get_lin_est(),
+                                     self.traj[i].linear_input(self.u[i]))
     
             
     def __len__(self):

@@ -18,7 +18,7 @@ class MixedNLGaussian(part_utils.RBPSBase):
     
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
-    def __init__(self, z0, P0, e0, Az=None, Bz=None, C=None, D=None, Qz=None, R=None,
+    def __init__(self, z0=None, P0=None, e0=None, Az=None, Bz=None, C=None, D=None, Qz=None, R=None,
                  Ae=None, Be=None, Qe=None, Qez=None):
         super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
                                               Az=Az, Bz=Bz,C=C, D=D, 
@@ -29,7 +29,7 @@ class MixedNLGaussian(part_utils.RBPSBase):
         self.Qez = Qez
         self.eta = e0
             
-    def update(self, data):
+    def update(self, data=None):
         super(MixedNLGaussian, self).update(data)
         
     def next_pdf(self, next_cpart, u):
@@ -128,6 +128,10 @@ class MixedNLGaussian(part_utils.RBPSBase):
     def collapse(self):
         """ collapse the object by sampling all the states """
         return MixedNLGaussianCollapsed(self)
+
+    @classmethod
+    def from_collapsed(cls, collapsed):
+        pass
 
     def set_lin_est(self, est):
         self.kf.x_new = est[0]

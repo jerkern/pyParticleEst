@@ -28,13 +28,13 @@ class RBPFBase(ParticleFilteringInterface):
     __metaclass__ = abc.ABCMeta
     
     def __init__(self, z0, P0, 
-                 Az=None, Bz=None, C=None, D=None,
+                 Az=None, Bz=None, C=None,
                   Qz=None, R=None):
         self.kf = kalman.KalmanSmoother(x0=z0, P0=P0,
-                                        A=Az, B=Bz,C=C, D=D, 
+                                        A=Az, B=Bz,C=C, 
                                         Q=Qz, R=R)
     
-    def set_dynamics(self, Az=None, Bz=None, C=None, D=None, Qz=None, R=None):
+    def set_dynamics(self, Az=None, Bz=None, C=None, Qz=None, R=None):
         
         if (Az):
             self.kf.A = Az
@@ -42,8 +42,6 @@ class RBPFBase(ParticleFilteringInterface):
             self.kf.B = Bz
         if (C):
             self.kf.C = C
-        if (D):
-            self.kf.D = D
         if (Qz):
             self.kf.Q = Qz
         if (R):
@@ -86,7 +84,7 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     def __init__(self, z0, P0, 
                  Az=None, Bz=None, C=None, D=None,
                  Qz=None, R=None):
-        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, Bz=Bz, C=C, D=D,
+        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, Bz=Bz, C=C,
                                       Qz=Qz, R=R)
         
     
@@ -107,33 +105,11 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     
     def clin_measure(self, y):
         """ Kalman measuement of the linear states conditioned on the non-linear trajectory estimate """
-        A = self.kf.A
-        B = self.kf.B
-        C = self.kf.C
-        Q = self.kf.Q
-        R = self.kf.R
-        x0 = self.kf.x_new
-        P = self.kf.P
-
-        kf = kalman.KalmanFilter(A=A,B=B,C=C, x0=numpy.reshape(x0,(-1,1)), P0=P, Q=Q, R=R)
-        kf.meas_update(y)
-        
-        return (kf.x_new.reshape((-1,1)), kf.P)
+        self.kf.meas_update(y)
 
     def clin_smooth(self, z_next, u):
         """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
-        A = self.kf.A
-        B = self.kf.B
-        C = self.kf.C
-        Q = self.kf.Q
-        R = self.kf.R
-        x0 = self.kf.x_new
-        P = self.kf.P
-
-        kf = kalman.KalmanSmoother(A=A,B=B,C=C, x0=numpy.reshape(x0,(-1,1)), P0=P, Q=Q, R=R)
-        kf.smooth(z_next[0], z_next[1], u)
-        
-        return (kf.x_new.reshape((-1,1)), kf.P)
+        self.kf.smooth(z_next[0], z_next[1], u)
 
     @abc.abstractmethod
     def set_nonlin_state(self, eta):
@@ -144,7 +120,7 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     def get_nonlin_state(self):
         """ Return the non-linear state estimates """
         return
-    
+
     @abc.abstractmethod
     def set_lin_est(self, lest):
         """ Set the estimate of the rao-blackwellized states """
@@ -160,5 +136,9 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
         """ Extract the part of u affect the conditionally rao-blackwellized states """
         return
     
-    
+    @classmethod
+    def assemble(cls, collapsed):
+        """ This method has to be overriden in the derived class, and should create
+        a full object from its collapsed representation """
+        return None   
 

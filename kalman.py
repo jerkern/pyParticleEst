@@ -27,7 +27,7 @@ class KalmanFilter(object):
         e_k ~ N(0,R)
         """
         
-    def __init__(self, x0, P0, A=None, B=None, C=None, D=None, Q=None, R=None):
+    def __init__(self, x0, P0, A=None, B=None, C=None, Q=None, R=None):
         """ x_{k+1} = A*x_{k}+B*u_k + v_k
         y_k = C*x_k + e_k 
         v_k ~ N(0,Q)
@@ -47,37 +47,39 @@ class KalmanFilter(object):
         self.x_new = x0 # Estimated state
         self.P = P0     # Estimated covariance
         self.K = None   # Define self.K for later use
-        
-        
-    def time_update(self, A = None, B = None, Q = None, u = None):
+        #self.eye = sp.identity(len(self.x_new))
+     
+#    def set_dynamics(self, A=None, B=None, C=None, Q=None, R=None):
+#        if (A != None):
+#            self.A = A
+#        if (B != None):
+#            self.B = B
+#        if (C != None):
+#            self.C = C
+#        if (Q != None):
+#            self.Q = Q
+#        if (R != None):
+#            self.R = R
+    
+    def time_update(self, u = None):
         """ Do a time update, i.e. predict one step forward in time using the input u """
-        if (Q == None):
-            Q = self.Q
-        if (A == None):
-            A = self.A
-        if (B == None):
-            B = self.B
-        if (u == None):
-            #k-diag is ones, but outside, so this is zero matrix
-            u = (sp.eye(B.shape[1], 1, k=2)).tocsr()
         
-        tmp = self.predict(A, B, Q, u)  # Calculate next state
-        self.x_new = tmp[0]
-        self.P = tmp[1]
+        # Calculate next state
+        (self.x_new, self.P) = self.predict(self.A, self.B, self.Q, u)  
         
     def predict(self, A, B, Q, u):
         """ Calculate next state estimate without actually updating the internal variables """
-        tmp = B.dot(u)                  # Calcate how u affects the states
-        x = A.dot(self.x_new) + tmp     # Calculate the next state
-        P = A.dot(self.P).dot(A.T) + Q  # Calucate the estimated variane  
+        x = A.dot(self.x_new)     # Calculate the next state
+        if (u != None):
+            # Calculate how u affects the states
+            x += B.dot(u)                  
+        P = A.dot(self.P).dot(A.T) + Q  # Calculate the estimated variance  
         return (x, P)
     
-    def meas_update(self, y, C = None, R = None):
+    def meas_update(self, y):
         """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
-        if (C == None):
-            C = self.C
-        if (R == None):
-            R = self.R
+        C = self.C
+        R = self.R
 
         S = C.dot(self.P).dot(C.T)+R
 
@@ -88,13 +90,14 @@ class KalmanFilter(object):
         else:
             Sinv = np.linalg.inv(S)
             self.K = self.P.dot(C.T).dot(Sinv)
-            
-        err = y-C.dot(self.x_new)
+        
+        yhat = C.dot(self.x_new)
+        err = y-yhat
         self.x_new = self.x_new + self.K.dot(err)  
-        self.P = (sp.identity(len(self.x_new))-C.T.dot(self.K.T).T).dot(self.P)
+        self.P -= self.K.dot(C)
 
         # Return the probability of the received measurement
-        return lognormpdf(y, C.dot(self.x_new), S)
+        return lognormpdf(y, yhat, S)
     
 
 

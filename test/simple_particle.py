@@ -60,6 +60,7 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
 
     def set_nonlin_state(self,inp):
         self.c = inp[0]
+        self.set_dynamics(C=numpy.array([[self.c, 0.0]]))
         
     def linear_input(self, u):
         return u[:2].reshape((-1,1))
