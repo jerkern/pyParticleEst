@@ -49,31 +49,20 @@ class KalmanFilter(object):
         self.K = None   # Define self.K for later use
         #self.eye = sp.identity(len(self.x_new))
      
-#    def set_dynamics(self, A=None, B=None, C=None, Q=None, R=None):
-#        if (A != None):
-#            self.A = A
-#        if (B != None):
-#            self.B = B
-#        if (C != None):
-#            self.C = C
-#        if (Q != None):
-#            self.Q = Q
-#        if (R != None):
-#            self.R = R
-    
     def time_update(self, u = None):
         """ Do a time update, i.e. predict one step forward in time using the input u """
         
         # Calculate next state
-        (self.x_new, self.P) = self.predict(self.A, self.B, self.Q, u)  
+        (self.x_new, self.P) = self.predict(u)  
         
-    def predict(self, A, B, Q, u):
+    def predict(self, u):
         """ Calculate next state estimate without actually updating the internal variables """
+        A = self.A
         x = A.dot(self.x_new)     # Calculate the next state
         if (u != None):
             # Calculate how u affects the states
-            x += B.dot(u)                  
-        P = A.dot(self.P).dot(A.T) + Q  # Calculate the estimated variance  
+            x += self.B.dot(u)                  
+        P = A.dot(self.P).dot(A.T) + self.Q  # Calculate the estimated variance  
         return (x, P)
     
     def meas_update(self, y):
@@ -106,22 +95,13 @@ class KalmanSmoother(KalmanFilter):
     
         Extends the KalmanFilter class and provides an additional method for smoothing
         backwards in time """
-    def smooth(self, x_next, P_next, u=None, A=None, B=None, Q=None):
+    def smooth(self, x_next, P_next, u=None):
         """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
             the relation x_{k+1} = A*x_k + B*u_k +v_k
             v_k ~ (0,Q)"""
-        if (Q == None):
-            Q = self.Q
-        if (A == None):
-            A = self.A
-        if (B == None):
-            B = self.B
-        if (u == None):
-            #k-diag is ones, but outside, so this is zero matrix
-            u = (sp.eye(B.shape[1], 1, k=2)).tocsr()
         
-        (x_np, P_np) = self.predict(A, B, Q, u)
-        tmp = self.P.dot(A.T.dot(np.linalg.inv(P_np)))
+        (x_np, P_np) = self.predict(u)
+        tmp = self.P.dot(self.A.T.dot(np.linalg.inv(P_np)))
         x_smooth = self.x_new + tmp.dot(x_next-x_np)
         P_smooth = self.P + tmp.dot(P_next - P_np).dot(tmp.T)
         
