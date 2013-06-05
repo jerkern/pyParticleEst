@@ -48,7 +48,7 @@ class RBPFBase(ParticleFilteringInterface):
             self.kf.R = R
     
     @abc.abstractmethod
-    def update(self, data):
+    def update(self, data=None):
         """ Update estimate using 'data' as input """
         self.kf.time_update(u=data)
     
@@ -88,7 +88,7 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
                                       Qz=Qz, R=R)
         
     
-    def clin_update(self, u):
+    def clin_update(self, u=None):
         """ Kalman update of the linear states conditioned on the non-linear trajectory estimate """
         A = self.kf.A
         B = self.kf.B
@@ -107,7 +107,7 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
         """ Kalman measuement of the linear states conditioned on the non-linear trajectory estimate """
         self.kf.meas_update(y)
 
-    def clin_smooth(self, z_next, u):
+    def clin_smooth(self, z_next, u=None):
         """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
         self.kf.smooth(z_next[0], z_next[1], u)
 

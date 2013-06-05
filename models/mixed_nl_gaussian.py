@@ -42,10 +42,11 @@ class MixedNLGaussian(part_utils.RBPSBase):
         
         x = numpy.hstack((next_cpart.eta,next_cpart.z)).reshape((-1,1))
         A = self.kf.A
-        B = self.kf.B
         
         # TODO, handle non-linear dependence!
-        lin_est = A.dot(z_mean) + B.dot(u)
+        lin_est = A.dot(z_mean)
+        if (u != None):
+            lin_est += self.kf.B.dot(u)
         st = numpy.vstack((nonlin_est,lin_est))
         Sigma = self.calc_sigma(lin_P)
         return kalman.lognormpdf(x,mu=st,S=Sigma)
@@ -118,6 +119,13 @@ class MixedNLGaussian(part_utils.RBPSBase):
         lin_P_ext = A_ext.dot(P.dot(A_ext.transpose()))
         Sigma = cov + lin_P_ext
         return Sigma
+    
+    def prep_clin_measure(self, y):
+        return y
+    
+    def clin_measure(self, y):
+        yl = self.prep_clin_measure(y)
+        return super(MixedNLGaussian, self).clin_measure(yl)
     
     def fwd_peak_density(self, u):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
