@@ -8,12 +8,12 @@ class ParticleFilteringInterface(object):
     __metaclass__ = abc.ABCMeta
      
     @abc.abstractmethod
-    def sample_input_noise(self, u):
-        """ Return a noise perturbed input vector u """
+    def sample_process_noise(self, u):
+        """ Return process noise for input u """
         return
     
     @abc.abstractmethod
-    def update(self, data):
+    def update(self, u, noise):
         """ Update estimate using 'data' as input """
         return
     
@@ -31,15 +31,13 @@ class RBPFBase(ParticleFilteringInterface):
                  Az=None, Bz=None, C=None,
                   Qz=None, R=None):
         self.kf = kalman.KalmanSmoother(x0=z0, P0=P0,
-                                        A=Az, B=Bz,C=C, 
+                                        A=Az, C=C, 
                                         Q=Qz, R=R)
     
     def set_dynamics(self, Az=None, Bz=None, C=None, Qz=None, R=None):
         
         if (Az):
             self.kf.A = Az
-        if (Bz):
-            self.kf.B = Bz
         if (C):
             self.kf.C = C
         if (Qz):
@@ -48,9 +46,9 @@ class RBPFBase(ParticleFilteringInterface):
             self.kf.R = R
     
     @abc.abstractmethod
-    def update(self, data=None):
+    def update(self, u, noise):
         """ Update estimate using 'data' as input """
-        self.kf.time_update(u=data)
+        self.kf.time_update(f_k=u)
     
     @abc.abstractmethod    
     def measure(self, y):
@@ -68,15 +66,10 @@ class ParticleSmoothingInterface(ParticleFilteringInterface):
         return
     
     @abc.abstractmethod
-    def sample_smooth(self, filt_traj, ind, next_cpart):
-        """ Return a collapsed particle with the rao-blackwellized states sampled """
+    def sample_smooth(self, next_part):
+        """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         return
-    
-    @abc.abstractmethod
-    def collapse(self):
-        """ Return a sample of the particle where the rao-blackwellized states
-        are drawn from the MVN that results from CLGSS structure """
-        return
+
     
 class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     __metaclass__ = abc.ABCMeta
@@ -84,22 +77,21 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     def __init__(self, z0, P0, 
                  Az=None, Bz=None, C=None, D=None,
                  Qz=None, R=None):
-        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, Bz=Bz, C=C,
+        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
                                       Qz=Qz, R=R)
         
     
-    def clin_update(self, u=None):
+    def clin_update(self, fz=None):
         """ Kalman update of the linear states conditioned on the non-linear trajectory estimate """
         A = self.kf.A
-        B = self.kf.B
         C = self.kf.C
         Q = self.kf.Q
         R = self.kf.R
         x0 = self.kf.x_new
         P = self.kf.P
 
-        kf = kalman.KalmanFilter(A=A,B=B,C=C, x0=numpy.reshape(x0,(-1,1)), P0=P, Q=Q, R=R)
-        kf.time_update(u=u)
+        kf = kalman.KalmanFilter(A=A,C=C, x0=numpy.reshape(x0,(-1,1)), P0=P, Q=Q, R=R)
+        kf.time_update(f_k=fz)
         
         return (kf.x_new.reshape((-1,1)), kf.P)
     
@@ -107,9 +99,9 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
         """ Kalman measuement of the linear states conditioned on the non-linear trajectory estimate """
         self.kf.meas_update(y)
 
-    def clin_smooth(self, z_next, u=None):
+    def clin_smooth(self, z_next, f_k=None):
         """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
-        self.kf.smooth(z_next[0], z_next[1], u)
+        self.kf.smooth(z_next[0], z_next[1], f_k)
 
     @abc.abstractmethod
     def set_nonlin_state(self, eta):
@@ -135,10 +127,3 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     def linear_input(self, u):
         """ Extract the part of u affect the conditionally rao-blackwellized states """
         return
-    
-    @classmethod
-    def assemble(cls, collapsed):
-        """ This method has to be overriden in the derived class, and should create
-        a full object from its collapsed representation """
-        return None   
-

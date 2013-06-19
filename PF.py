@@ -51,8 +51,8 @@ class ParticleFilter(object):
         
         for k in range(pa.num):
             
-            un = pa.part[k].sample_input_noise(u)
-            pa.part[k].update(un)
+            v = pa.part[k].sample_process_noise(u)
+            pa.part[k].update(u, v)
             
         return pa 
     

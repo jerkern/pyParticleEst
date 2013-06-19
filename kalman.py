@@ -21,13 +21,14 @@ def lognormpdf(x,mu,S):
 
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
-        x_{k+1} = A*x_{k}+B*u_k + v_k
-        y_k = C*x_k + e_k 
+        x_{k+1} = A*x_{k}+f_k + v_k
+        y_k = C*x_k + e_k
+        f_k - Additive (time-varying) constant
         v_k ~ N(0,Q)
         e_k ~ N(0,R)
         """
         
-    def __init__(self, x0, P0, A=None, B=None, C=None, Q=None, R=None):
+    def __init__(self, x0, P0, A=None, C=None, Q=None, R=None):
         """ x_{k+1} = A*x_{k}+B*u_k + v_k
         y_k = C*x_k + e_k 
         v_k ~ N(0,Q)
@@ -39,7 +40,6 @@ class KalmanFilter(object):
         if desired, for instance if the system dynamics are time-varying
         """
         self.A = A
-        self.B = B
         self.C = C
         
         self.R = R      # Measurement noise covariance
@@ -49,26 +49,29 @@ class KalmanFilter(object):
         self.K = None   # Define self.K for later use
         #self.eye = sp.identity(len(self.x_new))
      
-    def time_update(self, u = None):
+    def time_update(self, f_k):
         """ Do a time update, i.e. predict one step forward in time using the input u """
         
         # Calculate next state
-        (self.x_new, self.P) = self.predict(u)  
+        (self.x_new, self.P) = self.predict(f_k)  
         
-    def predict(self, u):
+    def predict(self, f_k):
         """ Calculate next state estimate without actually updating the internal variables """
         A = self.A
         x = A.dot(self.x_new)     # Calculate the next state
-        if (u != None):
+        if (f_k != None):
             # Calculate how u affects the states
-            x += self.B.dot(u)                  
+            x += f_k                 
         P = A.dot(self.P).dot(A.T) + self.Q  # Calculate the estimated variance  
         return (x, P)
     
-    def meas_update(self, y):
+    def meas_update(self, y, C=None, R=None):
         """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
-        C = self.C
-        R = self.R
+        
+        if (C == None):
+            C = self.C
+        if (R == None):
+            R = self.R
 
         S = C.dot(self.P).dot(C.T)+R
 
@@ -95,12 +98,12 @@ class KalmanSmoother(KalmanFilter):
     
         Extends the KalmanFilter class and provides an additional method for smoothing
         backwards in time """
-    def smooth(self, x_next, P_next, u=None):
+    def smooth(self, x_next, P_next, f_k):
         """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
             the relation x_{k+1} = A*x_k + B*u_k +v_k
             v_k ~ (0,Q)"""
         
-        (x_np, P_np) = self.predict(u)
+        (x_np, P_np) = self.predict(f_k)
         tmp = self.P.dot(self.A.T.dot(np.linalg.inv(P_np)))
         x_smooth = self.x_new + tmp.dot(x_next-x_np)
         P_smooth = self.P + tmp.dot(P_next - P_np).dot(tmp.T)

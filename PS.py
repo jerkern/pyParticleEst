@@ -17,16 +17,16 @@ class SmoothTrajectory(object):
         part = pt[-1].pa.sample()
         # Collapse particle which is conditionally linear gaussian
         # to a single point by sampling the MVN 
-        spart = part.collapse()
-        self.traj = [spart, ]
+        self.traj = numpy.zeros(len(pt), dtype=type(part)) 
+        self.traj[-1] = copy.copy(part)
+        self.traj[-1].sample_smooth(None)
         self.u = [pt[-1].u, ]
         self.y = [pt[-1].y, ]
         self.t = [pt[-1].t, ]
 
-        cur_ind = len(pt)
+        for cur_ind in reversed(range(len(pt)-1)):
 
-        for step in reversed(pt[:-1]):
-            cur_ind -= 1
+            step = pt[cur_ind]
             pa = step.pa
             ind = None
             p_next = -numpy.Inf*numpy.ones(numpy.shape(pa.w))
@@ -36,7 +36,8 @@ class SmoothTrajectory(object):
                 w = numpy.exp(pa.w)
                 while (cnt < len(p_next)/2.0): # Time-out limit
                     tmp_ind = PF.sample(w,1)[0]
-                    p = pa.part[tmp_ind].next_pdf(spart, step.u)
+                    p = pa.part[tmp_ind].next_pdf(self.traj[cur_ind+1],
+                                                  step.u)
                     accept = numpy.random.uniform()
                     p_acc = p - step.peak_fwd_density
                         
@@ -52,7 +53,8 @@ class SmoothTrajectory(object):
                 w = numpy.copy(pa.w)
                 for i in range(len(pa)):
                     if (p_next[i] == -numpy.Inf):
-                        p_next[i] = pa.part[i].next_pdf(spart, step.u)
+                        p_next[i] = pa.part[i].next_pdf(self.traj[cur_ind+1],
+                                                        step.u)
                     
                 w += p_next
                 # Normalize
@@ -69,42 +71,21 @@ class SmoothTrajectory(object):
             prev_part = pa.part[ind]
             p_index = pt.traj.index(step)           
             # Sample smoothed linear estimate
-            spart = prev_part.sample_smooth(pt, p_index, spart)
-            
-            self.traj.append(spart)
+            self.traj[cur_ind]=copy.copy(prev_part)
+            self.traj[cur_ind].sample_smooth(self.traj[cur_ind+1])
             self.u.append(step.u)
             self.y.append(step.y)
             self.t.append(step.t)
             
         # Reorder so the list are ordered with increasing time
-        self.traj.reverse()
         self.u.reverse()
         self.y.reverse()
         self.t.reverse()
-        self.part0 = copy.deepcopy(prev_part)
-
         
     def __len__(self):
         return len(self.traj)
-
-
-class SmoothTrajectoryRB(object):
-    def __init__(self, st):
-        """ Do constrained filtering of linear states
-            st - smoothed (non-RB) trajectory """
-        
-        self.traj = numpy.empty(len(st), type(st.part0))
-        self.u = tuple(st.u)
-        self.y = tuple(st.y)
-        self.t = tuple(st.t)
-        
-        # Initialise trajectory to contain objects of the correct type
-        for i in range(len(self.traj)):
-            self.traj[i] = copy.deepcopy(st.part0)
-                   
-        # Forward filtering
-        self.traj[0].set_nonlin_state(st.traj[0].eta)
-
+    
+    def constrained_smoothing(self):
         for i in range(len(self.traj)-1):
             
             if (self.y[i] != None):
@@ -112,17 +93,12 @@ class SmoothTrajectoryRB(object):
             
             tmp = self.traj[i].clin_update(self.traj[i].linear_input(self.u[i]))
 
-            self.traj[i+1].set_nonlin_state(st.traj[i+1].eta)
             self.traj[i+1].set_lin_est(tmp)
         
         # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
             self.traj[i].clin_smooth(self.traj[i+1].get_lin_est(),
                                      self.traj[i].linear_input(self.u[i]))
-    
-            
-    def __len__(self):
-        return len(self.traj)
 
 
 def do_smoothing(pt, M, rej_sampling=True):
@@ -139,18 +115,6 @@ def do_smoothing(pt, M, rej_sampling=True):
         print "%d/%d" % (i,M)
         straj[i] = SmoothTrajectory(pt, rej_sampling=rej_sampling)
         
-    return straj
-
-
-def do_rb_smoothing(straj):
-    """ Calculate rao-blackwellized smoothing of regular smoothed trajectories  """
-    
-    print "rb smoothing"
-    M = len(straj)
-    for i in range(M):
-        print "%d/%d" % (i,M)
-        straj[i] = SmoothTrajectoryRB(straj[i])
-    
     return straj
 
 
