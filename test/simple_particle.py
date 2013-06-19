@@ -48,14 +48,10 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         self.set_dynamics(fz=self.B.dot(u))
         return super(SimpleParticle,self).next_pdf(next_cpart, None)
 
-
-    def prep_clin_measure(self, y):
+    def set_nonlin_state(self,inp):
+        super(SimpleParticle, self).set_nonlin_state(inp)
+        # Update linear dynamics
         self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
-
-#    def set_nonlin_state(self,inp):
-#        super(SimpleParticle, self).set_nonlin_state(inp)
-#        # Update linear dynamics
-#        self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
         
     def linear_input(self, u):
         return u[:2].reshape((-1,1))

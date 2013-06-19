@@ -85,9 +85,6 @@ if __name__ == '__main__':
     # Use the filtered estimates above to created smoothed estimates
     nums = 10 # Number of backward trajectories to generate
     straj = PS.do_smoothing(pt, nums)   # Do sampled smoothing
-    #for st in straj:
-    #    st.constrained_smoothing()      # Use the non-linear smoothed trajectory from the previous
-                                        # step to do constrained smoothing of the linear states
     
     # Extract data from trajectories for plotting
     i=0
