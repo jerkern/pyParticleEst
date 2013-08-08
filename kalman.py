@@ -22,15 +22,16 @@ def lognormpdf(x,mu,S):
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
         x_{k+1} = A*x_{k}+f_k + v_k
-        y_k = C*x_k + e_k
+        y_k = C*x_k +f_k e_k
         f_k - Additive (time-varying) constant
+        h_k - Additive (time-varying) constant
         v_k ~ N(0,Q)
         e_k ~ N(0,R)
         """
         
     def __init__(self, x0, P0, A=None, C=None, Q=None, R=None):
-        """ x_{k+1} = A*x_{k}+B*u_k + v_k
-        y_k = C*x_k + e_k 
+        """ x_{k+1} = A*x_{k}+f_k + v_k
+        y_k = C*x_k + h_k + e_k 
         v_k ~ N(0,Q)
         e_k ~ N(0,R)
         x0 = x_0, P0 = P_0
@@ -50,7 +51,7 @@ class KalmanFilter(object):
         #self.eye = sp.identity(len(self.x_new))
      
     def time_update(self, f_k):
-        """ Do a time update, i.e. predict one step forward in time using the input u """
+        """ Do a time update, i.e. predict one step forward in time using the input f_k """
         
         # Calculate next state
         (self.x_new, self.P) = self.predict(f_k)  
@@ -65,7 +66,7 @@ class KalmanFilter(object):
         P = A.dot(self.P).dot(A.T) + self.Q  # Calculate the estimated variance  
         return (x, P)
     
-    def meas_update(self, y, C=None, R=None):
+    def meas_update(self, y, h_k, C=None, R=None):
         """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
         
         if (C == None):
@@ -84,6 +85,8 @@ class KalmanFilter(object):
             self.K = self.P.dot(C.T).dot(Sinv)
         
         yhat = C.dot(self.x_new)
+        if (h_k != None):
+            yhat += h_k
         err = y-yhat
         self.x_new = self.x_new + self.K.dot(err)  
         self.P -= self.K.dot(C).dot(self.P)
@@ -100,7 +103,7 @@ class KalmanSmoother(KalmanFilter):
         backwards in time """
     def smooth(self, x_next, P_next, f_k):
         """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
-            the relation x_{k+1} = A*x_k + B*u_k +v_k
+            the relation x_{k+1} = A*x_k + f_k +v_k
             v_k ~ (0,Q)"""
         
         (x_np, P_np) = self.predict(f_k)

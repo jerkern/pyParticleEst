@@ -3,6 +3,7 @@
 import numpy
 import kalman
 import part_utils
+import param_est
 
 class MixedNLGaussianCollapsed(object):
     """ Stores collapsed sample of MixedNLGaussian object """
@@ -13,13 +14,13 @@ class MixedNLGaussianCollapsed(object):
         self.z = tmpp.ravel()   
 
 
-class MixedNLGaussian(part_utils.RBPSBase):
+class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
     def __init__(self, z0=None, P0=None,  Az=None, C=None, Qz=None, R=None, fz=None,
-                 e0=None, Ae=None, Qe=None, Qez=None, fe=None):
+                 e0=None, Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None):
         super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
                                               Az=Az, C=C, 
                                               Qz=Qz, R=R)
@@ -35,18 +36,30 @@ class MixedNLGaussian(part_utils.RBPSBase):
             self.fz = fz
         else:
             self.fz = numpy.zeros((len(z0), 1))
+        if (h != None):
+            self.h = h
+        else:
+            self.h = numpy.zeros((self.kf.C.shape[0],1))
         
         self.sampled_z = None
         self.z_tN = None
         self.P_tN = None
         self.M_tN = None
-            
+        
+        # Element-wise matrix derivates needed for parameters estimation
+        self.grad_Ae = None
+        self.grad_Qe = None
+        self.grad_Qez = None
+        self.grad_eta = None
+        self.grad_fe = None
+        self.grad_fz = None
+        
     def update(self, u, noise):
         
         # Update non-linear state using sampled noise
         self.eta += self.fe + self.Ae.dot(self.kf.x_new) + noise
         
-        # Handle linear/non-linar noise correlation
+        # Handle linear/non-linear noise correlation
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
         Sigma_z = self.kf.Q + self.kf.A.dot(self.kf.P).dot(self.kf.A.T)
@@ -83,8 +96,9 @@ class MixedNLGaussian(part_utils.RBPSBase):
         return numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
                              numpy.hstack((self.Qez.T, self.kf.Q))))
     
-    def set_dynamics(self, Az=None, Bz=None, C=None, D=None, Qz=None, R=None,
-                     Ae=None, Be=None, Qe=None, Qez=None, fe=None, fz=None):
+    def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
+                     Ae=None, fe=None, Qe=None, Qez=None, 
+                     C=None, h=None):
         if (Az != None):
             self.kf.A = Az
         if (C != None):
@@ -103,7 +117,8 @@ class MixedNLGaussian(part_utils.RBPSBase):
             self.fe = fe
         if (fz != None):
             self.fz = fz
-
+            
+    
     def calc_suff_stats(self, next_part):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         # Create sample particle
@@ -171,3 +186,65 @@ class MixedNLGaussian(part_utils.RBPSBase):
 
     def set_nonlin_state(self,inp):
         self.eta = inp
+
+    def param_change(self, Az=None, fz=None, Qz=None, R=None,
+                     Ae=None, fe=None, Qe=None, Qez=None, 
+                     C=None, h=None, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
+                     grad_Ae=None, grad_fe=None, grad_Qe=None, grad_Qez=None, 
+                     grad_C=None, grad_h=None):
+        """ Update all values and gradients according to a new set of parameters  
+        grad_* params are tuples where the i:th entry is the element-wise derivative with
+        respect to the i:th parameter"""
+
+        self.set_dynamics(Az=Az, fz=fz, Qz=Qz, R=R,
+                     Ae=Ae, fe=fe, Qe=Qe, Qez=Qez, 
+                     C=C, h=h)
+        # Calculate values of all cached variables
+        
+        # Calcuate l1 according to (19a)
+        self.z1 = None #FIXME
+        tmp = self.kf.x_new - self.z1
+        l1 = tmp.dot(tmp.T) + self.kf.P
+        # Calculate l2 according to (16)
+        tmp1 = x_next - f - self.A.dot(self.kf.x_new)
+        zero_tmp = numpy.zeros((self.A.shape[0],self.Ae.shape[0]))
+        A1 = numpy.hstack((zero_tmp, self.A))
+        tmp2 = A1.dot(self.M_tN)
+        l2 = tmp.dot(tmp.T) - self.A.dot(self.kf.P).dot(self.A.T) - tmp2.T -tmp2
+        # Calculate l3 according to (19b)
+        y = None #FIXME
+        tmp = (y-self.h-self.kf.C.dot(self.kf.x_new))
+        l3 = tmp.dot(tmp.T) + self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
+        
+    @property
+    def logp_xo(self):
+        """ Calculate a term of the I1 integral as specified in [1]"""
+        return self.cached_logp_xo
+    
+    @property
+    def logp_xnext(self):
+        """ Calculate a term of the I2 integral as specified in [1]"""
+        return self.cached_logp_xnext
+    
+    @property
+    def logp_y(self):
+        """ Calculate a term of the I3 integral as specified in [1]"""
+        return self.cached_logp_xnet
+
+    @property
+    def grad_logp_xo(self):
+        """ Calculate gradient of a term of the I1 integral,
+            as specified in [1]"""
+        return self.cached_grad_logp_xo
+    
+    @property
+    def grad_logp_xnext(self):
+        """ Calculate gradient of a term of the I2 integral,
+            as specified in [1]"""
+        return self.cached_grad_logp_xnext
+    
+    @property
+    def grad_logp_y(self):
+        """ Calculate gradient of a term of the the I3 integral,
+            as specified in [1]"""
+        return self.cached_grad_logp_y
