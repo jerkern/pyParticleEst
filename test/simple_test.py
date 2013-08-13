@@ -50,7 +50,7 @@ if __name__ == '__main__':
     for i in range(steps):
         
         # Extract linear states
-        vals[:2,num,i]=correct.kf.x_new.reshape(-1)
+        vals[:2,num,i]=correct.kf.z.reshape(-1)
         # Extract non-linear state
         vals[2,num,i]=correct.eta[0,0]
 
@@ -61,11 +61,11 @@ if __name__ == '__main__':
         correct.update(u, 0.0*noise)
     
         # use the correct particle to generate the true measurement
-        y = correct.kf.C.dot(correct.kf.x_new)
+        y = correct.kf.C.dot(correct.kf.z)
         yvec.append(y)
     
     # Store values for last time-step aswell    
-    vals[:2,num,steps]=correct.kf.x_new.reshape(-1)
+    vals[:2,num,steps]=correct.kf.z.reshape(-1)
     vals[2,num,steps]=correct.eta[0,0]
     
         
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     for step in pt:
         pa = step.pa
         for j in range(pa.num):
-            vals[:2,j,i]=pa.part[j].kf.x_new.reshape(-1)
+            vals[:2,j,i]=pa.part[j].kf.z.reshape(-1)
             vals[2,j,i]=pa.part[j].eta[0,0]
         i += 1
         
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     
     for i in range(steps+1):
         for j in range(nums):
-            svals[:2,j,i]=straj[j].traj[i].kf.x_new.ravel()
+            svals[:2,j,i]=straj[j].traj[i].kf.z.ravel()
             svals[2,j,i]=straj[j].traj[i].get_nonlin_state().ravel()
             
     for j in range(nums):

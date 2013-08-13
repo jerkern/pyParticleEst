@@ -55,3 +55,6 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         
     def linear_input(self, u):
         return u[:2].reshape((-1,1))
+    
+    def set_params(self, params):
+        pass

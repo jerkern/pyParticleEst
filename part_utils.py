@@ -29,26 +29,22 @@ class RBPFBase(ParticleFilteringInterface):
     
     def __init__(self, z0, P0, 
                  Az=None, Bz=None, C=None,
-                  Qz=None, R=None):
-        self.kf = kalman.KalmanSmoother(x0=z0, P0=P0,
-                                        A=Az, C=C, 
-                                        Q=Qz, R=R)
-    
-    def set_dynamics(self, Az=None, Bz=None, C=None, Qz=None, R=None):
+                  Qz=None, R=None, f_k=None, h_k=None):
         
-        if (Az):
-            self.kf.A = Az
-        if (C):
-            self.kf.C = C
-        if (Qz):
-            self.kf.Q = Qz
-        if (R):
-            self.kf.R = R
+        self.kf = kalman.KalmanSmoother(z0=z0, P0=P0,
+                                        A=Az, C=C, 
+                                        Q=Qz, R=R,
+                                        f_k=f_k, h_k=h_k)
+    
+    def set_dynamics(self, Az=None, C=None, Qz=None, R=None, f_k=None, h_k=None):
+
+        self.kf.set_dynamics(A=Az, C=C, Q=Qz, R=R, f_k=f_k, h_k=h_k)
+
     
     @abc.abstractmethod
     def update(self, u, noise):
         """ Update estimate using 'data' as input """
-        self.kf.time_update(f_k=u)
+        self.kf.time_update()
     
     @abc.abstractmethod    
     def measure(self, y):
@@ -87,16 +83,16 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
         C = self.kf.C
         Q = self.kf.Q
         R = self.kf.R
-        x0 = self.kf.x_new
+        z0 = self.kf.z
         P = self.kf.P
 
-        kf = kalman.KalmanFilter(A=A,C=C, x0=numpy.reshape(x0,(-1,1)), P0=P, Q=Q, R=R)
-        kf.time_update(f_k=fz)
+        kf = kalman.KalmanFilter(A=A,C=C, z0=numpy.reshape(z0,(-1,1)), P0=P, Q=Q, R=R, f_k=fz)
+        kf.time_update()
         
-        return (kf.x_new.reshape((-1,1)), kf.P)
+        return (kf.z.reshape((-1,1)), kf.P)
     
     def clin_measure(self, y):
-        """ Kalman measuement of the linear states conditioned on the non-linear trajectory estimate """
+        """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
         self.kf.meas_update(y)
 
     def clin_smooth(self, z_next, f_k=None):
@@ -115,15 +111,15 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
 
     @abc.abstractmethod
     def set_lin_est(self, lest):
-        """ Set the estimate of the rao-blackwellized states """
+        """ Set the estimate of the Rao-Blackwellized states """
         return
  
     @abc.abstractmethod
     def get_lin_est(self):
-        """ Return the estimate of the rao-blackwellized states """
+        """ Return the estimate of the Rao-Blackwellized states """
         return
  
     @abc.abstractmethod
     def linear_input(self, u):
-        """ Extract the part of u affect the conditionally rao-blackwellized states """
+        """ Extract the part of u affect the conditionally Rao-Blackwellized states """
         return

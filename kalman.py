@@ -21,17 +21,17 @@ def lognormpdf(x,mu,S):
 
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
-        x_{k+1} = A*x_{k}+f_k + v_k
-        y_k = C*x_k +f_k e_k
+        z_{k+1} = A*z_{k}+f_k + v_k
+        y_k = C*z_k +f_k e_k
         f_k - Additive (time-varying) constant
         h_k - Additive (time-varying) constant
         v_k ~ N(0,Q)
         e_k ~ N(0,R)
         """
         
-    def __init__(self, x0, P0, A=None, C=None, Q=None, R=None):
-        """ x_{k+1} = A*x_{k}+f_k + v_k
-        y_k = C*x_k + h_k + e_k 
+    def __init__(self, z0, P0, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
+        """ z_{k+1} = A*z_{k}+f_k + v_k
+        y_k = C*z_k + h_k + e_k 
         v_k ~ N(0,Q)
         e_k ~ N(0,R)
         x0 = x_0, P0 = P_0
@@ -40,56 +40,69 @@ class KalmanFilter(object):
         x0 and P0 are mandatory, the matrices can be overriden at each time instant
         if desired, for instance if the system dynamics are time-varying
         """
-        self.A = A
-        self.C = C
-        
-        self.R = R      # Measurement noise covariance
-        self.Q = Q      # Process noise covariance
-        self.x_new = x0 # Estimated state
+        self.z = z0 # Estimated state
         self.P = P0     # Estimated covariance
-        self.K = None   # Define self.K for later use
-        #self.eye = sp.identity(len(self.x_new))
+
+        self.A = None
+        self.C = None
+        self.R = None      # Measurement noise covariance
+        self.Q = None      # Process noise covariance
+        self.f_k = None
+        self.h_k = None
+        
+        self.set_dynamics(A, C, Q, R, f_k, h_k)
+        
+    def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
+        if (A != None):
+            self.A = A
+        if (C != None):
+            self.C = C
+        if (Q != None):
+            self.Q = Q
+        if (R != None):
+            self.R = R
+        if (f_k != None):
+            self.f_k = f_k
+        if (h_k != None):
+            self.h_k = h_k
      
-    def time_update(self, f_k):
-        """ Do a time update, i.e. predict one step forward in time using the input f_k """
+    def time_update(self):
+        """ Do a time update, i.e. predict one step forward in time using the dynamics """
         
         # Calculate next state
-        (self.x_new, self.P) = self.predict(f_k)  
+        (self.z, self.P) = self.predict()  
         
-    def predict(self, f_k):
+    def predict(self):
         """ Calculate next state estimate without actually updating the internal variables """
         A = self.A
-        x = A.dot(self.x_new)     # Calculate the next state
-        if (f_k != None):
+        z = A.dot(self.z)     # Calculate the next state
+        if (self.f_k != None):
             # Calculate how u affects the states
-            x += f_k                 
+            z += self.f_k                 
         P = A.dot(self.P).dot(A.T) + self.Q  # Calculate the estimated variance  
-        return (x, P)
+        return (z, P)
     
-    def meas_update(self, y, h_k, C=None, R=None):
+    def meas_update(self, y):
         """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
-        
-        if (C == None):
-            C = self.C
-        if (R == None):
-            R = self.R
 
-        S = C.dot(self.P).dot(C.T)+R
+        C = self.C
+        
+        S = C.dot(self.P).dot(C.T)+self.R
 
         if (sp.issparse(S)):
             Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
             Sinv = np.linalg.inv(Sd)
-            self.K = self.P.dot(C.T).dot(sp.csr_matrix(Sinv))
+            K = self.P.dot(C.T).dot(sp.csr_matrix(Sinv))
         else:
             Sinv = np.linalg.inv(S)
-            self.K = self.P.dot(C.T).dot(Sinv)
+            K = self.P.dot(C.T).dot(Sinv)
         
-        yhat = C.dot(self.x_new)
-        if (h_k != None):
-            yhat += h_k
+        yhat = C.dot(self.z)
+        if (self.h_k != None):
+            yhat += self.h_k
         err = y-yhat
-        self.x_new = self.x_new + self.K.dot(err)  
-        self.P -= self.K.dot(C).dot(self.P)
+        self.z += K.dot(err)  
+        self.P -= K.dot(C).dot(self.P)
 
         # Return the probability of the received measurement
         return lognormpdf(y, yhat, S)

@@ -19,15 +19,20 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
-    def __init__(self, z0=None, P0=None,  Az=None, C=None, Qz=None, R=None, fz=None,
-                 e0=None, Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None):
+    def __init__(self, z0, P0, e0, Az=None, C=None, Qz=None, R=None, fz=None,
+                 Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None):
         super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
                                               Az=Az, C=C, 
                                               Qz=Qz, R=R)
         self.Ae = Ae
         self.Qe = Qe
-        self.Qez = Qez
+        
         self.eta = e0
+
+        if (Qez != None):
+            self.Qez = Qez
+        else:
+            Qez = numpy.zeros((len(z0),len(e0)))
         if (fe != None):
             self.fe = fe
         else:
@@ -57,7 +62,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def update(self, u, noise):
         
         # Update non-linear state using sampled noise
-        self.eta += self.fe + self.Ae.dot(self.kf.x_new) + noise
+        self.eta += self.fe + self.Ae.dot(self.kf.z) + noise
         
         # Handle linear/non-linear noise correlation
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
@@ -66,7 +71,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
         
-        self.kf.x_new = self.fz + self.kf.A.dot(self.kf.x_new) + tmp.dot(noise)
+        self.kf.z = self.fz + self.kf.A.dot(self.kf.z) + tmp.dot(noise)
         self.kf.P = Sigma_z - tmp.dot(Sigma_az)
         
 
@@ -80,7 +85,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def next_pdf(self, next_part, u):
         """ Implements the next_pdf function for MixedNLGaussian models """
         lin_P = self.kf.P
-        z_mean = numpy.reshape(self.kf.x_new,(-1,1))
+        z_mean = numpy.reshape(self.kf.z,(-1,1))
         
         _lin_cov = self.kf.Q
         nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
@@ -99,14 +104,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Ae=None, fe=None, Qe=None, Qez=None, 
                      C=None, h=None):
-        if (Az != None):
-            self.kf.A = Az
-        if (C != None):
-            self.kf.C = C
-        if (Qz != None):
-            self.kf.Q = Qz
-        if (R != None):
-            self.kf.R = R
+        super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R)
+
         if (Ae != None):
             self.Ae = Ae
         if (Qe != None):
@@ -123,7 +122,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         # Create sample particle
         
-        lin_est = self.kf.x_new
+        lin_est = self.kf.z
         P = self.kf.P
         A_ext = numpy.vstack((self.Ae, self.kf.A))
         _lin_cov = self.kf.Q
@@ -149,7 +148,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         if (next_part != None):
             (self.z_tN, self.P_tN, self.M_tN) = self.calc_suff_stats(next_part)
         else:
-            self.z_tN = self.kf.x_new
+            self.z_tN = self.kf.z
             self.P_tN = self.kf.P
 
         self.sampled_z = numpy.random.multivariate_normal(self.z_tN.ravel(),self.P_tN).ravel().reshape((-1,1))
@@ -187,64 +186,34 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def set_nonlin_state(self,inp):
         self.eta = inp
 
-    def param_change(self, Az=None, fz=None, Qz=None, R=None,
-                     Ae=None, fe=None, Qe=None, Qez=None, 
-                     C=None, h=None, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
+    def set_dynamics_gradient(self, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
                      grad_Ae=None, grad_fe=None, grad_Qe=None, grad_Qez=None, 
                      grad_C=None, grad_h=None):
-        """ Update all values and gradients according to a new set of parameters  
-        grad_* params are tuples where the i:th entry is the element-wise derivative with
-        respect to the i:th parameter"""
+        pass
 
-        self.set_dynamics(Az=Az, fz=fz, Qz=Qz, R=R,
-                     Ae=Ae, fe=fe, Qe=Qe, Qez=Qez, 
-                     C=C, h=h)
-        # Calculate values of all cached variables
+    def eval_logp_x1(self, z0, P0):
+        """ Calculate a term of the I1 integral approximation
+        and its gradient as specified in [1]"""
         
         # Calcuate l1 according to (19a)
-        self.z1 = None #FIXME
-        tmp = self.kf.x_new - self.z1
+        tmp = self.kf.x_new - z0
         l1 = tmp.dot(tmp.T) + self.kf.P
+
+    def eval_logp_xnext(self, x_next):
+        """ Calculate a term of the I2 integral approximation
+        and its gradient as specified in [1]"""
         # Calculate l2 according to (16)
+        f = numpy.vstack((self.fe, self.fz))
         tmp1 = x_next - f - self.A.dot(self.kf.x_new)
         zero_tmp = numpy.zeros((self.A.shape[0],self.Ae.shape[0]))
         A1 = numpy.hstack((zero_tmp, self.A))
         tmp2 = A1.dot(self.M_tN)
-        l2 = tmp.dot(tmp.T) - self.A.dot(self.kf.P).dot(self.A.T) - tmp2.T -tmp2
-        # Calculate l3 according to (19b)
-        y = None #FIXME
+        l2 = tmp1.dot(tmp1.T) - self.A.dot(self.kf.P).dot(self.A.T) - tmp2.T -tmp2
+
+    def eval_logp_y(self, y):
+        """ Calculate a term of the I3 integral approximation
+        and its gradient as specified in [1]"""
+
+                # Calculate l3 according to (19b)
         tmp = (y-self.h-self.kf.C.dot(self.kf.x_new))
         l3 = tmp.dot(tmp.T) + self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
-        
-    @property
-    def logp_xo(self):
-        """ Calculate a term of the I1 integral as specified in [1]"""
-        return self.cached_logp_xo
-    
-    @property
-    def logp_xnext(self):
-        """ Calculate a term of the I2 integral as specified in [1]"""
-        return self.cached_logp_xnext
-    
-    @property
-    def logp_y(self):
-        """ Calculate a term of the I3 integral as specified in [1]"""
-        return self.cached_logp_xnet
-
-    @property
-    def grad_logp_xo(self):
-        """ Calculate gradient of a term of the I1 integral,
-            as specified in [1]"""
-        return self.cached_grad_logp_xo
-    
-    @property
-    def grad_logp_xnext(self):
-        """ Calculate gradient of a term of the I2 integral,
-            as specified in [1]"""
-        return self.cached_grad_logp_xnext
-    
-    @property
-    def grad_logp_y(self):
-        """ Calculate gradient of a term of the the I3 integral,
-            as specified in [1]"""
-        return self.cached_grad_logp_y
