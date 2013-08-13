@@ -17,11 +17,12 @@ if __name__ == '__main__':
     # Create an array for our particles 
     particles = numpy.empty(num, type(correct))
     
+    
+    z0 = numpy.array([[0.0], [0.0]])
     # Initialize particles
     for k in range(len(particles)):
         # Let the initial value of the non-linear state be U(2,3)
-        particles[k] = SimpleParticle(numpy.array([[0.0], [0.0]]),
-                                      numpy.random.uniform(2, 3))
+        particles[k] = SimpleParticle(z0, numpy.random.uniform(2, 3))
     
     # Create a particle approximation object from our particles
     pa = PF.ParticleApproximation(particles=particles)
@@ -80,11 +81,14 @@ if __name__ == '__main__':
         pt.update(u+tmp)
         
         # Use noise corrupted measurements
-        pt.measure(yvec[i]+numpy.random.normal(0.0,1.))
+        pt.measure(yvec[i]+numpy.random.normal(0.0,5.))
         
     # Use the filtered estimates above to created smoothed estimates
     nums = 10 # Number of backward trajectories to generate
     straj = PS.do_smoothing(pt, nums)   # Do sampled smoothing
+    for st in straj:
+        st.constrained_smoothing(z0=z0,
+                                 P0=100000*numpy.diag([1.0, 1.0]))
     
     # Extract data from trajectories for plotting
     i=0

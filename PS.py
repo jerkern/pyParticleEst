@@ -71,7 +71,7 @@ class SmoothTrajectory(object):
             prev_part = pa.part[ind]
             p_index = pt.traj.index(step)           
             # Sample smoothed linear estimate
-            self.traj[cur_ind]=copy.copy(prev_part)
+            self.traj[cur_ind]=copy.deepcopy(prev_part)
             self.traj[cur_ind].sample_smooth(self.traj[cur_ind+1])
             self.u.append(step.u)
             self.y.append(step.y)
@@ -85,20 +85,21 @@ class SmoothTrajectory(object):
     def __len__(self):
         return len(self.traj)
     
-    def constrained_smoothing(self):
+    def constrained_smoothing(self, z0, P0):
+        
+        self.traj[0].set_lin_est((z0.ravel(), P0))
         for i in range(len(self.traj)-1):
             
             if (self.y[i] != None):
                 self.traj[i].clin_measure(self.y[i])
             
-            tmp = self.traj[i].clin_update(self.traj[i].linear_input(self.u[i]))
+            tmp = self.traj[i].clin_predict()
 
             self.traj[i+1].set_lin_est(tmp)
         
         # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
-            self.traj[i].clin_smooth(self.traj[i+1].get_lin_est(),
-                                     self.traj[i].linear_input(self.u[i]))
+            self.traj[i].clin_smooth(self.traj[i+1].get_lin_est())
 
 
 def do_smoothing(pt, M, rej_sampling=True):

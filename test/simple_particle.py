@@ -15,7 +15,7 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         
         P = 100000*numpy.diag([1.0, 1.0])
         
-        R = numpy.array([[1.]])
+        R = numpy.array([[5.]])
         
         Ae = numpy.zeros((1,2))
         
@@ -53,8 +53,8 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         # Update linear dynamics
         self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
         
-    def linear_input(self, u):
-        return u[:2].reshape((-1,1))
-    
+#    def linear_input(self, u):
+#        return u[:2].reshape((-1,1))
+#    
     def set_params(self, params):
         pass

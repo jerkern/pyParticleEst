@@ -1,7 +1,6 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
 import abc
 import kalman
-import numpy
 
 class ParticleFilteringInterface(object):
     """ Base class for particles to be used with particle filtering """
@@ -77,27 +76,18 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
                                       Qz=Qz, R=R)
         
     
-    def clin_update(self, fz=None):
+    def clin_predict(self):
         """ Kalman update of the linear states conditioned on the non-linear trajectory estimate """
-        A = self.kf.A
-        C = self.kf.C
-        Q = self.kf.Q
-        R = self.kf.R
-        z0 = self.kf.z
-        P = self.kf.P
-
-        kf = kalman.KalmanFilter(A=A,C=C, z0=numpy.reshape(z0,(-1,1)), P0=P, Q=Q, R=R, f_k=fz)
-        kf.time_update()
-        
-        return (kf.z.reshape((-1,1)), kf.P)
+        (z, P) = self.kf.predict()
+        return (z.reshape((-1,1)), P)
     
     def clin_measure(self, y):
         """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
         self.kf.meas_update(y)
 
-    def clin_smooth(self, z_next, f_k=None):
+    def clin_smooth(self, z_next):
         """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
-        self.kf.smooth(z_next[0], z_next[1], f_k)
+        self.kf.smooth(z_next[0], z_next[1])
 
     @abc.abstractmethod
     def set_nonlin_state(self, eta):
@@ -107,19 +97,17 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     @abc.abstractmethod
     def get_nonlin_state(self):
         """ Return the non-linear state estimates """
-        return
 
-    @abc.abstractmethod
     def set_lin_est(self, lest):
         """ Set the estimate of the Rao-Blackwellized states """
-        return
+        self.kf.z = lest[0].reshape((-1,1))
+        self.kf.P = lest[1]
  
-    @abc.abstractmethod
     def get_lin_est(self):
         """ Return the estimate of the Rao-Blackwellized states """
-        return
- 
-    @abc.abstractmethod
-    def linear_input(self, u):
-        """ Extract the part of u affect the conditionally Rao-Blackwellized states """
-        return
+        return (self.kf.z, self.kf.P)
+# 
+#    @abc.abstractmethod
+#    def linear_input(self, u):
+#        """ Extract the part of u affect the conditionally Rao-Blackwellized states """
+#        return

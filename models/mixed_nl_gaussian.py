@@ -9,7 +9,7 @@ class MixedNLGaussianCollapsed(object):
     """ Stores collapsed sample of MixedNLGaussian object """
     def __init__(self, parent):
         self.eta = parent.get_nonlin_state().ravel()            
-        tmpp = numpy.random.multivariate_normal(numpy.ravel(parent.kf.x_new),
+        tmpp = numpy.random.multivariate_normal(numpy.ravel(parent.kf.z),
                                                 parent.kf.P)
         self.z = tmpp.ravel()   
 
@@ -32,7 +32,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         if (Qez != None):
             self.Qez = Qez
         else:
-            Qez = numpy.zeros((len(z0),len(e0)))
+            self.Qez = numpy.zeros((len(e0),len(z0)))
         if (fe != None):
             self.fe = fe
         else:
@@ -71,6 +71,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
         
+        # This is what is sometimes called "the second measurement update"
+        # for Rao-Blackwellized particle filters
         self.kf.z = self.fz + self.kf.A.dot(self.kf.z) + tmp.dot(noise)
         self.kf.P = Sigma_z - tmp.dot(Sigma_az)
         
@@ -173,13 +175,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         zero = numpy.zeros((Sigma.shape[0],1))
         return kalman.lognormpdf(zero, zero, Sigma)
     
-    def set_lin_est(self, est):
-        self.kf.x_new = est[0]
-        self.kf.P = est[1]
-        
-    def get_lin_est(self):
-        return (self.kf.x_new, self.kf.P)
-
     def get_nonlin_state(self):
         return self.eta
 
@@ -196,7 +191,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         and its gradient as specified in [1]"""
         
         # Calcuate l1 according to (19a)
-        tmp = self.kf.x_new - z0
+        tmp = self.kf.z - z0
         l1 = tmp.dot(tmp.T) + self.kf.P
 
     def eval_logp_xnext(self, x_next):
@@ -204,7 +199,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         and its gradient as specified in [1]"""
         # Calculate l2 according to (16)
         f = numpy.vstack((self.fe, self.fz))
-        tmp1 = x_next - f - self.A.dot(self.kf.x_new)
+        tmp1 = x_next - f - self.A.dot(self.kf.z)
         zero_tmp = numpy.zeros((self.A.shape[0],self.Ae.shape[0]))
         A1 = numpy.hstack((zero_tmp, self.A))
         tmp2 = A1.dot(self.M_tN)
@@ -215,5 +210,5 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         and its gradient as specified in [1]"""
 
                 # Calculate l3 according to (19b)
-        tmp = (y-self.h-self.kf.C.dot(self.kf.x_new))
+        tmp = (y-self.h-self.kf.C.dot(self.kf.z))
         l3 = tmp.dot(tmp.T) + self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
