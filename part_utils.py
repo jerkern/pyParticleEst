@@ -76,12 +76,12 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
                                       Qz=Qz, R=R)
         
     
-    def clin_predict(self):
+    def clin_predict(self, next_part=None):
         """ Kalman update of the linear states conditioned on the non-linear trajectory estimate """
         (z, P) = self.kf.predict()
         return (z.reshape((-1,1)), P)
     
-    def clin_measure(self, y):
+    def clin_measure(self, y, next_part=None):
         """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
         self.kf.meas_update(y)
 

@@ -91,13 +91,16 @@ class SmoothTrajectory(object):
         for i in range(len(self.traj)-1):
             
             if (self.y[i] != None):
-                self.traj[i].clin_measure(self.y[i])
-            tmp = self.traj[i].clin_predict()
-
+                # Estimate z_t given information about eta_{t+1}
+                self.traj[i].clin_measure(y=self.y[i],
+                                          next_part=self.traj[i+1])
+                
+            # Predict z_{t+1} given information about eta_{t+1}
+            tmp = self.traj[i].clin_predict(self.traj[i+1])
             self.traj[i+1].set_lin_est(tmp)
         
         if (self.y[-1] != None):
-            self.traj[-1].clin_measure(self.y[-1])
+            self.traj[-1].clin_measure(self.y[-1], next_part=None)
         # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
             self.traj[i].clin_smooth(self.traj[i+1].get_lin_est())

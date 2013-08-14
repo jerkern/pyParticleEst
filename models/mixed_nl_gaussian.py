@@ -76,6 +76,21 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         self.kf.z += tmp.dot(noise)
         self.kf.P -= tmp.dot(Sigma_az)
 
+    def clin_predict(self, next_part=None):
+        noise = next_part.eta - self.fe - self.Ae.dot(self.kf.z)
+        Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
+        Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
+        
+        (z, P) = super(MixedNLGaussian, self).clin_predict(next)
+        
+        # This is what is sometimes called "the second measurement update"
+        # for Rao-Blackwellized particle filters
+        tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
+        z += tmp.dot(noise)
+        P -= tmp.dot(Sigma_az)
+        
+        return (z, P)
+
     def sample_process_noise(self, u): 
         """ Return sampled process noise for the non-linear states """
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
@@ -159,14 +174,19 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Sigma = cov + lin_P_ext
         return Sigma
     
+
+    
     def prep_clin_measure(self, y):
         return y
     
-    def clin_measure(self, y):
+    def clin_measure(self, y, next_part=None):
+                # This implementation doesn't handle correlation between measurement
+        # and process noise (ie, we don't need to know the next state
         yl = self.prep_clin_measure(y)
         return super(MixedNLGaussian, self).clin_measure(yl)
     
     def measure(self, y):
+
         return super(MixedNLGaussian, self).measure(y)
     
     def fwd_peak_density(self, u):
