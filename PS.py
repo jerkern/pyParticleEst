@@ -87,19 +87,21 @@ class SmoothTrajectory(object):
     
     def constrained_smoothing(self, z0, P0):
         
-        self.traj[0].set_lin_est((z0.ravel(), P0))
+        self.traj[0].set_lin_est((z0, P0))
         for i in range(len(self.traj)-1):
             
             if (self.y[i] != None):
                 self.traj[i].clin_measure(self.y[i])
-            
             tmp = self.traj[i].clin_predict()
 
             self.traj[i+1].set_lin_est(tmp)
         
+        if (self.y[-1] != None):
+            self.traj[-1].clin_measure(self.y[-1])
         # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
             self.traj[i].clin_smooth(self.traj[i+1].get_lin_est())
+
 
 
 def do_smoothing(pt, M, rej_sampling=True):

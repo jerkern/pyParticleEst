@@ -81,7 +81,7 @@ if __name__ == '__main__':
         pt.update(u+tmp)
         
         # Use noise corrupted measurements
-        pt.measure(yvec[i]+numpy.random.normal(0.0,5.))
+        pt.measure(yvec[i]+numpy.random.normal(0.0,1.))
         
     # Use the filtered estimates above to created smoothed estimates
     nums = 10 # Number of backward trajectories to generate

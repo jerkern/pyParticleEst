@@ -67,15 +67,14 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         # Handle linear/non-linear noise correlation
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
-        Sigma_z = self.kf.Q + self.kf.A.dot(self.kf.P).dot(self.kf.A.T)
         
-        tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
-        
+        super(MixedNLGaussian, self).update(u, noise)
+
         # This is what is sometimes called "the second measurement update"
         # for Rao-Blackwellized particle filters
-        self.kf.z = self.fz + self.kf.A.dot(self.kf.z) + tmp.dot(noise)
-        self.kf.P = Sigma_z - tmp.dot(Sigma_az)
-        
+        tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
+        self.kf.z += tmp.dot(noise)
+        self.kf.P -= tmp.dot(Sigma_az)
 
     def sample_process_noise(self, u): 
         """ Return sampled process noise for the non-linear states """
@@ -106,7 +105,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Ae=None, fe=None, Qe=None, Qez=None, 
                      C=None, h=None):
-        super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R)
+        super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, f_k=fz,h_k=h)
 
         if (Ae != None):
             self.Ae = Ae
@@ -116,8 +115,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             self.Qez = Qez
         if (fe != None):
             self.fe = fe
-        if (fz != None):
-            self.fz = fz
             
     
     def calc_suff_stats(self, next_part):
@@ -168,6 +165,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def clin_measure(self, y):
         yl = self.prep_clin_measure(y)
         return super(MixedNLGaussian, self).clin_measure(yl)
+    
+    def measure(self, y):
+        return super(MixedNLGaussian, self).measure(y)
     
     def fwd_peak_density(self, u):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
