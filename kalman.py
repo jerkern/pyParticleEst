@@ -82,6 +82,12 @@ class KalmanFilter(object):
         P = A.dot(self.P).dot(A.T) + self.Q  # Calculate the estimated variance  
         return (z, P)
     
+    def measurement_diff(self, y):
+        yhat = self.C.dot(self.z)
+        if (self.h_k != None):
+            yhat += self.h_k
+        return y-yhat
+    
     def meas_update(self, y):
         """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
 
@@ -100,7 +106,7 @@ class KalmanFilter(object):
         yhat = C.dot(self.z)
         if (self.h_k != None):
             yhat += self.h_k
-        err = y-yhat
+        err = self.measurement_diff(y)
         self.z += K.dot(err)  
         self.P -= K.dot(C).dot(self.P)
 

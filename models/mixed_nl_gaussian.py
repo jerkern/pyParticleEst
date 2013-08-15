@@ -229,6 +229,10 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
 
-                # Calculate l3 according to (19b)
-        tmp = (y-self.h-self.kf.C.dot(self.kf.z))
-        l3 = tmp.dot(tmp.T) + self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
+        # Calculate l3 according to (19b)
+        tmp = self.kf.measurement_diff(y) 
+        l3 = tmp.dot(tmp.T)
+        l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
+        (tmp, ld) = numpy.linalg.slogdet(self.kf.R)
+        tmp = numpy.linalg.solve(self.kf.R, l3)
+        return ld + numpy.trace(tmp)
