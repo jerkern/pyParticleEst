@@ -40,8 +40,8 @@ class KalmanFilter(object):
         x0 and P0 are mandatory, the matrices can be overriden at each time instant
         if desired, for instance if the system dynamics are time-varying
         """
-        self.z = z0 # Estimated state
-        self.P = P0     # Estimated covariance
+        self.z = np.copy(z0) # Estimated state
+        self.P = np.copy(P0)     # Estimated covariance
 
         self.A = None
         self.C = None

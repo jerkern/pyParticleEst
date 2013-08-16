@@ -5,14 +5,6 @@ import kalman
 import part_utils
 import param_est
 
-class MixedNLGaussianCollapsed(object):
-    """ Stores collapsed sample of MixedNLGaussian object """
-    def __init__(self, parent):
-        self.eta = parent.get_nonlin_state().ravel()            
-        tmpp = numpy.random.multivariate_normal(numpy.ravel(parent.kf.z),
-                                                parent.kf.P)
-        self.z = tmpp.ravel()   
-
 
 class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
@@ -27,7 +19,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         self.Ae = Ae
         self.Qe = Qe
         
-        self.eta = e0
+        self.eta = numpy.copy(e0.reshape((-1,1)))
 
         if (Qez != None):
             self.Qez = Qez
@@ -60,9 +52,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         self.grad_fz = None
         
     def update(self, u, noise):
-        
+        noise = numpy.reshape(noise, (-1,1))
         # Update non-linear state using sampled noise
-        self.eta += self.fe + self.Ae.dot(self.kf.z) + noise
+        self.eta = self.fe + self.Ae.dot(self.kf.z) + noise
         
         # Handle linear/non-linear noise correlation
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
@@ -91,7 +83,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         return (z, P)
 
-    def sample_process_noise(self, u): 
+    def sample_process_noise(self, u=None): 
         """ Return sampled process noise for the non-linear states """
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         
@@ -186,7 +178,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         return super(MixedNLGaussian, self).clin_measure(yl)
     
     def measure(self, y):
-
+        y=numpy.reshape(y, (-1,1))
         return super(MixedNLGaussian, self).measure(y)
     
     def fwd_peak_density(self, u):
@@ -218,12 +210,29 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Calculate a term of the I2 integral approximation
         and its gradient as specified in [1]"""
         # Calculate l2 according to (16)
-        f = numpy.vstack((self.fe, self.fz))
-        tmp1 = x_next - f - self.A.dot(self.kf.z)
-        zero_tmp = numpy.zeros((self.A.shape[0],self.Ae.shape[0]))
-        A1 = numpy.hstack((zero_tmp, self.A))
-        tmp2 = A1.dot(self.M_tN)
-        l2 = tmp1.dot(tmp1.T) - self.A.dot(self.kf.P).dot(self.A.T) - tmp2.T -tmp2
+        if (self.fe != None):
+            fe = self.fe
+        else:
+            fe = numpy.zeros((len(self.eta),1))
+        if (self.kf.f_k != None):
+            fz = self.kf.f_k
+        else:
+            fz = numpy.zeros((len(self.kf.z),1))
+            
+        x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
+        f = numpy.vstack((fe, fz))
+        A = numpy.vstack((self.Ae, self.kf.A))
+        tmp1 = x_kplus - f - A.dot(self.kf.z)
+        zero_tmp = numpy.zeros((len(self.kf.z),len(self.eta)))
+        M_ext = numpy.hstack((zero_tmp, self.M_tN))
+        tmp2 = A.dot(M_ext)
+        l2 = tmp1.dot(tmp1.T)
+        l2 += A.dot(self.kf.P).dot(A.T) - tmp2.T -tmp2
+        
+        Q = self.get_Q()
+        (tmp, ld) = numpy.linalg.slogdet(Q)
+        tmp = numpy.linalg.solve(Q, l2)
+        return ld + numpy.trace(tmp)
 
     def eval_logp_y(self, y):
         """ Calculate a term of the I3 integral approximation

@@ -39,7 +39,10 @@ class ParamEstimation(object):
     
     def __init__(self, u, y):
         
-        self.u = u
+        if (u != None):
+            self.u = u
+        else:
+            self.u = [None] * len(y)
         self.y = y
         self.pt = None
         self.straj = None
@@ -64,12 +67,12 @@ class ParamEstimation(object):
         self.pt = PF.ParticleTrajectory(pa,0.67)
         
         # Run particle filter
-        for i in range(self.u.shape[1]):
+        for i in range(len(self.y)):
             # Run PF using noise corrupted input signal
-            self.pt.update(self.u[:,i].reshape(-1,1))
+            self.pt.update(self.u[i])
         
             # Use noise corrupted measurements
-            self.pt.measure(self.y[:,i].reshape(-1,1))
+            self.pt.measure(self.y[i])
             
         # Use the filtered estimates above to created smoothed estimates
         self.straj = PS.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
@@ -83,3 +86,10 @@ class ParamEstimation(object):
                 if (traj.y[i] != None):
                     logp_y += traj.traj[i].eval_logp_y(traj.y[i])
         return -logp_y
+    
+    def eval_logp_xnext(self):
+        logp_xnext = 0.0
+        for traj in self.straj:
+            for i in range(len(traj.traj)-1):
+                logp_xnext += traj.traj[i].eval_logp_xnext(traj.traj[i+1])
+        return -logp_xnext
