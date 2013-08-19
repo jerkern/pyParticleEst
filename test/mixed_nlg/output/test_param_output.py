@@ -30,7 +30,7 @@ if __name__ == '__main__':
                                   params=(c_true,))
 
     # How many steps forward in time should our simulation run
-    steps = 20
+    steps = 32
     
     # Create a random input vector to drive our "correct state"
     mean = -numpy.hstack((-1.0*numpy.ones(steps/4), 1.0*numpy.ones(steps/2),-1.0*numpy.ones(steps/4) ))
@@ -64,11 +64,13 @@ if __name__ == '__main__':
     vals[:2,num,steps]=correct.kf.z.reshape(-1)
     vals[2,num,steps]=correct.eta[0,0]
 
-    u_noise = numpy.copy(uvec)
-    y_noise = copy.deepcopy(yvec)
-    for i in range(y_noise.shape[1]):
-        u_noise[:,i] += numpy.random.normal((0.0,0.0),(0.1,0.1)).ravel()
-        y_noise[:,i] += numpy.random.normal(0.0,1.0)
+    #u_noise = numpy.copy(uvec)
+    #y_noise = copy.deepcopy(yvec)
+    u_noise = uvec.T.tolist()
+    y_noise = yvec.T.tolist() 
+    for i in range(len(u_noise)):
+        u_noise[i] = (u_noise[i] + numpy.random.normal((0.0,0.0),(0.1,0.1)).ravel()).reshape((-1,1))
+        y_noise[i] = (y_noise[i] + numpy.random.normal((0.0,),(1.0,))).reshape((-1,1))
     
     print "estimation start"
     
@@ -117,7 +119,8 @@ if __name__ == '__main__':
                 
         y_est = correct.kf.C.dot(svals[:2,0,:])
         #plt.plot(x[1:],yvec[0,:],'bx')
-        plt.plot(x[1:],y_noise[0,:]/c_true,'b+')
+        ytmp = numpy.asarray(y_noise).ravel()
+        plt.plot(x[1:],ytmp/c_true,'b+')
                 
             
         plt.plot(range(steps+1),vals[0,num,:],'go')
