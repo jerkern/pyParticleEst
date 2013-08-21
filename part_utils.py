@@ -50,6 +50,15 @@ class RBPFBase(ParticleFilteringInterface):
         """ Return the log-pdf value of the measurement """
         return self.kf.meas_update(y=y)
 
+    @abc.abstractmethod
+    def prep_update(self, u):
+        """ Update estimate using 'data' as input """
+        self.kf.time_update()
+    
+    @abc.abstractmethod    
+    def prep_measure(self, y):
+        """ Return the log-pdf value of the measurement """
+        return self.kf.meas_update(y=y)
 
 class ParticleSmoothingInterface(ParticleFilteringInterface):
     """ Base class for particles to be used with particle smoothing """
@@ -69,11 +78,11 @@ class ParticleSmoothingInterface(ParticleFilteringInterface):
 class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     __metaclass__ = abc.ABCMeta
     
-    def __init__(self, z0, P0, 
-                 Az=None, Bz=None, C=None, D=None,
-                 Qz=None, R=None):
-        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
-                                      Qz=Qz, R=R)
+#    def __init__(self, z0, P0, 
+#                 Az=None, Bz=None, C=None,
+#                  Qz=None, R=None, f_k=None, h_k=None):
+#        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
+#                                      Qz=Qz, R=R, f_k=f_k, h_k=h_k)
         
     
     def clin_predict(self, next_part=None):

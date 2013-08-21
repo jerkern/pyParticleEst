@@ -45,12 +45,17 @@ class ParticleFilter(object):
         
         u = numpy.reshape(u,(-1,1))
         
+        # Prepare the particle for the update, eg. for 
+        # mixed linear/non-linear calculate the variables that
+        # depend on the current state
+        for k in range(pa.num):
+            pa.part[k].prep_update(u)
+        
         if (not inplace):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
         
         for k in range(pa.num):
-            
             v = pa.part[k].sample_process_noise(u)
             pa.part[k].update(u, v)
             
@@ -71,7 +76,11 @@ class ParticleFilter(object):
         
         new_weights = numpy.empty(pa.num, numpy.float)
         for k in range(pa.num):
-            new_weights[k] = pa.part[k].measure(r)
+            # Allow particle to update any internal variables 
+            # depending on the current state and to do any
+            # pre-processing of the mesurements.
+            y = pa.part[k].prep_measure(r)
+            new_weights[k] = pa.part[k].measure(y)
 
         if (self.lp_hack == None):
             # Check so that the approximation hasn't degenerated

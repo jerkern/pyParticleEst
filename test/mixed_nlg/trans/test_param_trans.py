@@ -22,7 +22,7 @@ class ParticleParamTransEst(param_est.ParamEstimation):
 
 if __name__ == '__main__':
     
-    num = 50
+    num = 100
     
     theta_true = 0.1
     R = numpy.array([[0.1]])
@@ -72,12 +72,14 @@ if __name__ == '__main__':
     # Create an array for our particles 
     ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
 
-    nums=5
+    nums=10
 
     plt.ion()
     fig1 = plt.figure()
-    param_steps = 20
-    param_vals = numpy.linspace(0.0, 1.0, param_steps)
+    #param_steps = 20
+    #param_vals = numpy.linspace(0.0, 1.0, param_steps)
+    param_steps = 1
+    param_vals = numpy.asarray((0.1,))
     logpy = numpy.zeros((param_steps,))
     logpxnext = numpy.zeros((param_steps,))
     for k in range(param_steps):

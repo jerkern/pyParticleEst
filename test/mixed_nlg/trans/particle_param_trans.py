@@ -24,17 +24,16 @@ class ParticleParamTrans(mixed_nl_gaussian.MixedNLGaussian):
                                                  R=R, Qe=Qe, Qz=Qz,
                                                  fe=fe)
         
-    def update(self, u, noise):
+    def prep_update(self, u):
         """ Perform a time update of all states """
         fe = numpy.copy(self.eta)
         super(ParticleParamTrans, self).set_dynamics(fe=fe)
-        super(ParticleParamTrans, self).update(u, noise)
         
-    def measure(self, y):
+    def prep_measure(self, y):
         """ Perform a measurement update """
         h = numpy.copy(self.eta)
         super(ParticleParamTrans, self).set_dynamics(h=h)
-        return super(ParticleParamTrans,self).measure(y)
+        return y
     
     def next_pdf(self, next_cpart, u):
         return super(ParticleParamTrans,self).next_pdf(next_cpart, None)

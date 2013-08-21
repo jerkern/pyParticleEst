@@ -15,7 +15,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
                  Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None):
         super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
                                               Az=Az, C=C, 
-                                              Qz=Qz, R=R)
+                                              Qz=Qz, R=R,
+                                              h_k=h, f_k=fz)
         self.Ae = Ae
         self.Qe = Qe
         
@@ -33,10 +34,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             self.fz = fz
         else:
             self.fz = numpy.zeros((len(z0), 1))
-        if (h != None):
-            self.h = h
-        else:
-            self.h = numpy.zeros((self.kf.C.shape[0],1))
         
         self.sampled_z = None
         self.z_tN = None
@@ -53,33 +50,39 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
     def update(self, u, noise):
         noise = numpy.reshape(noise, (-1,1))
-        # Update non-linear state using sampled noise
+        # Update non-linear state using sampled noise,
+        # the noise term here includes the uncertainty from z
         self.eta = self.fe + self.Ae.dot(self.kf.z) + noise
-        
+        print "update1, z=%s, eta=%s, P=%s" % (self.kf.z, self.eta, self.kf.P)
+        print "noise=%s, self.fe=%s" % (noise, self.fe)
         # Handle linear/non-linear noise correlation
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
-        
+        #print "Sa=%s, Saz=%s" % (Sigma_a, Sigma_az)
         super(MixedNLGaussian, self).update(u, noise)
-
+        #print "update2, z=%s" % self.kf.z
         # This is what is sometimes called "the second measurement update"
         # for Rao-Blackwellized particle filters
         tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
         self.kf.z += tmp.dot(noise)
         self.kf.P -= tmp.dot(Sigma_az)
+        print "update3, z=%s" % self.kf.z
 
     def clin_predict(self, next_part=None):
+        print "clin_predict1, z=%s, eta=%s, P=%s" % (self.kf.z, next_part.eta, self.kf.P)
         noise = next_part.eta - self.fe - self.Ae.dot(self.kf.z)
+        print "noise=%s, self.fe=%s" % (noise, self.fe)
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
-        
+        #print "Sa=%s, Saz=%s" % (Sigma_a, Sigma_az)
         (z, P) = super(MixedNLGaussian, self).clin_predict(next)
-        
+        #print "clin_predict2, z=%s" % z
         # This is what is sometimes called "the second measurement update"
         # for Rao-Blackwellized particle filters
         tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
         z += tmp.dot(noise)
         P -= tmp.dot(Sigma_az)
+        print "clin_predict3, z=%s" % z
         
         return (z, P)
 
@@ -87,7 +90,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Return sampled process noise for the non-linear states """
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         
-        return numpy.random.multivariate_normal(numpy.zeros(len(self.   eta)), Sigma_a).reshape((-1,1))
+        return numpy.random.multivariate_normal(numpy.zeros(len(self.eta)), Sigma_a).reshape((-1,1))
 
         
     def next_pdf(self, next_part, u):
@@ -121,7 +124,10 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         if (Qez != None):
             self.Qez = Qez
         if (fe != None):
+            print "set_dynamics, fe=%s" % (fe)
             self.fe = fe
+        if (h != None):
+            print "set_dynamics, h=%s" % (h)
             
     
     def calc_suff_stats(self, next_part):
@@ -147,7 +153,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         return (z_tN, P_tN, M_tN)
     
- 
     
     def sample_smooth(self, next_part):
         """ Implements the sample_smooth function for MixedNLGaussian models """
@@ -166,19 +171,22 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Sigma = cov + lin_P_ext
         return Sigma
     
-
-    
-    def prep_clin_measure(self, y):
-        return y
-    
     def clin_measure(self, y, next_part=None):
                 # This implementation doesn't handle correlation between measurement
         # and process noise (ie, we don't need to know the next state
-        yl = self.prep_clin_measure(y)
-        return super(MixedNLGaussian, self).clin_measure(yl)
+        print "clin_measure, h_k=%s" % self.kf.h_k
+#        tmp =  super(MixedNLGaussian, self).clin_measure(yl)
+#        print "clin_measure2, z=%s" % self.kf.z
+#        return tmp
+        return super(MixedNLGaussian, self).clin_measure(y)
     
     def measure(self, y):
         y=numpy.reshape(y, (-1,1))
+#        print "measure1, z=%s" % self.kf.z
+#        tmp =  super(MixedNLGaussian, self).measure(y)
+#        print "measure2, z=%s" % self.kf.z
+#        return tmp
+        print "measure, h_k=%s" % self.kf.h_k
         return super(MixedNLGaussian, self).measure(y)
     
     def fwd_peak_density(self, u):
@@ -196,6 +204,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def set_dynamics_gradient(self, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
                      grad_Ae=None, grad_fe=None, grad_Qe=None, grad_Qez=None, 
                      grad_C=None, grad_h=None):
+        pass
+    
+    def set_params(self, params):
         pass
 
     def eval_logp_x1(self, z0, P0):

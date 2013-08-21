@@ -32,17 +32,16 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
                                             Az=A, C=C, Ae=Ae,
                                             R=R, Qe=Qe, Qz=Qz, Qez=Qez)
         
-    def update(self, u, noise):
+    def prep_update(self, u):
         """ Perform a time update of all states """
         self.set_dynamics(fz=self.B.dot(u))
         # Update linear states
-        super(SimpleParticle, self).update(u, noise)
         
-    def measure(self, y):
+    def prep_measure(self, y):
         """ Perform a measurement update """
         # measurement matrix C depends on the value of c
         self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
-        return super(SimpleParticle,self).measure(y)
+        return y
     
     def next_pdf(self, next_cpart, u):
         self.set_dynamics(fz=self.B.dot(u))
@@ -52,9 +51,4 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         super(SimpleParticle, self).set_nonlin_state(inp)
         # Update linear dynamics
         self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
-        
-#    def linear_input(self, u):
-#        return u[:2].reshape((-1,1))
-#    
-    def set_params(self, params):
-        pass
+
