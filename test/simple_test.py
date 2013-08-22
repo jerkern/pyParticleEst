@@ -59,6 +59,7 @@ if __name__ == '__main__':
         u = uvec[:,i].reshape(-1,1)
         # Drive the correct particle using the true input
         noise = correct.sample_process_noise(u)
+        correct.prep_update(u)
         correct.update(u, 0.0*noise)
     
         # use the correct particle to generate the true measurement
