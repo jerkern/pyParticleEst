@@ -30,10 +30,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             self.fe = fe
         else:
             self.fe = numpy.zeros((len(self.eta), 1))
-        if (fz != None):
-            self.fz = fz
-        else:
-            self.fz = numpy.zeros((len(z0), 1))
+
         
         self.sampled_z = None
         self.z_tN = None
@@ -52,7 +49,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         noise = numpy.reshape(noise, (-1,1))
         # Update non-linear state using sampled noise,
         # the noise term here includes the uncertainty from z
-        self.eta += self.fe + self.Ae.dot(self.kf.z) + noise
+        self.eta = self.pred_eta() + noise
 
         # Handle linear/non-linear noise correlation
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
@@ -65,9 +62,12 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
         self.kf.z += tmp.dot(noise)
         self.kf.P -= tmp.dot(Sigma_az)
+        
+    def pred_eta(self):
+        return self.eta + self.fe + self.Ae.dot(self.kf.z)
 
     def clin_predict(self, next_part=None):
-        noise = next_part.eta - self.fe - self.Ae.dot(self.kf.z)
+        noise = next_part.eta - self.pred_eta()
         Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
         (z, P) = super(MixedNLGaussian, self).clin_predict(next)
@@ -87,18 +87,15 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
     def next_pdf(self, next_part, u):
         """ Implements the next_pdf function for MixedNLGaussian models """
-        lin_P = self.kf.P
-        z_mean = numpy.reshape(self.kf.z,(-1,1))
         
-        _lin_cov = self.kf.Q
-        nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
+        #nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
+        eta_est = self.pred_eta()
+        x_next = numpy.vstack((next_part.eta,next_part.sampled_z)).reshape((-1,1))
         
-        x = numpy.vstack((next_part.eta,next_part.sampled_z)).reshape((-1,1))
-        
-        lin_est = self.kf.A.dot(z_mean)+self.fz
-        st = numpy.vstack((nonlin_est,lin_est))
-        Sigma = self.calc_sigma(lin_P)
-        return kalman.lognormpdf(x,mu=st,S=Sigma)
+        z_est = self.kf.predict()[0]
+        x_est = numpy.vstack((eta_est,z_est))
+        Sigma = self.calc_sigma()
+        return kalman.lognormpdf(x_next,mu=x_est,S=Sigma)
     
     def get_Q(self):
         return numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
@@ -132,7 +129,10 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Wz = W[:,el:]
         QPinv = numpy.linalg.inv(Q+A_ext.dot(P.dot(A_ext.transpose())))
         Sigma = P-P.dot(A_ext.transpose().dot(QPinv)).dot(A_ext.dot(P))
-        c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.fz)+numpy.linalg.inv(P).dot(lin_est))
+        if (self.kf.f_k):
+            c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(lin_est))
+        else:
+            c = Sigma.dot(Wa.dot(next_part.eta-self.fe)+numpy.linalg.inv(P).dot(lin_est))
         
         z_tN = Sigma.dot(Wz.dot(next_part.z_tN))+c
         M_tN = Sigma.dot(Wz.dot(next_part.P_tN))
@@ -151,10 +151,10 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
 
         self.sampled_z = numpy.random.multivariate_normal(self.z_tN.ravel(),self.P_tN).ravel().reshape((-1,1))
     
-    def calc_sigma(self, P):
+    def calc_sigma(self):
         cov = self.get_Q()
         A_ext = numpy.vstack((self.Ae, self.kf.A))
-        lin_P_ext = A_ext.dot(P.dot(A_ext.transpose()))
+        lin_P_ext = A_ext.dot(self.kf.P.dot(A_ext.transpose()))
         Sigma = cov + lin_P_ext
         return Sigma
     
@@ -170,7 +170,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     
     def fwd_peak_density(self, u):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
-        Sigma = self.calc_sigma(self.kf.P)
+        Sigma = self.calc_sigma()
         zero = numpy.zeros((Sigma.shape[0],1))
         return kalman.lognormpdf(zero, zero, Sigma)
     
@@ -220,7 +220,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         l2 += A.dot(self.kf.P).dot(A.T) - tmp2.T -tmp2
         
         Q = self.get_Q()
-        (tmp, ld) = numpy.linalg.slogdet(Q)
+        (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(Q, l2)
         return ld + numpy.trace(tmp)
 
@@ -232,6 +232,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         tmp = self.kf.measurement_diff(y) 
         l3 = tmp.dot(tmp.T)
         l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
-        (tmp, ld) = numpy.linalg.slogdet(self.kf.R)
+        (_tmp, ld) = numpy.linalg.slogdet(self.kf.R)
         tmp = numpy.linalg.solve(self.kf.R, l3)
         return ld + numpy.trace(tmp)

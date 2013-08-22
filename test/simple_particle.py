@@ -42,13 +42,3 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         # measurement matrix C depends on the value of c
         self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
         return y
-    
-    def next_pdf(self, next_cpart, u):
-        self.set_dynamics(fz=self.B.dot(u))
-        return super(SimpleParticle,self).next_pdf(next_cpart, None)
-
-    def set_nonlin_state(self,inp):
-        super(SimpleParticle, self).set_nonlin_state(inp)
-        # Update linear dynamics
-        self.set_dynamics(C=numpy.array([[self.eta[0,0], 0.0]]))
-

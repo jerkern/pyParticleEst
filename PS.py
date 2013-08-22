@@ -105,9 +105,9 @@ class SmoothTrajectory(object):
             y = self.traj[-1].prep_measure(self.y[-1])
             self.traj[-1].clin_measure(y, next_part=None)
 
-        # Backward smoothing
-        for i in reversed(range(len(self.traj)-1)):
-            self.traj[i].clin_smooth(self.traj[i+1].get_lin_est())
+#        # Backward smoothing
+#        for i in reversed(range(len(self.traj)-1)):
+#            self.traj[i].clin_smooth(self.traj[i+1].get_lin_est())
 
 
 

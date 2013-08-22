@@ -72,7 +72,7 @@ if __name__ == '__main__':
     # Create an array for our particles 
     ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
 
-    nums=10
+    nums=5
 
     plt.ion()
     fig1 = plt.figure()
