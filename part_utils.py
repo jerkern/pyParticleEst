@@ -96,6 +96,7 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
 
     def clin_smooth(self, z_next):
         """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
+        # FIXME! he noise must depend on the next state
         self.kf.smooth(z_next[0], z_next[1])
 
     @abc.abstractmethod
@@ -115,8 +116,3 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
     def get_lin_est(self):
         """ Return the estimate of the Rao-Blackwellized states """
         return (self.kf.z, self.kf.P)
-# 
-#    @abc.abstractmethod
-#    def linear_input(self, u):
-#        """ Extract the part of u affect the conditionally Rao-Blackwellized states """
-#        return
