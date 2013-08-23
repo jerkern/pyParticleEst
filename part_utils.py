@@ -85,8 +85,14 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
 #                                      Qz=Qz, R=R, f_k=f_k, h_k=h_k)
         
     
+    def clin_dynamics(self, next_part):
+        """ Update dynamics conditioned on the non-linear trajectory """
+        pass
+    
     def clin_predict(self, next_part=None):
-        """ Kalman update of the linear states conditioned on the non-linear trajectory estimate """
+        """ Kalman update of the linear states conditioned on the non-linear trajectory estimate,
+            Before calling this method clin_dynamics should be called to update the dynamics
+            according to the conditioning on the non-linear trajectory """
         (z, P) = self.kf.predict()
         return (z.reshape((-1,1)), P)
     
@@ -94,10 +100,12 @@ class RBPSBase(RBPFBase, ParticleSmoothingInterface):
         """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
         self.kf.meas_update(y)
 
-    def clin_smooth(self, z_next):
-        """ Kalman smoothing of the linear states conditioned on the next particles linear states """ 
-        # FIXME! he noise must depend on the next state
-        self.kf.smooth(z_next[0], z_next[1])
+    def clin_smooth(self, next_part):
+        """ Kalman smoothing of the linear states conditioned on the next particles linear states
+            Before calling this method clin_dynamics should be called to update the dynamics
+            according to the conditioning on the non-linear trajectory """
+        tmp = (next_part.get_lin_est())
+        self.kf.smooth(tmp[0], tmp[1])
 
     @abc.abstractmethod
     def set_nonlin_state(self, eta):

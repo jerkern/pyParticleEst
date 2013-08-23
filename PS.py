@@ -89,6 +89,11 @@ class SmoothTrajectory(object):
         
         self.traj[0].set_lin_est((numpy.copy(z0), numpy.copy(P0)))
 
+        # This will change the linear sub-dynamics for each particle
+        # according to the conditioning on the non-linear trajectory
+        for i in range(len(self.traj)-1):
+            self.traj[i].clin_dynamics(self.traj[i+1])
+
         for i in range(len(self.traj)-1):
             
             if (self.y[i] != None):
@@ -97,7 +102,6 @@ class SmoothTrajectory(object):
                 self.traj[i].clin_measure(y=y, next_part=self.traj[i+1])
             
             # Predict z_{t+1} given information about eta_{t+1}
-            self.traj[i].prep_update(self.u[i])
             tmp = self.traj[i].clin_predict(self.traj[i+1])
             self.traj[i+1].set_lin_est(tmp)
         
@@ -106,8 +110,8 @@ class SmoothTrajectory(object):
             self.traj[-1].clin_measure(y, next_part=None)
 
         # Backward smoothing
-#        for i in reversed(range(len(self.traj)-1)):
-#            self.traj[i].clin_smooth(self.traj[i+1])
+        for i in reversed(range(len(self.traj)-1)):
+            self.traj[i].clin_smooth(self.traj[i+1])
 
 
 
