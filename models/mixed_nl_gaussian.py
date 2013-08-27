@@ -54,11 +54,11 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, f_k=fz,h_k=h)
 
         if (Ae != None):
-            self.Ae = Ae
+            self.Ae = numpy.copy(Ae)
         if (Qe != None):
-            self.Qe = Qe
+            self.Qe = numpy.copy(Qe)
         if (Qez != None):
-            self.Qez = Qez
+            self.Qez = numpy.copy(Qez)
         if (Qz != None):
             self.Qz = numpy.copy(self.kf.Q)
         if (fz != None):
@@ -106,7 +106,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     
     def get_Q(self):
         return numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
-                             numpy.hstack((self.Qez.T, self.kf.Q))))
+                             numpy.hstack((self.Qez.T, self.Qz))))
     
 
     def calc_suff_stats(self, next_part):
@@ -199,17 +199,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Calculate a term of the I2 integral approximation
         and its gradient as specified in [1]"""
         # Calculate l2 according to (16)
-        if (self.fe != None):
-            fe = self.fe
-        else:
-            fe = numpy.zeros((len(self.eta),1))
-        if (self.kf.f_k != None):
-            fz = self.kf.f_k
-        else:
-            fz = numpy.zeros((len(self.kf.z),1))
             
         x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
-        f = numpy.vstack((fe, fz))
+        f = numpy.vstack((self.fe, self.fz))
         A = numpy.vstack((self.Ae, self.kf.A))
         tmp1 = x_kplus - f - A.dot(self.kf.z)
         zero_tmp = numpy.zeros((len(self.kf.z),len(self.eta)))

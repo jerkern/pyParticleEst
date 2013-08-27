@@ -22,7 +22,7 @@ class ParticleParamTransEst(param_est.ParamEstimation):
 
 if __name__ == '__main__':
     
-    num = 100
+    num = 50
     
     theta_true = 0.1
     R = numpy.array([[0.1]])
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     correct = ParticleParamTrans(eta0=e0, z0=z0,P0=P0, params=(theta_true,))
 
     # How many steps forward in time should our simulation run
-    steps = 40
+    steps = 20
     
 
     # Create arrays for storing some values for later plotting    
@@ -69,24 +69,28 @@ if __name__ == '__main__':
     
     print "estimation start"
     
+    nums=4
+    
     # Create an array for our particles 
     ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
-
-    nums=5
-
+    ParamEstimator.set_params(numpy.array((theta_true,)).reshape((-1,1)))
+    ParamEstimator.simulate(num_part=num, num_traj=nums)
+    
+    
+    
+    print "maximization start"
+    
     plt.ion()
     fig1 = plt.figure()
-    #param_steps = 20
-    #param_vals = numpy.linspace(0.0, 1.0, param_steps)
-    param_steps = 1
-    param_vals = numpy.asarray((0.1,))
+    param_steps = 51
+    param_vals = numpy.linspace(-1.0, 1.0, param_steps)
+#    param_steps = 1
+#    param_vals = numpy.asarray((0.1,))
     logpy = numpy.zeros((param_steps,))
     logpxnext = numpy.zeros((param_steps,))
     for k in range(param_steps):
         fig1.clf()
         ParamEstimator.set_params(numpy.array((param_vals[k],)).reshape((-1,1)))
-        ParamEstimator.simulate(num_part=num, num_traj=nums)
-        
         logpy[k] = ParamEstimator.eval_logp_y()
         logpxnext[k] = ParamEstimator.eval_logp_xnext()
 
@@ -131,4 +135,5 @@ if __name__ == '__main__':
     fig2 = plt.figure()
     plt.plot(param_vals, logpy,'g')
     plt.plot(param_vals, logpxnext,'b')
+    plt.plot(param_vals, logpxnext+logpy,'r')
     plt.show()

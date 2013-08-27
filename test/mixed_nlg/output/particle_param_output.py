@@ -28,15 +28,13 @@ class ParticleParamOutput(mixed_nl_gaussian.MixedNLGaussian):
                                                  Az=A, C=C, Ae=Ae,
                                                  R=R, Qe=Qe, Qz=Qz)
         
-    def update(self, u, noise):
+    def prep_update(self, u):
         """ Perform a time update of all states """
         self.set_dynamics(fz=self.B.dot(u))
-        # Update linear states
-        super(ParticleParamOutput, self).update(u, noise)
         
-    def measure(self, y):
-        """ Perform a measurement update """
-        return super(ParticleParamOutput,self).measure(y)
+    def prep_measure(self, y):
+        return y    
+    
     
     def next_pdf(self, next_cpart, u):
         self.set_dynamics(fz=self.B.dot(u))
@@ -46,7 +44,7 @@ class ParticleParamOutput(mixed_nl_gaussian.MixedNLGaussian):
         """ New set of parameters """
         # Update all needed matrices and derivates with respect
         # to the new parameter set
-        C = numpy.array([[params[0,0], 0.0]])
+        C = numpy.array([[params[0], 0.0]])
         C_grad = (numpy.array([[1.0, 0.0]]),)
         self.set_dynamics(C=C)
         self.set_dynamics_gradient(grad_C=C_grad)

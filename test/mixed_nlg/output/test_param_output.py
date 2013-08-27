@@ -54,6 +54,7 @@ if __name__ == '__main__':
         u = uvec[:,i].reshape(-1,1)
         # Drive the correct particle using the true input
         noise = correct.sample_process_noise(u)
+        correct.prep_update(u)
         correct.update(u, 0.0*noise)
     
         # use the correct particle to generate the true measurement
@@ -74,10 +75,14 @@ if __name__ == '__main__':
     
     print "estimation start"
     
+    nums=1
+    
     # Create an array for our particles 
     ParamEstimator = ParticleParamOutputEst(u_noise, y_noise)
-
-    nums=1
+    ParamEstimator.set_params(numpy.array((c_true,)).reshape((-1,1)))
+    ParamEstimator.simulate(num_part=num, num_traj=nums)
+    
+    
 
     plt.ion()
     fig1 = plt.figure()
@@ -87,7 +92,6 @@ if __name__ == '__main__':
     for i in range(param_steps):
         fig1.clf()
         ParamEstimator.set_params(numpy.array((param_vals[i],)).reshape((-1,1)))
-        ParamEstimator.simulate(num_part=num, num_traj=nums)
         
         logpy[i] = ParamEstimator.eval_logp_y()
 
@@ -115,7 +119,7 @@ if __name__ == '__main__':
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'g-')
             plt.plot(range(steps+1),svals[1,j,:],'r-')
-            plt.plot(x,0.0*x+ParamEstimator.params[0],'k-')
+
                 
         y_est = correct.kf.C.dot(svals[:2,0,:])
         #plt.plot(x[1:],yvec[0,:],'bx')

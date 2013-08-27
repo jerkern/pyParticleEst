@@ -54,6 +54,10 @@ class ParamEstimation(object):
     
     def set_params(self, params):
         self.params = params.ravel()
+        if (self.straj != None):
+            for i in range(len(self.straj)):
+                for j in range(len(self.straj[i].traj)):
+                    self.straj[i].traj[j].set_params(self.params)
     
     def simulate(self, num_part, num_traj):
         
