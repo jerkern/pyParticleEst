@@ -40,13 +40,19 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         self.P_tN = None
         self.M_tN = None
         
-        # Element-wise matrix derivates needed for parameters estimation
-        self.grad_Ae = None
-        self.grad_Qe = None
-        self.grad_Qez = None
-        self.grad_eta = None
-        self.grad_fe = None
+        self.params = None
+        # Lists of element-wise derivatives, e.g self.grad_Az[0] is the 
+        # element-wise derivative of Az with respect to the first parameter
+        self.grad_Az = None
         self.grad_fz = None
+        self.grad_Ae = None
+        self.grad_fe = None
+        self.grad_Qe = None
+        self.grad_Qez = None 
+        self.grad_Qz = None
+        self.grad_C = None
+        self.grad_h = None
+        self.grad_R = None
         
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Ae=None, fe=None, Qe=None, Qez=None, 
@@ -182,19 +188,66 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def set_dynamics_gradient(self, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
                      grad_Ae=None, grad_fe=None, grad_Qe=None, grad_Qez=None, 
                      grad_C=None, grad_h=None):
-        pass
+        """ Lists of element-wise derivatives """
+        if (grad_Az != None):
+            self.grad_Az = grad_Az
+        if (grad_fz !=None):
+            self.grad_fz = grad_fz
+        if (grad_Ae != None):
+            self.grad_Ae = grad_Ae
+        if (grad_fe != None):
+            self.grad_fe = grad_fe
+        if (grad_Qe != None):
+            self.grad_Qe = grad_Qe
+        if (grad_Qez != None):
+            self.grad_Qez = grad_Qez 
+        if (grad_Qz != None):
+            self.grad_Qz = grad_Qz
+        if (grad_C != None):
+            self.grad_C = grad_C
+        if (grad_h != None):
+            self.grad_h = grad_h
+        if (grad_R != None):
+            self.grad_R = grad_R
     
     def set_params(self, params):
-        pass
+        self.params = numpy.copy(params).reshape((-1,1))
+    
+    def eta0_logpdf(self, eta):
+        """ Evaluate logprob of the initial non-linear state eta,
+            default implementation assumes all are equal, override this
+            if another behavior is desired """
+        return 0.0
 
-    def eval_logp_x1(self, z0, P0):
+    def eval_logp_x1(self, z0, P0, grad_z0, grad_P0):
         """ Calculate a term of the I1 integral approximation
         and its gradient as specified in [1]"""
         
         # Calcuate l1 according to (19a)
         tmp = self.kf.z - z0
         l1 = tmp.dot(tmp.T) + self.kf.P
+        grad_l1 = None
+        # TODO, calc grad of l1 and how it depends on other gradients
+        
+        Q = self.get_Q()
+        (_tmp, ld) = numpy.linalg.slogdet(Q)
+        tmp = numpy.linalg.solve(P0, l1)
+        val = -0.5*(ld + numpy.trace(tmp)) + self.eta0_logpdf(self.eta)
+        grad = numpy.zeros(self.params.shape)
+        # Calculate gradient
+        if (grad_P0 != None): 
+            for i in range(len(self.params)):
+                tmp = 0.0
+                if (grad_P0[i] != None):
+                    tmp = l1 - numpy.linalg.solve(P0, l1)
+                    if (grad_l1 != None):
+                        tmp += grad_l1[0]
+                    tmp = grad_P0[i].dot(tmp)
+                grad[i] = numpy.linalg.solve(P0, tmp)
+        return (val, grad)
 
+            
+        
     def eval_logp_xnext(self, x_next):
         """ Calculate a term of the I2 integral approximation
         and its gradient as specified in [1]"""
@@ -209,20 +262,55 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         tmp2 = A.dot(M_ext)
         l2 = tmp1.dot(tmp1.T)
         l2 += A.dot(self.kf.P).dot(A.T) - tmp2.T -tmp2
-        
+        grad_l2 = None
+        # TODO, calc grad of l2 and how it depends on other gradients
+
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(Q, l2)
-        return ld + numpy.trace(tmp)
-
+        val = -0.5*(ld + numpy.trace(tmp))
+        grad = numpy.zeros(self.params.shape)
+        # Calculate gradient
+        grad_Q = self.grad_Q
+        if (grad_Q != None): 
+            for i in range(len(self.params)):
+                tmp = 0.0
+                if (grad_Q[i] != None):
+                    tmp = l2 - numpy.linalg.solve(Q, l2)
+                    if (grad_l2 != None):
+                        tmp += grad_l2[0]
+                    tmp = grad_Q[i].dot(tmp)
+                grad[i] = numpy.linalg.solve(Q, tmp)
+                
+        return (val, grad)
+    
     def eval_logp_y(self, y):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
 
+        # For later use
+        R = self.kf.R
+        grad_R = self.grad_R
         # Calculate l3 according to (19b)
         tmp = self.kf.measurement_diff(y) 
         l3 = tmp.dot(tmp.T)
         l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
-        (_tmp, ld) = numpy.linalg.slogdet(self.kf.R)
-        tmp = numpy.linalg.solve(self.kf.R, l3)
-        return ld + numpy.trace(tmp)
+        grad_l3 = None
+        # TODO, calc grad of l3 and how it depends on other gradients
+        (_tmp, ld) = numpy.linalg.slogdet(R)
+        tmp = numpy.linalg.solve(R, l3)
+        val = -0.5*(ld + numpy.trace(tmp))
+        
+        grad = numpy.zeros(self.params.shape)
+        # Calculate gradient
+        if (grad_R != None): 
+            for i in range(len(self.params)):
+                tmp = 0.0
+                if (grad_R[i] != None):
+                    tmp = l3 - numpy.linalg.solve(R, l3)
+                    if (grad_l3 != None):
+                        tmp += grad_l3[0]
+                    tmp = grad_R[i].dot(tmp)
+                grad[i] = numpy.linalg.solve(R, tmp)
+                
+        return (val, grad)

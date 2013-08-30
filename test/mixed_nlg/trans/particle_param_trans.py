@@ -27,12 +27,12 @@ class ParticleParamTrans(mixed_nl_gaussian.MixedNLGaussian):
     def prep_update(self, u):
         """ Perform a time update of all states """
         fe = numpy.copy(self.eta)
-        super(ParticleParamTrans, self).set_dynamics(fe=fe)
+        self.set_dynamics(fe=fe)
         
     def prep_measure(self, y):
         """ Perform a measurement update """
         h = numpy.copy(self.eta)
-        super(ParticleParamTrans, self).set_dynamics(h=h)
+        self.set_dynamics(h=h)
         return y
     
     def next_pdf(self, next_cpart, u):
@@ -46,3 +46,4 @@ class ParticleParamTrans(mixed_nl_gaussian.MixedNLGaussian):
         Ae_grad = numpy.array([[1.0,]])
         self.set_dynamics(Ae=Ae)
         self.set_dynamics_gradient(grad_Ae=Ae_grad)
+        return super(ParticleParamTrans, self).set_params(params)

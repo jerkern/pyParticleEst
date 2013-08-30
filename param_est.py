@@ -18,19 +18,25 @@ class ParamEstInterface(object):
     @abc.abstractmethod
     def eval_logp_x1(self, z0, P0):
         """ Calculate a term of the I1 integral approximation
-        and its gradient as specified in [1]"""
+        and its gradient as specified in [1].
+        The gradient is an array where each element is the derivative with 
+        respect to the corresponding parameter"""
         pass
 
     @abc.abstractmethod
     def eval_logp_xnext(self, x_next):
         """ Calculate a term of the I2 integral approximation
-        and its gradient as specified in [1]"""
+        and its gradient as specified in [1]
+        The gradient is an array where each element is the derivative with 
+        respect to the corresponding parameter"""
         pass
 
     @abc.abstractmethod    
     def eval_logp_y(self, y):
         """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
+        and its gradient as specified in [1]
+        The gradient is an array where each element is the derivative with 
+        respect to the corresponding parameter"""
         pass
     
 
@@ -82,18 +88,38 @@ class ParamEstimation(object):
         self.straj = PS.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
         for i in range(len(self.straj)):
             self.straj[i].constrained_smoothing(z0, P0)
-       
-    def eval_logp_y(self):
+            
+    def maximize(self):
+        pass
+            
+    def eval_prob(self):
+        (log_py, d_log_py) = self.eval_logp_y()
+        (log_px0, d_log_px0) = self.eval_logp_x0()
+        (log_pxnext, d_log_pxnext) = self.eval_logp_xnext()
+        return (log_px0 + log_pxnext + log_py, d_log_py + d_log_px0 + d_log_pxnext)
+    
+    def eval_logp_x0(self):
         logp_y = 0.0
+        M = len(self.straj)
         for traj in self.straj:
             for i in range(len(traj.traj)):
                 if (traj.y[i] != None):
-                    logp_y += traj.traj[i].eval_logp_y(traj.y[i])
-        return -logp_y
+                    logp_y += traj.traj[i].eval_logp_y(traj.y[i])[0]
+        return logp_y/M
+       
+    def eval_logp_y(self):
+        logp_y = 0.0
+        M = len(self.straj)
+        for traj in self.straj:
+            for i in range(len(traj.traj)):
+                if (traj.y[i] != None):
+                    logp_y += traj.traj[i].eval_logp_y(traj.y[i])[0]
+        return logp_y/M
     
     def eval_logp_xnext(self):
         logp_xnext = 0.0
+        M = len(self.straj)
         for traj in self.straj:
             for i in range(len(traj.traj)-1):
-                logp_xnext += traj.traj[i].eval_logp_xnext(traj.traj[i+1])
-        return -logp_xnext
+                logp_xnext += traj.traj[i].eval_logp_xnext(traj.traj[i+1])[0]
+        return logp_xnext/M
