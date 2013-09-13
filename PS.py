@@ -92,6 +92,8 @@ class SmoothTrajectory(object):
         # This will change the linear sub-dynamics for each particle
         # according to the conditioning on the non-linear trajectory
         for i in range(len(self.traj)-1):
+            # TODO How does the dynamics change if we use eta_t+1 as
+            # an measurement of z_t ? 
             self.traj[i].clin_dynamics(self.traj[i+1])
 
         for i in range(len(self.traj)-1):
@@ -99,6 +101,7 @@ class SmoothTrajectory(object):
             if (self.y[i] != None):
                 # Estimate z_t given information about eta_{t+1}
                 y = self.traj[i].prep_measure(self.y[i])
+                # TODO !!! Bug? Extra measurement of z_t provided by eta_t+1
                 self.traj[i].clin_measure(y=y, next_part=self.traj[i+1])
             
             # Predict z_{t+1} given information about eta_{t+1}

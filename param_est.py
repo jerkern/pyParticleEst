@@ -16,7 +16,7 @@ class ParamEstInterface(object):
         pass
 
     @abc.abstractmethod
-    def eval_logp_x1(self, z0, P0):
+    def eval_logp_x1(self, z0, P0, grad_z0, grad_P0):
         """ Calculate a term of the I1 integral approximation
         and its gradient as specified in [1].
         The gradient is an array where each element is the derivative with 

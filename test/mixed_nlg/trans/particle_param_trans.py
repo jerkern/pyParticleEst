@@ -43,7 +43,7 @@ class ParticleParamTrans(mixed_nl_gaussian.MixedNLGaussian):
         # Update all needed matrices and derivates with respect
         # to the new parameter set
         Ae = numpy.array([[params[0],]])
-        Ae_grad = numpy.array([[1.0,]])
+        Ae_grad = (numpy.array([[1.0,]]),)
         self.set_dynamics(Ae=Ae)
         self.set_dynamics_gradient(grad_Ae=Ae_grad)
         return super(ParticleParamTrans, self).set_params(params)

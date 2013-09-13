@@ -48,3 +48,4 @@ class ParticleParamOutput(mixed_nl_gaussian.MixedNLGaussian):
         C_grad = (numpy.array([[1.0, 0.0]]),)
         self.set_dynamics(C=C)
         self.set_dynamics_gradient(grad_C=C_grad)
+        return super(ParticleParamOutput, self).set_params(params)

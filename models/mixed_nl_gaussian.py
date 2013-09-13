@@ -223,11 +223,14 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Calculate a term of the I1 integral approximation
         and its gradient as specified in [1]"""
         
-        # Calcuate l1 according to (19a)
+        # Calculate l1 according to (19a)
         tmp = self.kf.z - z0
         l1 = tmp.dot(tmp.T) + self.kf.P
         grad_l1 = None
-        # TODO, calc grad of l1 and how it depends on other gradients
+        if (grad_z0 != None):
+            grad_l1 = numpy.zeros(self.params.shape)
+            for i in range(len(grad_l1)):
+                grad_l1[i] = -grad_z0[i].dot((self.kf.z-z0).T) - (self.kf.z-z0).dot(grad_z0[i].T)
         
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
@@ -256,14 +259,22 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
         f = numpy.vstack((self.fe, self.fz))
         A = numpy.vstack((self.Ae, self.kf.A))
-        tmp1 = x_kplus - f - A.dot(self.kf.z)
+        predict_err = x_kplus - f - A.dot(self.kf.z)
         zero_tmp = numpy.zeros((len(self.kf.z),len(self.eta)))
         M_ext = numpy.hstack((zero_tmp, self.M_tN))
-        tmp2 = A.dot(M_ext)
-        l2 = tmp1.dot(tmp1.T)
-        l2 += A.dot(self.kf.P).dot(A.T) - tmp2.T -tmp2
-        grad_l2 = None
-        # TODO, calc grad of l2 and how it depends on other gradients
+        AM_ext = A.dot(M_ext)
+        l2 = predict_err.dot(predict_err.T)
+        l2 += A.dot(self.kf.P).dot(A.T) - AM_ext.T -AM_ext
+        grad_l2 = numpy.zeros(self.params.shape)
+        
+        #calc grad of l2 and how it depends on other gradients
+        for i in range(len(grad_l2)):
+            grad_f = numpy.vstack((self.grad_fe[i], self.grad_fz[i]))
+            grad_A = numpy.vstack((self.grad_Ae[i], self.grad_Az[i]))
+            tmp = (grad_f + grad_A.dot.self.kf.z).dot(predict_err.T)
+            tmp2 = grad_A[i].dot(M_ext)
+            tmp3 = grad_A[i].dot(self.kf.P).dot(A)
+            grad_l2[i] = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T   
 
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
@@ -271,15 +282,18 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         val = -0.5*(ld + numpy.trace(tmp))
         grad = numpy.zeros(self.params.shape)
         # Calculate gradient
-        grad_Q = self.grad_Q
-        if (grad_Q != None): 
+        if (self.grad_Qe != None or 
+            self.grad_Qez != None or 
+            self.grad_Qz != None): 
             for i in range(len(self.params)):
                 tmp = 0.0
-                if (grad_Q[i] != None):
-                    tmp = l2 - numpy.linalg.solve(Q, l2)
-                    if (grad_l2 != None):
-                        tmp += grad_l2[0]
-                    tmp = grad_Q[i].dot(tmp)
+                grad_Q = numpy.vstack((numpy.hstack((self.grad_Qe[i], self.grad_Qez[i])),
+                                      numpy.hstack((self.grad_Qez[i].T, self.grad_Qz))))
+ 
+                tmp = l2 - numpy.linalg.solve(Q, l2)
+                if (grad_l2 != None):
+                    tmp += grad_l2[0]
+                tmp = grad_Q.dot(tmp)
                 grad[i] = numpy.linalg.solve(Q, tmp)
                 
         return (val, grad)
