@@ -219,35 +219,43 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             if another behavior is desired """
         return 0.0
 
-    def eval_logp_x1(self, z0, P0, diff_z0, diff_P0):
+    def calc_logprod_derivative(self, A, dA, B, dB):
+        """ I = logdet(A)+Tr(inv(A)*B)
+            dI/dx = Tr(inv(A)*(dA - dA*inv(A)*B + dB) """
+            
+        tmp = numpy.linalg.solve(A, B)
+        tmp2 = dA + dB - dA.dot(tmp)
+        return numpy.trace(numpy.linalg.solve(A,tmp2))
+
+    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
         """ Calculate a term of the I1 integral approximation
         and its gradient as specified in [1]"""
         
         # Calculate l1 according to (19a)
-        tmp = self.kf.z - z0
-        l1 = tmp.dot(tmp.T) + self.kf.P
-        diff_l1 = None
-        if (diff_z0 != None):
-            diff_l1 = [None,] * len(self.params)
-            for i in range(len(diff_l1)):
-                diff_l1[i] = numpy.zeros(l1.shape)
-                diff_l1[i] = -diff_z0[i].dot((self.kf.z-z0).T) - (self.kf.z-z0).dot(diff_z0[i].T)
-        
+        z0_diff = self.kf.z - z0
+        l1 = z0_diff.dot(z0_diff.T) + self.kf.P
+       
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(P0, l1)
         val = -0.5*(ld + numpy.trace(tmp)) + self.eta0_logpdf(self.eta)
         grad = numpy.zeros(self.params.shape)
         # Calculate gradient
-        if (diff_P0 != None): 
-            for i in range(len(self.params)):
-                tmp = 0.0
-                if (diff_P0[i] != None):
-                    tmp = l1 - numpy.linalg.solve(P0, l1)
-                    if (diff_l1 != None):
-                        tmp += diff_l1[i]
-                    tmp = diff_P0[i].dot(tmp)
-                grad[i] = numpy.linalg.solve(P0, tmp)
+        for i in range(len(self.params)):
+
+            if (diff_z0 != None):
+                dl1 = -diff_z0[i].dot((self.kf.z-z0).T) - (self.kf.z-z0).dot(diff_z0[i].T)
+            else:
+                dl1 = numpy.zeros(l1.shape)
+        
+            if (diff_P0 != None): 
+                dP0 = diff_P0[i]
+            else:
+                dP0 = numpy.zeros(P0.shape)
+                tmp = numpy.zeros((len(l1), 1))
+
+            # TODO, prob. of eta0 can also depend on parameters!
+            grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
         return (val, grad)
 
             
@@ -266,37 +274,51 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         AM_ext = A.dot(M_ext)
         l2 = predict_err.dot(predict_err.T)
         l2 += A.dot(self.kf.P).dot(A.T) - AM_ext.T -AM_ext
-        diff_l2 = [None,] * len(self.params)
-        
-        #calc grad of l2 and how it depends on other gradients
-        for i in range(len(diff_l2)):
-            diff_l2[i] = numpy.zeros(l2.shape)
-            grad_f = numpy.vstack((self.grad_fe[i], self.grad_fz[i]))
-            grad_A = numpy.vstack((self.grad_Ae[i], self.grad_Az[i]))
-            tmp = (grad_f + grad_A.dot.self.kf.z).dot(predict_err.T)
-            tmp2 = grad_A[i].dot(M_ext)
-            tmp3 = grad_A[i].dot(self.kf.P).dot(A)
-            diff_l2[i] = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T   
-
+      
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(Q, l2)
         val = -0.5*(ld + numpy.trace(tmp))
-        grad = numpy.zeros(self.params.shape)
+        
         # Calculate gradient
-        if (self.grad_Qe != None or 
-            self.grad_Qez != None or 
-            self.grad_Qz != None): 
-            for i in range(len(self.params)):
-                tmp = 0.0
-                grad_Q = numpy.vstack((numpy.hstack((self.grad_Qe[i], self.grad_Qez[i])),
-                                      numpy.hstack((self.grad_Qez[i].T, self.grad_Qz))))
- 
-                tmp = l2 - numpy.linalg.solve(Q, l2)
-                if (diff_l2 != None):
-                    tmp += diff_l2[i]
-                tmp = grad_Q.dot(tmp)
-                grad[i] = numpy.linalg.solve(Q, tmp)
+        grad = numpy.zeros(self.params.shape)
+        for i in range(len(self.params)):
+            tmp = numpy.zeros((len(l2), 1))
+            
+            grad_Q = numpy.zeros(Q.shape)
+            
+            if (self.grad_Qe != None or 
+                self.grad_Qez != None or 
+                self.grad_Qz != None): 
+            
+                if (self.grad_Qe != None):
+                    grad_Q[:len(self.eta),:len(self.eta)] = self.grad_Qe[i]
+                if (self.grad_Qez != None):
+                    grad_Q[:len(self.eta),len(self.eta):] = self.grad_Qez[i]
+                    grad_Q[len(self.eta):,:len(self.eta)] = self.grad_Qez[i].T
+                if (self.grad_Qz != None):
+                    grad_Q[len(self.eta):, len(self.eta):] = self.grad_Qz[i]
+
+
+            diff_l2 = numpy.zeros(l2.shape)
+            grad_f = numpy.zeros((len(self.eta)+len(self.kf.z),1))
+            if (self.grad_fe != None):
+                grad_f[:len(self.eta)] = self.grad_fe[i]
+            if (self.grad_fz != None):
+                grad_f[len(self.eta):] = self.grad_fz[i]
+                    
+            grad_A = numpy.zeros(A.shape)
+            if (self.grad_Ae != None):
+                grad_A[:len(self.eta),:] = self.grad_Ae[i]
+            if (self.grad_Az != None):
+                grad_A[len(self.eta):,:] = self.grad_Az[i]
+                    
+            tmp = (grad_f + grad_A.dot(self.kf.z)).dot(predict_err.T)
+            tmp2 = grad_A.dot(M_ext)
+            tmp3 = grad_A.dot(self.kf.P).dot(A.T)
+            diff_l2 = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T
+                
+            grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
                 
         return (val, grad)
     
@@ -312,30 +334,27 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         l3 = meas_diff.dot(meas_diff.T)
         l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
         
-        diff_l3 = None
-        if (self.grad_h != None or self.grad_C != None):
-            diff_l3 = [None,] * len(self.params)
-            for i in range(len(self.params)):
-                diff_l3[i] = numpy.zeros(l3.shape)
-                tmp = self.grad_h[i]-self.grad_C[i].dot(self.kf.z)
-                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
-                diff_l3[i] += -tmp -tmp.T + tmp2 + tmp2.T
-                
-        
         (_tmp, ld) = numpy.linalg.slogdet(R)
         tmp = numpy.linalg.solve(R, l3)
         val = -0.5*(ld + numpy.trace(tmp))
         
-        grad = numpy.zeros(self.params.shape)
         # Calculate gradient
-        if (grad_R != None): 
-            for i in range(len(self.params)):
-                tmp = 0.0
-                if (grad_R[i] != None):
-                    tmp = l3 - numpy.linalg.solve(R, l3)
-                    if (diff_l3 != None):
-                        tmp += diff_l3[i]
-                    tmp = grad_R[i].dot(tmp)
-                grad[i] = numpy.linalg.solve(R, tmp)
+        grad = numpy.zeros(self.params.shape)
+        for i in range(len(self.params)):
+            
+            dl3 = numpy.zeros(l3.shape)
+            if (self.grad_C != None):
+                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
+                tmp = self.grad_C[i].dot(self.kf.z)
+                if (self.grad_h != None):
+                    tmp += self.grad_h[i]
+                dl3 += -tmp -tmp.T + tmp2 + tmp2.T
+        
+            if (grad_R != None): 
+                dR = grad_R[i]
+            else:
+                dR = numpy.zeros(R.shape)
+
+            grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
                 
         return (val, grad)

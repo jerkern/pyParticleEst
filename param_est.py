@@ -2,6 +2,7 @@
 import abc
 import PF
 import PS
+import numpy
  
 class ParamEstInterface(object):
     """ Interface s for particles to be used with the parameter estimation
@@ -16,7 +17,7 @@ class ParamEstInterface(object):
         pass
 
     @abc.abstractmethod
-    def eval_logp_x1(self, z0, P0, grad_z0, grad_P0):
+    def eval_logp_x0(self, z0, P0, grad_z0, grad_P0):
         """ Calculate a term of the I1 integral approximation
         and its gradient as specified in [1].
         The gradient is an array where each element is the derivative with 
@@ -99,27 +100,36 @@ class ParamEstimation(object):
         return (log_px0 + log_pxnext + log_py, d_log_py + d_log_px0 + d_log_pxnext)
     
     def eval_logp_x0(self):
-        logp_y = 0.0
+        logp_x0 = 0.0
+        grad_logpx0 = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
-        for traj in self.straj:
-            for i in range(len(traj.traj)):
-                if (traj.y[i] != None):
-                    logp_y += traj.traj[i].eval_logp_y(traj.y[i])[0]
-        return logp_y/M
+#        for traj in self.straj:
+#            for i in range(len(traj.traj)):
+#                if (traj.y[i] != None):
+#                    (val, grad) = traj.traj[i].eval_logp_x0(traj.y[i])
+#                    logp_x0 += val
+#                    grad_logpx0 += grad
+        return (logp_x0/M, grad_logpx0/M)
        
     def eval_logp_y(self):
         logp_y = 0.0
+        grad_logpy = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
         for traj in self.straj:
             for i in range(len(traj.traj)):
                 if (traj.y[i] != None):
-                    logp_y += traj.traj[i].eval_logp_y(traj.y[i])[0]
-        return logp_y/M
+                    (val, grad) = traj.traj[i].eval_logp_y(traj.y[i])
+                    logp_y += val
+                    grad_logpy += grad
+        return (logp_y/M, grad_logpy/M)
     
     def eval_logp_xnext(self):
         logp_xnext = 0.0
+        grad_logpxn = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
         for traj in self.straj:
             for i in range(len(traj.traj)-1):
-                logp_xnext += traj.traj[i].eval_logp_xnext(traj.traj[i+1])[0]
-        return logp_xnext/M
+                (val, grad) = traj.traj[i].eval_logp_xnext(traj.traj[i+1])
+                logp_xnext += val
+                grad_logpxn += grad
+        return (logp_xnext/M, grad_logpxn/M)
