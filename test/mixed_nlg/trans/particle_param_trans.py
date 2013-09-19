@@ -9,9 +9,9 @@ class ParticleParamTrans(mixed_nl_gaussian.MixedNLGaussian):
 
         C = numpy.array([[0.0,]])
         
-        R = numpy.array([[0.1]])
+        R = numpy.array([[0.0001]])
 
-        Az = numpy.eye(1)
+        Az = numpy.eye(1.0)
         
         Qe= numpy.diag([ 0.1,])
         Qz = numpy.diag([ 0.1,])

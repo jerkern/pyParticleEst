@@ -86,35 +86,35 @@ class SmoothTrajectory(object):
         return len(self.traj)
     
     def constrained_smoothing(self, z0, P0):
+        """ Kalman smoothing of the linear states conditione on the non-linear
+            trajetory """
         
-        self.traj[0].set_lin_est((numpy.copy(z0), numpy.copy(P0)))
-
-        # This will change the linear sub-dynamics for each particle
-        # according to the conditioning on the non-linear trajectory
-        for i in range(len(self.traj)-1):
-            # TODO How does the dynamics change if we use eta_t+1 as
-            # an measurement of z_t ? 
-            self.traj[i].clin_dynamics(self.traj[i+1])
-
-        for i in range(len(self.traj)-1):
-            
-            if (self.y[i] != None):
-                # Estimate z_t given information about eta_{t+1}
-                y = self.traj[i].prep_measure(self.y[i])
-                # TODO !!! Bug? Extra measurement of z_t provided by eta_t+1
-                self.traj[i].clin_measure(y=y, next_part=self.traj[i+1])
-            
-            # Predict z_{t+1} given information about eta_{t+1}
-            tmp = self.traj[i].clin_predict(self.traj[i+1])
-            self.traj[i+1].set_lin_est(tmp)
-        
-        if (self.y[-1] != None):
-            y = self.traj[-1].prep_measure(self.y[-1])
-            self.traj[-1].clin_measure(y, next_part=None)
+#        self.traj[0].set_lin_est((numpy.copy(z0), numpy.copy(P0)))
+#
+#        for i in range(len(self.traj)-1):
+#            
+#            if (self.y[i] != None):
+#                # Estimate z_t
+#                y = self.traj[i].prep_measure(self.y[i])
+#                self.traj[i].clin_measure(y=y, next_part=self.traj[i+1])
+#            
+#            # Update z_t and dynamics given information about eta_{t+1}
+#            etan = self.traj[i+1].get_nonlin_state()
+#            self.traj[i].meas_eta_next(etan)
+#            # Predict z_{t+1} given information about eta_{t+1}, save
+#            # conditional dynamics for later use in the smoothing step
+#            self.traj[i].cond_dynamics(etan)
+#            lin_est = self.traj[i].kf.predict()
+#            self.traj[i+1].set_lin_est(lin_est)
+#
+#        
+#        if (self.y[-1] != None):
+#            y = self.traj[-1].prep_measure(self.y[-1])
+#            self.traj[-1].clin_measure(y, next_part=None)
 
         # Backward smoothing
-        for i in reversed(range(len(self.traj)-1)):
-            self.traj[i].clin_smooth(self.traj[i+1])
+#        for i in reversed(range(len(self.traj)-1)):
+#            self.traj[i].clin_smooth(self.traj[i+1])
 
 
 

@@ -54,11 +54,11 @@ class ParticleFilter(object):
         if (not inplace):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
-        
+            
         for k in range(pa.num):
             v = pa.part[k].sample_process_noise(u)
             pa.part[k].update(u, v)
-            
+        
         return pa 
     
     

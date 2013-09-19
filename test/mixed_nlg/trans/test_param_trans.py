@@ -9,11 +9,12 @@ import copy
 import matplotlib.pyplot as plt
 from test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
 
+
 class ParticleParamTransEst(param_est.ParamEstimation):
         
     def create_initial_estimate(self, params, num):
         particles = numpy.empty(num, ParticleParamTrans)
-        e0 = numpy.array([0.0,])
+        e0 = numpy.array([-0.4,])
         z0 = numpy.array([0.0,])
         P0 = numpy.eye(1)
         for k in range(len(particles)):
@@ -22,17 +23,15 @@ class ParticleParamTransEst(param_est.ParamEstimation):
 
 if __name__ == '__main__':
     
-    num = 50
+    num = 100
     
-    theta_true = 0.1
+    theta_true = 0.0    
     R = numpy.array([[0.1]])
     Q = numpy.array([ 0.1, 0.1])
-    e0 = numpy.array([0.0, ])
+    e0 = numpy.array([-0.4, ])
     z0 = numpy.array([0.0, ])
     P0 = numpy.eye(1)
     
-    # Create a reference which we will try to estimate using a RBPS
-    correct = ParticleParamTrans(eta0=e0, z0=z0,P0=P0, params=(theta_true,))
 
     # How many steps forward in time should our simulation run
     steps = 20
@@ -42,34 +41,35 @@ if __name__ == '__main__':
     vals = numpy.zeros((2, num+1, steps+1))
     yvec = numpy.zeros((1, steps))
 
-
+    e = numpy.copy(e0)
+    z = numpy.copy(z0)
     # Create reference
     for i in range(steps):
-        
-        # Extract linear states
-        vals[0,num,i]=correct.kf.z.reshape(-1)
-        # Extract non-linear state
-        vals[1,num,i]=correct.eta[0,0]
 
-        # Drive the correct particle using the true input
-        noise = correct.sample_process_noise()
-        correct.update(u=None, noise=noise)
-        correct.kf.z += numpy.random.normal(0.0, Q[1])
-        # use the correct particle to generate the true measurement
-        yvec[0,i] = correct.eta[0,0]
+        # Extract linear states
+        vals[0,num,i]=e
+        # Extract non-linear state
+        vals[1,num,i]=z
+        
+        
+        e = e + theta_true * z + 0.01 + 0.0*numpy.random.normal(0.0, 0.1)
+        #z = z - 0.01 + 0.0*numpy.random.normal(0.0, 0.1)
+        z = z
+        y = e
+        yvec[0,i] = y
 
     
     # Store values for last time-step aswell    
-    vals[0,num,steps]=correct.kf.z.reshape(-1)
-    vals[1,num,steps]=correct.eta[0,0]
+    vals[0,num,steps]=e
+    vals[1,num,steps]=z
 
     y_noise = yvec.T.tolist()
     for i in range(len(y_noise)):
-        y_noise[i][0] += numpy.random.normal(0.0,R)
+        y_noise[i][0] += 0.0*numpy.random.normal(0.0,R)
     
     print "estimation start"
     
-    nums=4
+    nums=1
     
     # Create an array for our particles 
     ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     
     plt.ion()
     fig1 = plt.figure()
-    param_steps = 51
+    param_steps = 11
     param_vals = numpy.linspace(-1.0, 1.0, param_steps)
 #    param_steps = 1
 #    param_vals = numpy.asarray((0.1,))
@@ -91,16 +91,16 @@ if __name__ == '__main__':
     for k in range(param_steps):
         fig1.clf()
         ParamEstimator.set_params(numpy.array((param_vals[k],)).reshape((-1,1)))
-        logpy[k] = ParamEstimator.eval_logp_y()
-        logpxnext[k] = ParamEstimator.eval_logp_xnext()
+        (logpy[k], _grad) = ParamEstimator.eval_logp_y()
+        (logpxnext[k], _grad) = ParamEstimator.eval_logp_xnext()
 
         # Extract data from trajectories for plotting
         i=0
         for step in ParamEstimator.pt:
             pa = step.pa
             for j in range(pa.num):
-                vals[0,j,i]=pa.part[j].kf.z.reshape(-1)
-                vals[1,j,i]=pa.part[j].eta[0,0]
+                vals[0,j,i]=pa.part[j].eta[0,0]
+                vals[1,j,i]=pa.part[j].kf.z.reshape(-1)
             i += 1
         
         x = numpy.asarray(range(steps+1))    
@@ -112,8 +112,8 @@ if __name__ == '__main__':
         
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
-                svals[1,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
+                svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
+                svals[1,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
                 
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'g-')

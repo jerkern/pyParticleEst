@@ -73,27 +73,33 @@ class KalmanFilter(object):
         """ Do a time update, i.e. predict one step forward in time using the dynamics """
         
         # Calculate next state
-        (self.z, self.P) = self.predict()  
+        (self.z, self.P) = self.predict_full(A=self.A, f_k=self.f_k, Q=self.Q)  
         
     def predict(self):
-        """ Calculate next state estimate without actually updating the internal variables """
-        A = self.A
-        z = self.f_k + A.dot(self.z)     # Calculate the next state
-        P = A.dot(self.P).dot(A.T) + self.Q  # Calculate the estimated variance  
+        return self.predict_full(A=self.A, f_k=self.f_k, Q=self.Q)
+    
+    def predict_full(self, A, f_k, Q):
+        """ Calculate next state estimate without actually updating
+            the internal variables """
+        z = f_k + A.dot(self.z)     # Calculate the next state
+        P = A.dot(self.P).dot(A.T) + Q  # Calculate the estimated variance  
         return (z, P)
     
-    def measurement_diff(self, y):
-        yhat = self.C.dot(self.z)
-        if (self.h_k != None):
-            yhat += self.h_k
-        return y-yhat
+    def measurement_diff(self, y, C, h_k=None):
+        yhat = C.dot(self.z)
+        if (h_k != None):
+            yhat += h_k
+        return (y-yhat)
     
-    def meas_update(self, y):
-        """ Do a measurement update, i.e correct the current estimate with information from a new measurement """
+    def measure(self, y):
+        """ Do a measurement update, i.e correct the current estimate 
+            with information from a new measurement """
 
-        C = self.C
+        return self.measure_full(y, h_k=self.h_k, C=self.C, R=self.R)
+
+    def measure_full(self, y, h_k, C, R):
         
-        S = C.dot(self.P).dot(C.T)+self.R
+        S = C.dot(self.P).dot(C.T)+R
 
         if (sp.issparse(S)):
             Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
@@ -103,15 +109,12 @@ class KalmanFilter(object):
             Sinv = np.linalg.inv(S)
             K = self.P.dot(C.T).dot(Sinv)
         
-        yhat = C.dot(self.z)
-        if (self.h_k != None):
-            yhat += self.h_k
-        err = self.measurement_diff(y)
+        err = self.measurement_diff(y, C, h_k)
         self.z += K.dot(err)  
         self.P -= K.dot(C).dot(self.P)
 
         # Return the probability of the received measurement
-        return lognormpdf(y, yhat, S)
+        return lognormpdf(0, err, S)
     
 
 

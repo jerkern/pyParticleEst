@@ -69,24 +69,38 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             self.Qz = numpy.copy(self.kf.Q)
         if (fz != None):
             self.fz = numpy.copy(self.kf.f_k)
-        
-    def update(self, u, noise):
+            
+    def calc_next_eta(self, u, noise):
+        """ Update non-linear state using sampled noise,
+        # the noise term here includes the uncertainty from z """
         noise = numpy.reshape(noise, (-1,1))
-        # Update non-linear state using sampled noise,
-        # the noise term here includes the uncertainty from z
-        self.eta = self.pred_eta() + noise
-
-        # Handle linear/non-linear noise correlation
-        Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
-        Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
-
-        super(MixedNLGaussian, self).update(u, noise)
-
+        eta = self.pred_eta() + noise
+        return eta
+    
+    def meas_eta_next(self, eta_next):
+        """ Update estimate using observation of next state """
         # This is what is sometimes called "the second measurement update"
         # for Rao-Blackwellized particle filters
-        tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
-        self.kf.z += tmp.dot(noise)
-        self.kf.P -= tmp.dot(Sigma_az)
+        return self.kf.measure_full(y=eta_next, h_k=self.fe,
+                                    C=self.Ae, R=self.Qe)
+    
+    def calc_cond_dynamics(self, eta_next):
+        #Compensate for noise correlation
+#   TODO     tmp = self.Qez.T.dot(numpy.linalg.inv(self.Qe))
+        tmp = numpy.zeros((len(self.kf.z),len(self.eta)))
+        A_cond = self.kf.A - tmp.dot(self.Ae)
+        offset = tmp.dot(eta_next - self.fe)
+        return (A_cond, self.fz + offset)
+    
+    def cond_dynamics(self, eta_next):
+        """ Condition dynamics on future state 'eta_next'. """
+        (Az, fz) = self.calc_cond_dynamics(eta_next)
+        self.kf.set_dynamics(f_k=fz, A=Az)
+
+    def cond_predict(self, eta_next=None):
+        #Compensate for noise correlation
+        (Az, fz) = self.calc_cond_dynamics(eta_next)
+        return self.kf.predict_full(f_k=fz, A=Az, Q=self.Qz)
 
     def pred_eta(self):
         return self.eta + self.fe + self.Ae.dot(self.kf.z)
@@ -156,19 +170,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Sigma = cov + lin_P_ext
         return Sigma
 
-    
-    def clin_dynamics(self, next_part):
-        """ Update dynamics conditioned on the non-linear trajectory """
-        noise = next_part.eta - self.pred_eta()
-        Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
-        Sigma_az = self.Qez + self.Ae.dot(self.kf.P).dot(self.kf.A.T)
-        tmp = Sigma_az.T.dot(numpy.linalg.inv(Sigma_a))
-        
-        # This is what is sometimes called "the second measurement update"
-        # for Rao-Blackwellized particle filters
-        self.kf.set_dynamics(f_k=self.fz + tmp.dot(noise),
-                             Q=self.Qz - tmp.dot(Sigma_az))
-        
     def measure(self, y):
         y=numpy.reshape(y, (-1,1))
         return super(MixedNLGaussian, self).measure(y)
@@ -267,6 +268,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             
         x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
         f = numpy.vstack((self.fe, self.fz))
+        # TODO this A could have been changed!
         A = numpy.vstack((self.Ae, self.kf.A))
         predict_err = x_kplus - f - A.dot(self.kf.z)
         zero_tmp = numpy.zeros((len(self.kf.z),len(self.eta)))
@@ -330,7 +332,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         R = self.kf.R
         grad_R = self.grad_R
         # Calculate l3 according to (19b)
-        meas_diff = self.kf.measurement_diff(y) 
+        meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
         l3 = meas_diff.dot(meas_diff.T)
         l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
         
