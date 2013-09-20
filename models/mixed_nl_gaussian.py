@@ -69,6 +69,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             self.Qz = numpy.copy(self.kf.Q)
         if (fz != None):
             self.fz = numpy.copy(self.kf.f_k)
+        if (fe != None):
+            self.fe = numpy.copy(fe)
             
     def calc_next_eta(self, u, noise):
         """ Update non-linear state using sampled noise,
@@ -76,6 +78,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         noise = numpy.reshape(noise, (-1,1))
         eta = self.pred_eta() + noise
         return eta
+
+    def pred_eta(self):
+        return self.fe + self.Ae.dot(self.kf.z)
     
     def meas_eta_next(self, eta_next):
         """ Update estimate using observation of next state """
@@ -102,8 +107,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         (Az, fz) = self.calc_cond_dynamics(eta_next)
         return self.kf.predict_full(f_k=fz, A=Az, Q=self.Qz)
 
-    def pred_eta(self):
-        return self.eta + self.fe + self.Ae.dot(self.kf.z)
+
 
     def sample_process_noise(self, u=None): 
         """ Return sampled process noise for the non-linear states """
@@ -184,7 +188,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         return self.eta
 
     def set_nonlin_state(self,inp):
-        self.eta = inp
+        self.eta = numpy.copy(inp)
 
     def set_dynamics_gradient(self, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
                      grad_Ae=None, grad_fe=None, grad_Qe=None, grad_Qez=None, 

@@ -24,17 +24,18 @@ class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
         Qe= numpy.diag([ 0.01,])
         Qz = numpy.diag([ 0.0000001, 0.0000001])+self.B.dot(self.Q_in.dot(self.B.T)) # Noise is acting on input
         Qez = numpy.zeros((1,2))
-                   
+        fe = numpy.copy(eta)
         # Linear states handled by base-class
         super(SimpleParticle,self).__init__(z0=numpy.reshape(x0,(-1,1)),
                                             P0=P,
                                             e0 = eta,
                                             Az=A, C=C, Ae=Ae,
-                                            R=R, Qe=Qe, Qz=Qz, Qez=Qez)
+                                            R=R, Qe=Qe, Qz=Qz, Qez=Qez, fe=fe)
         
     def prep_update(self, u):
         """ Perform a time update of all states """
-        self.set_dynamics(fz=self.B.dot(u))
+        fe = numpy.copy(self.eta)
+        self.set_dynamics(fz=self.B.dot(u), fe=fe)
         # Update linear states
         
     def prep_measure(self, y):

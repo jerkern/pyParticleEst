@@ -45,7 +45,7 @@ class RBPFBase(ParticleFilteringInterface):
         """ Update estimate using noise as input """
         etan = self.calc_next_eta(u, noise)
         # Update linear estimate and dynamics by using etan as measurement
-        #self.meas_eta_next(etan)
+        self.meas_eta_next(etan)
         lin_est = self.cond_predict(etan)
         self.set_nonlin_state(etan)
         self.set_lin_est(lin_est)
