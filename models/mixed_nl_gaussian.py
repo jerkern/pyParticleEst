@@ -91,8 +91,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     
     def calc_cond_dynamics(self, eta_next):
         #Compensate for noise correlation
-#   TODO     tmp = self.Qez.T.dot(numpy.linalg.inv(self.Qe))
-        tmp = numpy.zeros((len(self.kf.z),len(self.eta)))
+        tmp = self.Qez.T.dot(numpy.linalg.inv(self.Qe))
         A_cond = self.kf.A - tmp.dot(self.Ae)
         offset = tmp.dot(eta_next - self.fe)
         return (A_cond, self.fz + offset)

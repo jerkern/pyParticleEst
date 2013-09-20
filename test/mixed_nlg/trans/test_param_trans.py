@@ -14,27 +14,28 @@ class ParticleParamTransEst(param_est.ParamEstimation):
         
     def create_initial_estimate(self, params, num):
         particles = numpy.empty(num, ParticleParamTrans)
-        e0 = numpy.array([-0.4,])
-        z0 = numpy.array([0.0,])
-        P0 = numpy.eye(1)
+        
         for k in range(len(particles)):
-            particles[k] = ParticleParamTrans(eta0=e0, z0=z0, P0=P0, params=params)
+            e = numpy.array([numpy.random.normal(0.0,1.0),])
+            z = numpy.array([0.0,])
+            P = numpy.eye(1)
+            particles[k] = ParticleParamTrans(eta0=e, z0=z, P0=P, params=params)
         return (particles, z0, P0)
 
 if __name__ == '__main__':
     
-    num = 100
+    num = 50
     
-    theta_true = 0.0    
+    theta_true = 0.5    
     R = numpy.array([[0.1]])
     Q = numpy.array([ 0.1, 0.1])
-    e0 = numpy.array([-0.4, ])
-    z0 = numpy.array([0.0, ])
+    e0 = numpy.array([1.0, ])
+    z0 = numpy.array([-1.5, ])
     P0 = numpy.eye(1)
     
 
     # How many steps forward in time should our simulation run
-    steps = 20
+    steps = 200
     
 
     # Create arrays for storing some values for later plotting    
@@ -52,9 +53,8 @@ if __name__ == '__main__':
         vals[1,num,i]=z
         
         
-        e = e + theta_true * z + 0.01 + 0.0*numpy.random.normal(0.0, 0.1)
-        #z = z - 0.01 + 0.0*numpy.random.normal(0.0, 0.1)
-        z = z
+        e = e + theta_true * z + numpy.random.normal(0.0, 0.1)
+        z = z + numpy.random.normal(0.0, 0.1)
         y = e
         yvec[0,i] = y
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     
     print "estimation start"
     
-    nums=1
+    nums=10
     
     # Create an array for our particles 
     ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     
     plt.ion()
     fig1 = plt.figure()
-    param_steps = 11
+    param_steps = 51
     param_vals = numpy.linspace(-1.0, 1.0, param_steps)
 #    param_steps = 1
 #    param_vals = numpy.asarray((0.1,))

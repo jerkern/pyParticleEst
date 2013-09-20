@@ -67,7 +67,7 @@ class GradientTest(param_est.ParamEstimation):
     
 if __name__ == '__main__':
     
-    num = 1
+    num = 50
     
     theta_true = 0.1
     R = numpy.array([[0.1]])
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     correct = PartModel(eta0=e0, z0=z0,P0=P0, params=(theta_true,))
 
     # How many steps forward in time should our simulation run
-    steps = 20
+    steps = 200
     
 
     # Create arrays for storing some values for later plotting    
