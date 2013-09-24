@@ -231,18 +231,34 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         tmp2 = dA + dB - dA.dot(tmp)
         return numpy.trace(numpy.linalg.solve(A,tmp2))
 
-    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
+    def calc_l1(self, z0, P0):
+        z0_diff = self.kf.z - z0
+        l1 = z0_diff.dot(z0_diff.T) + self.kf.P
+        return l1
+        
+    def eval_logp_x0(self, z0, P0):
         """ Calculate a term of the I1 integral approximation
         and its gradient as specified in [1]"""
         
         # Calculate l1 according to (19a)
-        z0_diff = self.kf.z - z0
-        l1 = z0_diff.dot(z0_diff.T) + self.kf.P
+        l1 = self.calc_l1(z0, P0)
        
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(P0, l1)
         val = -0.5*(ld + numpy.trace(tmp)) + self.eta0_logpdf(self.eta)
+
+        return val
+
+    def eval_grad_logp_x0(self, z0, P0, diff_z0, diff_P0):
+        """ Calculate gradient of a term of the I1 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""    
+            
+        # Calculate l1 according to (19a)
+        l1 = self.calc_l1(z0, P0)
+       
         grad = numpy.zeros(self.params.shape)
         # Calculate gradient
         for i in range(len(self.params)):
@@ -256,19 +272,12 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
                 dP0 = diff_P0[i]
             else:
                 dP0 = numpy.zeros(P0.shape)
-                tmp = numpy.zeros((len(l1), 1))
 
             # TODO, prob. of eta0 can also depend on parameters!
             grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
-        return (val, grad)
-
-            
-        
-    def eval_logp_xnext(self, x_next):
-        """ Calculate a term of the I2 integral approximation
-        and its gradient as specified in [1]"""
-        # Calculate l2 according to (16)
-            
+        return grad   
+    
+    def calc_l2(self, x_next):
         x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
         f = numpy.vstack((self.fe, self.fz))
         # TODO this A could have been changed!
@@ -279,11 +288,31 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         AM_ext = A.dot(M_ext)
         l2 = predict_err.dot(predict_err.T)
         l2 += A.dot(self.kf.P).dot(A.T) - AM_ext.T -AM_ext
+        return (l2, A, M_ext, predict_err)    
+        
+    def eval_logp_xnext(self, x_next):
+        """ Calculate a term of the I2 integral approximation
+        and its gradient as specified in [1]"""
+        # Calculate l2 according to (16)
+            
+        l2 = self.calc_l2(x_next)[0]
       
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(Q, l2)
         val = -0.5*(ld + numpy.trace(tmp))
+        
+        return val
+    
+    def eval_grad_logp_xnext(self, x_next):
+        """ Calculate gradient of a term of the I2 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""
+        # Calculate l2 according to (16)    
+        (l2, A, M_ext, predict_err) = self.calc_l2(x_next)
+      
+        Q = self.get_Q()
         
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
@@ -325,7 +354,13 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
                 
             grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
                 
-        return (val, grad)
+        return grad
+    
+    def calc_l3(self, y):
+        meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
+        l3 = meas_diff.dot(meas_diff.T)
+        l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
+        return l3
     
     def eval_logp_y(self, y):
         """ Calculate a term of the I3 integral approximation
@@ -333,15 +368,24 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
 
         # For later use
         R = self.kf.R
-        grad_R = self.grad_R
         # Calculate l3 according to (19b)
-        meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
-        l3 = meas_diff.dot(meas_diff.T)
-        l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
+        l3 = self.calc_l3(y)
         
         (_tmp, ld) = numpy.linalg.slogdet(R)
         tmp = numpy.linalg.solve(R, l3)
         val = -0.5*(ld + numpy.trace(tmp))
+        
+        return val
+    
+    def eval_grad_logp_y(self, y):
+        """ Calculate a term of the I3 integral approximation
+        and its gradient as specified in [1]"""
+
+        # For later use
+        R = self.kf.R
+        grad_R = self.grad_R
+        # Calculate l3 according to (19b)
+        l3 = self.calc_l3(y)
         
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
@@ -362,4 +406,4 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
 
             grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
                 
-        return (val, grad)
+        return grad

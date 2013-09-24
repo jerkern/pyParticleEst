@@ -26,11 +26,11 @@ if __name__ == '__main__':
     
     num = 50
     
-    theta_true = 0.5    
+    theta_true = 0.3    
     R = numpy.array([[0.1]])
     Q = numpy.array([ 0.1, 0.1])
-    e0 = numpy.array([1.0, ])
-    z0 = numpy.array([-1.5, ])
+    e0 = numpy.array([-0.5, ])
+    z0 = numpy.array([0.5, ])
     P0 = numpy.eye(1)
     
 

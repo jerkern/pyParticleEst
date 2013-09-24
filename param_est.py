@@ -3,6 +3,7 @@ import abc
 import PF
 import PS
 import numpy
+import scipy.optimize
  
 class ParamEstInterface(object):
     """ Interface s for particles to be used with the parameter estimation
@@ -17,27 +18,45 @@ class ParamEstInterface(object):
         pass
 
     @abc.abstractmethod
-    def eval_logp_x0(self, z0, P0, grad_z0, grad_P0):
+    def eval_logp_x0(self, z0, P0):
         """ Calculate a term of the I1 integral approximation
-        and its gradient as specified in [1].
-        The gradient is an array where each element is the derivative with 
-        respect to the corresponding parameter"""
+            as specified in [1]."""
         pass
 
     @abc.abstractmethod
     def eval_logp_xnext(self, x_next):
         """ Calculate a term of the I2 integral approximation
-        and its gradient as specified in [1]
-        The gradient is an array where each element is the derivative with 
-        respect to the corresponding parameter"""
+            as specified in [1]."""
         pass
 
     @abc.abstractmethod    
     def eval_logp_y(self, y):
         """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]
-        The gradient is an array where each element is the derivative with 
-        respect to the corresponding parameter"""
+            as specified in [1]."""
+        pass
+    
+    @abc.abstractmethod
+    def eval_grad_logp_x0(self, z0, P0, grad_z0, grad_P0):
+        """ Calculate gradient of a term of the I1 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""
+        pass
+
+    @abc.abstractmethod
+    def eval_grad_logp_xnext(self, x_next):
+        """ Calculate gradient of a term of the I2 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""
+        pass
+
+    @abc.abstractmethod    
+    def eval_grad_logp_y(self, y):
+        """ Calculate gradient of a term of the I3 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""
         pass
     
 
@@ -91,17 +110,40 @@ class ParamEstimation(object):
             self.straj[i].constrained_smoothing(z0, P0)
             
     def maximize(self):
-        pass
+        
+        def fval(params):
+            if (not numpy.allclose(self.params, params)):
+                self.set_params(params)
+            log_py = self.eval_logp_y()
+            log_px0 = self.eval_logp_x0()
+            log_pxnext = self.eval_logp_xnext()
+            return log_py + log_px0 + log_pxnext
+        
+        def fgrad(params):
+            if (not numpy.allclose(self.params, params)):
+                self.set_params(params)
+            d_log_py = self.eval_grad_logp_y()
+            d_log_px0 = self.eval_grad_logp_x0()
+            d_log_pxnext = self.eval_grad_logp_xnext()
+            return d_log_py + d_log_px0 + d_log_pxnext
+        
+        res = scipy.optimize.minimize(fun=fval, x0=self.params, method='BFGS', jac=fgrad)
+        return res.x
             
     def eval_prob(self):
-        (log_py, d_log_py) = self.eval_logp_y()
-        (log_px0, d_log_px0) = self.eval_logp_x0()
-        (log_pxnext, d_log_pxnext) = self.eval_logp_xnext()
-        return (log_px0 + log_pxnext + log_py, d_log_py + d_log_px0 + d_log_pxnext)
+        log_py = self.eval_logp_y()
+        log_px0 = self.eval_logp_x0()
+        log_pxnext = self.eval_logp_xnext()
+        return log_px0 + log_pxnext + log_py
+    
+    def eval_prob_grad(self):
+        d_log_py = self.eval_grad_logp_y()
+        d_log_px0 = self.eval_grad_logp_x0()
+        d_log_pxnext = self.eval_grad_logp_xnext()
+        return d_log_py + d_log_px0 + d_log_pxnext
     
     def eval_logp_x0(self):
         logp_x0 = 0.0
-        grad_logpx0 = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
 #        for traj in self.straj:
 #            for i in range(len(traj.traj)):
@@ -109,27 +151,53 @@ class ParamEstimation(object):
 #                    (val, grad) = traj.traj[i].eval_logp_x0(traj.y[i])
 #                    logp_x0 += val
 #                    grad_logpx0 += grad
-        return (logp_x0/M, grad_logpx0/M)
+        return logp_x0/M
+    
+    def eval_grad_logp_x0(self):
+        grad_logpx0 = numpy.zeros((len(self.params.shape),1))
+        M = len(self.straj)
+#        for traj in self.straj:
+#            for i in range(len(traj.traj)):
+#                if (traj.y[i] != None):
+#                    (val, grad) = traj.traj[i].eval_grad_logp_x0(traj.y[i])
+#                    logp_x0 += val
+#                    grad_logpx0 += grad
+        return grad_logpx0/M
        
     def eval_logp_y(self):
         logp_y = 0.0
+        M = len(self.straj)
+        for traj in self.straj:
+            for i in range(len(traj.traj)):
+                if (traj.y[i] != None):
+                    val = traj.traj[i].eval_logp_y(traj.y[i])
+                    logp_y += val
+        return logp_y/M
+    
+    def eval_grad_logp_y(self):
         grad_logpy = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
         for traj in self.straj:
             for i in range(len(traj.traj)):
                 if (traj.y[i] != None):
-                    (val, grad) = traj.traj[i].eval_logp_y(traj.y[i])
-                    logp_y += val
+                    grad = traj.traj[i].eval_grad_logp_y(traj.y[i])
                     grad_logpy += grad
-        return (logp_y/M, grad_logpy/M)
+        return grad_logpy/M
     
     def eval_logp_xnext(self):
         logp_xnext = 0.0
+        M = len(self.straj)
+        for traj in self.straj:
+            for i in range(len(traj.traj)-1):
+                val = traj.traj[i].eval_logp_xnext(traj.traj[i+1])
+                logp_xnext += val
+        return logp_xnext/M
+    
+    def eval_grad_logp_xnext(self):
         grad_logpxn = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
         for traj in self.straj:
             for i in range(len(traj.traj)-1):
-                (val, grad) = traj.traj[i].eval_logp_xnext(traj.traj[i+1])
-                logp_xnext += val
+                grad = traj.traj[i].eval_grad_logp_xnext(traj.traj[i+1])
                 grad_logpxn += grad
-        return (logp_xnext/M, grad_logpxn/M)
+        return grad_logpxn/M
