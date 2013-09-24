@@ -234,7 +234,7 @@ class ParticleApproximation(object):
             new number of particles is N. If left out the number of particles
             remains the same """
         
-        print "Resample! %f/%d (%0.2f%%)" % (self.N_eff, self.num, 100.0*self.N_eff/self.num)
+        #print "Resample! %f/%d (%0.2f%%)" % (self.N_eff, self.num, 100.0*self.N_eff/self.num)
         # To few effective particles, trigger resampling
         if (N  == None):
             N = self.num

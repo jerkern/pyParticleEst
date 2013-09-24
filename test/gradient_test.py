@@ -119,8 +119,8 @@ if __name__ == '__main__':
     gt = GradientTest(u=None, y=y_noise)
     gt.set_params(numpy.array((theta_true,)).reshape((-1,1)))
     
-    param_steps = 51
-    param_vals = numpy.linspace(-1.0, 1.0, param_steps)
+    param_steps = 301
+    param_vals = numpy.linspace(-30.0, 30.0, param_steps)
     gt.test(0, param_vals)
 
     gt.plot_y.plot(1)

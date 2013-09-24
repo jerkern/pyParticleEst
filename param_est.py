@@ -59,6 +59,10 @@ class ParamEstInterface(object):
             respect to the corresponding parameter"""
         pass
     
+def set_traj_params(straj, params):
+    for i in range(len(straj)):
+            for j in range(len(straj[i].traj)):
+                straj[i].traj[j].set_params(params)
 
 class ParamEstimation(object):
     __metaclass__ = abc.ABCMeta
@@ -79,11 +83,9 @@ class ParamEstimation(object):
         pass
     
     def set_params(self, params):
-        self.params = params.ravel()
+        self.params = numpy.copy(params)
         if (self.straj != None):
-            for i in range(len(self.straj)):
-                for j in range(len(self.straj[i].traj)):
-                    self.straj[i].traj[j].set_params(self.params)
+            set_traj_params(self.straj, params)
     
     def simulate(self, num_part, num_traj):
         
@@ -109,27 +111,36 @@ class ParamEstimation(object):
         for i in range(len(self.straj)):
             self.straj[i].constrained_smoothing(z0, P0)
             
-    def maximize(self):
+    def maximize(self, param0, num_part, num_traj, tol):
         
         def fval(params):
-            if (not numpy.allclose(self.params, params)):
-                self.set_params(params)
+            print params
+            set_traj_params(self.straj, params)
             log_py = self.eval_logp_y()
             log_px0 = self.eval_logp_x0()
             log_pxnext = self.eval_logp_xnext()
-            return log_py + log_px0 + log_pxnext
+            return -1.0*(log_py + log_px0 + log_pxnext)
         
         def fgrad(params):
-            if (not numpy.allclose(self.params, params)):
-                self.set_params(params)
+            set_traj_params(self.straj, params)
             d_log_py = self.eval_grad_logp_y()
             d_log_px0 = self.eval_grad_logp_x0()
             d_log_pxnext = self.eval_grad_logp_xnext()
-            return d_log_py + d_log_px0 + d_log_pxnext
+            return (d_log_py + d_log_px0 + d_log_pxnext).ravel()
         
-        res = scipy.optimize.minimize(fun=fval, x0=self.params, method='BFGS', jac=fgrad)
-        return res.x
-            
+        params = numpy.copy(param0)
+        while (True):
+            old_params = numpy.copy(params)
+            self.set_params(params)
+            self.simulate(num_part, num_traj)
+            res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
+            #res = scipy.optimize.minimize(fun=fval, x0=self.params, method='BFGS', jac=fgrad)
+            params = res.x
+            print params
+            if (numpy.linalg.norm(old_params-params, numpy.inf) < tol):
+                break
+        return params
+    
     def eval_prob(self):
         log_py = self.eval_logp_y()
         log_px0 = self.eval_logp_x0()

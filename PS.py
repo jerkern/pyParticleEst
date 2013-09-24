@@ -127,9 +127,9 @@ def do_smoothing(pt, M, rej_sampling=True):
         pt.prep_rejection_sampling()
     
     straj = numpy.empty(M, SmoothTrajectory)
-    print "smoothing"
+    #print "smoothing"
     for i in range(M):
-        print "%d/%d" % (i,M)
+        #print "%d/%d" % (i,M)
         straj[i] = SmoothTrajectory(pt, rej_sampling=rej_sampling)
         
     return straj
