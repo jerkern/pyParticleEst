@@ -25,7 +25,7 @@ class ParticleParamTransEst(param_est.ParamEstimation):
 if __name__ == '__main__':
     
     num = 50
-    nums=5
+    nums=10
     
     theta_true = 0.1
     theta_guess = 0.3   
@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     # How many steps forward in time should our simulation run
     steps = 200
-    sims = 130
+    sims = 5
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))

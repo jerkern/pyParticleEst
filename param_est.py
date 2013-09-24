@@ -126,15 +126,15 @@ class ParamEstimation(object):
             d_log_py = self.eval_grad_logp_y()
             d_log_px0 = self.eval_grad_logp_x0()
             d_log_pxnext = self.eval_grad_logp_xnext()
-            return (d_log_py + d_log_px0 + d_log_pxnext).ravel()
+            return -1.0*(d_log_py + d_log_px0 + d_log_pxnext).ravel()
         
         params = numpy.copy(param0)
         while (True):
             old_params = numpy.copy(params)
             self.set_params(params)
             self.simulate(num_part, num_traj)
-            res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
-            #res = scipy.optimize.minimize(fun=fval, x0=self.params, method='BFGS', jac=fgrad)
+            #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
+            res = scipy.optimize.minimize(fun=fval, x0=params, method='BFGS', jac=fgrad)
             params = res.x
             print params
             if (numpy.linalg.norm(old_params-params, numpy.inf) < tol):
