@@ -9,6 +9,9 @@ import copy
 import matplotlib.pyplot as plt
 from test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
 
+e0 = numpy.array([0.0, ])
+z0 = numpy.array([1.0, ])
+P0 = numpy.eye(1)
 
 class ParticleParamTransEst(param_est.ParamEstimation):
         
@@ -16,10 +19,8 @@ class ParticleParamTransEst(param_est.ParamEstimation):
         particles = numpy.empty(num, ParticleParamTrans)
         
         for k in range(len(particles)):
-            e = numpy.array([numpy.random.normal(0.0,1.0),])
-            z = numpy.array([0.0,])
-            P = numpy.eye(1)
-            particles[k] = ParticleParamTrans(eta0=e, z0=z, P0=P, params=params)
+            e = numpy.array([numpy.random.normal(e0,1.0),])
+            particles[k] = ParticleParamTrans(eta0=e, z0=z0, P0=P0, params=params)
         return (particles, z0, P0)
 
 if __name__ == '__main__':
@@ -31,14 +32,12 @@ if __name__ == '__main__':
     theta_guess = 0.3   
     R = numpy.array([[0.1]])
     Q = numpy.array([ 0.1, 0.1])
-    e0 = numpy.array([-0.5, ])
-    z0 = numpy.array([0.5, ])
-    P0 = numpy.eye(1)
+
     
 
     # How many steps forward in time should our simulation run
     steps = 200
-    sims = 5
+    sims = 20
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
@@ -74,29 +73,37 @@ if __name__ == '__main__':
     
         y_noise = yvec.T.tolist()
         for i in range(len(y_noise)):
-            y_noise[i][0] += 0.0*numpy.random.normal(0.0,R)
+            y_noise[i][0] += numpy.random.normal(0.0,R)
         
         print "estimation start"
         
+        plt.clf()
+        x = numpy.asarray(range(steps+1))
+        plt.plot(x[1:],numpy.asarray(y_noise)[:,0],'b.')
+        plt.plot(range(steps+1),vals[0,num,:],'go')
+        plt.plot(range(steps+1),vals[1,num,:],'ro')
+            
+        
+        
+        fig1.show()
+        plt.title("Param = %s" % theta_true)
+        plt.show()
+        plt.draw()
+
         # Create an array for our particles 
         ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
-        param = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums, tol=10.0**-2)
+        param = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums, tol=0.002)
         
         # Extract data from trajectories for plotting
-        i=0
-        for step in ParamEstimator.pt:
-            pa = step.pa
-            for j in range(pa.num):
-                vals[0,j,i]=pa.part[j].eta[0,0]
-                vals[1,j,i]=pa.part[j].kf.z.reshape(-1)
-            i += 1
-        plt.clf()
-        x = numpy.asarray(range(steps+1))    
-        for j in range(num):
-            plt.plot(x,vals[0,j,:],'gx')
-            plt.plot(x,vals[1,j,:],'rx')
-        
+#        i=0
+#        for step in ParamEstimator.pt:
+#            pa = step.pa
+#            for j in range(pa.num):
+#                vals[0,j,i]=pa.part[j].eta[0,0]
+#                vals[1,j,i]=pa.part[j].kf.z.reshape(-1)
+#            i += 1
+#        
         svals = numpy.zeros((3, nums, steps+1))
         
         for i in range(steps+1):
@@ -107,13 +114,7 @@ if __name__ == '__main__':
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'g-')
             plt.plot(range(steps+1),svals[1,j,:],'r-')
-    
-        #plt.plot(x[1:],yvec[0,:],'bx')
-        plt.plot(x[1:],numpy.asarray(y_noise)[:,0],'b+')
-                
-            
-        plt.plot(range(steps+1),vals[0,num,:],'go')
-        plt.plot(range(steps+1),vals[1,num,:],'ro')
+
         fig1.show()
         plt.title("Param = %s" % theta_true)
         plt.show()

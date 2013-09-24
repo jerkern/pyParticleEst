@@ -1,7 +1,7 @@
 import numpy
-import mixed_nl_gaussian
+import models.mixed_nl_gaussian
 
-class ParticleParamTrans(mixed_nl_gaussian.MixedNLGaussian):
+class ParticleParamTrans(models.mixed_nl_gaussian.MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, eta0, z0, P0, params):
         """ Define all model variables """
