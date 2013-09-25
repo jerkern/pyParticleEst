@@ -2,7 +2,6 @@
 
 import numpy
 import param_est
-import copy
 
 import matplotlib.pyplot as plt
 from test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
@@ -50,6 +49,7 @@ if __name__ == '__main__':
     fig2 = plt.figure()
     
     for k in range(sims):
+        print k
         # Create reference
         e = numpy.random.normal(0.0, 1.0)
         z = numpy.random.normal(1.0, 1.0)

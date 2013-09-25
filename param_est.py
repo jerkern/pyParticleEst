@@ -133,7 +133,7 @@ class ParamEstimation(object):
             old_params = numpy.copy(params)
             self.set_params(params)
             self.simulate(num_part, num_traj)
-            #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
+            res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             res = scipy.optimize.minimize(fun=fval, x0=params, method='BFGS', jac=fgrad)
             params = res.x
             print params
