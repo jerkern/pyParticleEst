@@ -45,7 +45,7 @@ if __name__ == '__main__':
         
         # Create an array for our particles 
         ParamEstimator = ParticleParamInitEst(None, ylist)
-        param = ParamEstimator.maximize(param0=z0_guess, num_part=num, num_traj=nums, tol=0.001)
+        param = ParamEstimator.maximize(param0=z0_guess, num_part=num, num_traj=nums)
         
         estimate[0,k] = param
         

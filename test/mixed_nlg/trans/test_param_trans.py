@@ -88,7 +88,7 @@ if __name__ == '__main__':
         # Create an array for our particles 
         ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
-        param = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums, tol=0.002)
+        param = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums)
         
         # Extract data from trajectories for plotting
 #        i=0

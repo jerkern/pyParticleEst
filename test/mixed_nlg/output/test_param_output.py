@@ -28,9 +28,10 @@ if __name__ == '__main__':
     
     num = 1
     nums=1
-    sims = 25
+    sims = 400
     
     c_true = 2.5
+    # TODO, seems to be problem when c_guess > c_true
     c_guess = numpy.array((2.0,))
     
     # How many steps forward in time should our simulation run
@@ -60,7 +61,7 @@ if __name__ == '__main__':
         
         # Create an array for our particles 
         ParamEstimator = ParticleParamOutputEst(ulist, ylist)
-        param = ParamEstimator.maximize(param0=c_guess, num_part=num, num_traj=nums, tol=0.001)
+        param = ParamEstimator.maximize(param0=c_guess, num_part=num, num_traj=nums)
         
         estimate[0,k] = param
         

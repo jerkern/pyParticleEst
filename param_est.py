@@ -112,10 +112,9 @@ class ParamEstimation(object):
             (z0, P0) = self.straj[i].traj[0].get_z0_initial()
             self.straj[i].constrained_smoothing(z0, P0)
             
-    def maximize(self, param0, num_part, num_traj, tol):
+    def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001):
         
         def fval(params):
-            print params
             set_traj_params(self.straj, params)
             log_py = self.eval_logp_y()
             log_px0 = self.eval_logp_x0()
@@ -130,15 +129,17 @@ class ParamEstimation(object):
             return -1.0*(d_log_py + d_log_px0 + d_log_pxnext).ravel()
         
         params = numpy.copy(param0)
-        while (True):
-            old_params = numpy.copy(params)
+        Q = -numpy.Inf
+        for _i in xrange(max_iter):
+            Q_old = Q
             self.set_params(params)
             self.simulate(num_part, num_traj)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             res = scipy.optimize.minimize(fun=fval, x0=params, method='BFGS', jac=fgrad)
             params = res.x
-            print params
-            if (numpy.linalg.norm(old_params-params, numpy.inf) < tol):
+            Q = -fval(params)
+            print params, Q
+            if (numpy.abs(Q - Q_old) < tol):
                 break
         return params
     
