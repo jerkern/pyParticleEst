@@ -18,7 +18,7 @@ class ParticleParamTransEst(param_est.ParamEstimation):
         for k in range(len(particles)):
             e = numpy.array([numpy.random.normal(e0,1.0),])
             particles[k] = ParticleParamTrans(eta0=e, z0=z0, P0=P0, params=params)
-        return (particles, z0, P0)
+        return particles
 
 if __name__ == '__main__':
     

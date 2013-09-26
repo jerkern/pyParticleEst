@@ -89,7 +89,7 @@ class ParamEstimation(object):
     
     def simulate(self, num_part, num_traj):
         
-        (particles, z0, P0) = self.create_initial_estimate(params=self.params, num=num_part)
+        particles = self.create_initial_estimate(params=self.params, num=num_part)
         
         # Create a particle approximation object from our particles
         pa = PF.ParticleApproximation(particles=particles)
@@ -109,6 +109,7 @@ class ParamEstimation(object):
         # Use the filtered estimates above to created smoothed estimates
         self.straj = PS.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
         for i in range(len(self.straj)):
+            (z0, P0) = self.straj[i].traj[0].get_z0_initial()
             self.straj[i].constrained_smoothing(z0, P0)
             
     def maximize(self, param0, num_part, num_traj, tol):
@@ -133,7 +134,7 @@ class ParamEstimation(object):
             old_params = numpy.copy(params)
             self.set_params(params)
             self.simulate(num_part, num_traj)
-            res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
+            #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             res = scipy.optimize.minimize(fun=fval, x0=params, method='BFGS', jac=fgrad)
             params = res.x
             print params
@@ -156,23 +157,20 @@ class ParamEstimation(object):
     def eval_logp_x0(self):
         logp_x0 = 0.0
         M = len(self.straj)
-#        for traj in self.straj:
-#            for i in range(len(traj.traj)):
-#                if (traj.y[i] != None):
-#                    (val, grad) = traj.traj[i].eval_logp_x0(traj.y[i])
-#                    logp_x0 += val
-#                    grad_logpx0 += grad
+        for traj in self.straj:
+            (z0, P0) = traj.traj[0].get_z0_initial()
+            val = traj.traj[0].eval_logp_x0(z0, P0)
+            logp_x0 += val
         return logp_x0/M
     
     def eval_grad_logp_x0(self):
         grad_logpx0 = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
-#        for traj in self.straj:
-#            for i in range(len(traj.traj)):
-#                if (traj.y[i] != None):
-#                    (val, grad) = traj.traj[i].eval_grad_logp_x0(traj.y[i])
-#                    logp_x0 += val
-#                    grad_logpx0 += grad
+        for traj in self.straj:
+            (z0, P0) = traj.traj[0].get_z0_initial()
+            (grad_z0, grad_P0) = traj.traj[0].get_grad_z0_initial()
+            grad = traj.traj[0].eval_grad_logp_x0(z0, P0, grad_z0, grad_P0)
+            grad_logpx0 += grad
         return grad_logpx0/M
        
     def eval_logp_y(self):

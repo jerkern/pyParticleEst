@@ -22,7 +22,7 @@ class ParticleParamOutputEst(param_est.ParamEstimation):
         particles = numpy.empty(num, ParticleParamOutput)
         for k in range(len(particles)):
             particles[k] = ParticleParamOutput(x0=z0, P0=P0, Qz=Qz, R=R, params=params)
-        return (particles, z0, P0)
+        return particles
 
 if __name__ == '__main__':
     

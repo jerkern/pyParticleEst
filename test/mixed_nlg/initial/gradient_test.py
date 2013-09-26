@@ -7,8 +7,8 @@ import param_est
 import numpy
 import matplotlib.pyplot as plt
 
-import particle_param_output
-from test.mixed_nlg.output.particle_param_output import ParticleParamOutput as PartModel # Our model definition
+import test.mixed_nlg.initial.particle_param_init as particle_param_init
+from particle_param_init import ParticleParamInit as PartModel
 
 class GradPlot():
     def __init__(self, params, vals, diff):
@@ -31,12 +31,9 @@ class GradPlot():
         
 
 
-z0 = numpy.array([[0.0], [0.0]])
-P0 = 1000.0*numpy.eye(2)
-Q_in = numpy.diag([ 0.1, 0.1])
-B = numpy.array([[0.0, 0.0], [1.0, -1.0]])
-Qz = numpy.diag([ 0.0000001, 0.0000001])+B.dot(Q_in.dot(B.T))
-R = numpy.array([[1.0]])
+P0 = 100.0*numpy.eye(1)
+Qz = numpy.diag([0.1])
+R = numpy.diag([0.01])
     
 class GradientTest(param_est.ParamEstimation):
 
@@ -44,7 +41,7 @@ class GradientTest(param_est.ParamEstimation):
         self.params = params
         particles = numpy.empty(num, PartModel)
         for k in range(len(particles)):
-            particles[k] = PartModel(x0=z0, P0=P0, Qz=Qz, R=R, params=params)
+            particles[k] = PartModel(P0=P0, Qz=Qz, R=R, params=params)
         return particles
     
     def test(self, param_id, param_vals, num=100, nums=1):
@@ -72,6 +69,22 @@ class GradientTest(param_est.ParamEstimation):
         self.plot_xn = GradPlot(param_vals, logpxn, grad_lpxn)
         self.plot_x0 = GradPlot(param_vals, logpx0, grad_lpx0)
 
+    def plot_estimate(self, states, y):
+        svals = numpy.zeros((1, nums, steps+1))
+        for i in range(steps+1):
+            for j in range(len(self.straj)):
+                svals[:,j,i]=self.straj[j].traj[i].kf.z.ravel()
+                
+        plt.figure()
+        y = numpy.asarray(y)
+        y = y.ravel()
+        for j in range(nums):
+            plt.plot(range(steps+1),svals[0,j,:],'g-')
+            plt.plot(range(steps+1),states[0,:],'go')
+            plt.plot(range(1,steps+1),y,'bx')
+            
+        plt.show()
+        plt.draw()
     
 if __name__ == '__main__':
     
@@ -79,29 +92,25 @@ if __name__ == '__main__':
     nums=1
     sims = 1
     
-    c_true = 2.5
-    c_guess = numpy.array((2.5,))
+    z0_true = numpy.array((2.0,))
     
     # How many steps forward in time should our simulation run
     steps = 32
     
-    # Create a random input vector to drive our "correct state"
-    mean = -numpy.hstack((-1.0*numpy.ones(steps/4), 1.0*numpy.ones(steps/2),-1.0*numpy.ones(steps/4) ))
-    diff_vec = numpy.random.normal(mean, .1, steps)
-    uvec = numpy.vstack((1.0-diff_vec/2, 1.0+diff_vec/2))
-
     # Create reference
-    (ulist, ylist, states) = particle_param_output.generate_refernce(z0, P0, Qz, R, uvec, steps, c_true)
+    (ylist, states) = particle_param_init.generate_reference(P0=P0, Qz=Qz, R=R, params=z0_true, steps=steps)
 
     # Create an array for our particles 
-    gt = GradientTest(u=ulist, y=ylist)
-    gt.set_params(numpy.array((c_true,)).reshape((-1,1)))
+    gt = GradientTest(u=None, y=ylist)
+    gt.set_params(numpy.array((z0_true,)).reshape((-1,1)))
     
     param_steps = 101
     param_vals = numpy.linspace(-10.0, 10.0, param_steps)
     gt.test(0, param_vals)
 
+    gt.plot_estimate(states, ylist)
     gt.plot_y.plot(1)
     gt.plot_xn.plot(2)
     gt.plot_x0.plot(3)
+    
     

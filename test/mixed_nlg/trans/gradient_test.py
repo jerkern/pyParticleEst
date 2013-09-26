@@ -40,7 +40,7 @@ class GradientTest(param_est.ParamEstimation):
         P0 = numpy.eye(1)
         for k in range(len(particles)):
             particles[k] = PartModel(eta0=e0, z0=z0, P0=P0, params=params)
-        return (particles, z0, P0)
+        return particles
     
     def test(self, param_id, param_vals, num=100, nums=1):
         self.simulate(num_part=num, num_traj=nums)
@@ -55,7 +55,7 @@ class GradientTest(param_est.ParamEstimation):
             tmp = numpy.copy(self.params)
             tmp[param_id] = param_vals[k]
             
-            self.set_params(tmp.reshape((-1,1)))
+            self.set_params(tmp)
             logpy[k] = self.eval_logp_y()
             logpxn[k] = self.eval_logp_xnext()
             logpx0[k] = self.eval_logp_x0()
@@ -117,9 +117,9 @@ if __name__ == '__main__':
     
     # Create an array for our particles 
     gt = GradientTest(u=None, y=y_noise)
-    gt.set_params(numpy.array((theta_true,)).reshape((-1,1)))
+    gt.set_params(numpy.array((theta_true,)))
     
-    param_steps = 301
+    param_steps = 101
     param_vals = numpy.linspace(-30.0, 30.0, param_steps)
     gt.test(0, param_vals)
 

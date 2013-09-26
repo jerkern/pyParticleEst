@@ -23,6 +23,11 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         self.Qz = numpy.copy(self.kf.Q)
         self.fz = numpy.copy(self.kf.f_k)
         
+        # Sore z0, P0 needed for default implementation of 
+        # get_z0_initial and get_grad_z0_initial
+        self.z0 = numpy.copy(z0)
+        self.P0 = numpy.copy(P0)
+        
         self.eta = numpy.copy(e0.reshape((-1,1)))
 
         if (Qez != None):
@@ -217,12 +222,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def set_params(self, params):
         self.params = numpy.copy(params).reshape((-1,1))
     
-    def eta0_logpdf(self, eta):
-        """ Evaluate logprob of the initial non-linear state eta,
-            default implementation assumes all are equal, override this
-            if another behavior is desired """
-        return 0.0
-
     def calc_logprod_derivative(self, A, dA, B, dB):
         """ I = logdet(A)+Tr(inv(A)*B)
             dI/dx = Tr(inv(A)*(dA - dA*inv(A)*B + dB) """
@@ -235,6 +234,34 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         z0_diff = self.kf.z - z0
         l1 = z0_diff.dot(z0_diff.T) + self.kf.P
         return l1
+
+    def eval_eta0_logpdf(self, eta):
+        """ Evaluate logprob of the initial non-linear state eta,
+            default implementation assumes all are equal, override this
+            if another behavior is desired """
+        return 0.0
+    
+    def eval_grad_eta0_logpdf(self, eta):
+        """ Evaluate logprob of the initial non-linear state eta,
+            default implementation assumes all are equal, override this
+            if another behavior is desired """
+        return numpy.zeros(self.params.shape)
+    
+    # Default implementation, for when initial state is independent 
+    # of parameters
+    def get_z0_initial(self):
+        return (self.z0, self.P0)
+
+    # Default implementation, for when initial state is independent 
+    # of parameters    
+    def get_grad_z0_initial(self):
+        grad_z0 = []
+        grad_P0 = []
+        for _i in range(len(self.params)):
+            grad_z0.append(numpy.zeros(self.z0.shape))
+            grad_P0.append(numpy.zeros(self.P0.shape))
+            
+        return (grad_z0, grad_P0)
         
     def eval_logp_x0(self, z0, P0):
         """ Calculate a term of the I1 integral approximation
@@ -246,9 +273,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Q = self.get_Q()
         (_tmp, ld) = numpy.linalg.slogdet(Q)
         tmp = numpy.linalg.solve(P0, l1)
-        val = -0.5*(ld + numpy.trace(tmp)) + self.eta0_logpdf(self.eta)
-
-        return val
+        val = -0.5*(ld + numpy.trace(tmp)) 
+        return val + self.eval_eta0_logpdf(self.eta)
 
     def eval_grad_logp_x0(self, z0, P0, diff_z0, diff_P0):
         """ Calculate gradient of a term of the I1 integral approximation
@@ -273,9 +299,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             else:
                 dP0 = numpy.zeros(P0.shape)
 
-            # TODO, prob. of eta0 can also depend on parameters!
             grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
-        return grad   
+        return grad + self.eval_grad_eta0_logpdf(self.eta)
+    
     
     def calc_l2(self, x_next):
         x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
