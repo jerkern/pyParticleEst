@@ -314,6 +314,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         AM_ext = A.dot(M_ext)
         l2 = predict_err.dot(predict_err.T)
         l2 += A.dot(self.kf.P).dot(A.T) - AM_ext.T -AM_ext
+        # TODO: This term seems to have been missing?
+        l2[len(self.eta):,len(self.eta):] += x_next.kf.P
         return (l2, A, M_ext, predict_err)    
         
     def eval_logp_xnext(self, x_next):
