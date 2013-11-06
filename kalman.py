@@ -129,9 +129,9 @@ class KalmanSmoother(KalmanFilter):
             v_k ~ (0,Q)"""
         
         (x_np, P_np) = self.predict()
-        tmp = self.P.dot(self.A.T.dot(np.linalg.inv(P_np)))
-        x_smooth = self.z + tmp.dot(x_next-x_np)
-        P_smooth = self.P + tmp.dot(P_next - P_np).dot(tmp.T)
+        J = self.P.dot(self.A.T.dot(np.linalg.inv(P_np)))
+        x_smooth = self.z + J.dot(x_next-x_np)
+        P_smooth = self.P + J.dot(P_next - P_np).dot(J.T)
         
         self.z = x_smooth
         self.P = P_smooth
