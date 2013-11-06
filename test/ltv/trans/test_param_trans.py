@@ -4,11 +4,10 @@ import numpy
 import param_est
 
 import matplotlib.pyplot as plt
-from test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
+from test.ltv.trans.particle_param_trans import ParticleParamTrans # Our model definition
 
-e0 = numpy.array([0.0, ])
-z0 = numpy.array([1.0, ])
-P0 = numpy.eye(1)
+z0 = numpy.array([0.0, 1.0, ])
+P0 = numpy.eye(2)
 
 class ParticleParamTransEst(param_est.ParamEstimation):
         
@@ -16,17 +15,17 @@ class ParticleParamTransEst(param_est.ParamEstimation):
         particles = numpy.empty(num, ParticleParamTrans)
         
         for k in range(len(particles)):
-            e = numpy.array([numpy.random.normal(e0,1.0),])
-            particles[k] = ParticleParamTrans(eta0=e, z0=z0, P0=P0, params=params)
+            particles[k] = ParticleParamTrans(z0=z0, P0=P0, params=params)
         return particles
 
 if __name__ == '__main__':
     
-    num = 50
-    nums = 10
+    num = 1
+    nums = 1
     
     theta_true = 0.1
-    theta_guess = 0.3   
+    theta_guess = 0.3
+    #theta_guess = theta_true   
     R = numpy.array([[0.1]])
     Q = numpy.array([ 0.1, 0.1])
 
@@ -34,13 +33,11 @@ if __name__ == '__main__':
 
     # How many steps forward in time should our simulation run
     steps = 200
-    sims = 130
+    sims = 100
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
     yvec = numpy.zeros((1, steps))
-
-    
 
     estimate = numpy.zeros((1,sims))
     
@@ -88,6 +85,8 @@ if __name__ == '__main__':
         # Create an array for our particles 
         ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
+        #ParamEstimator.simulate(num_part=num, num_traj=nums)
+        print "maximization start"
         param = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums)
         
         # Extract data from trajectories for plotting
@@ -99,23 +98,17 @@ if __name__ == '__main__':
 #                vals[1,j,i]=pa.part[j].kf.z.reshape(-1)
 #            i += 1
 #        
-        svals = numpy.zeros((3, nums, steps+1))
+        svals = numpy.zeros((2, nums, steps+1))
         
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
-                svals[1,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
+                svals[:,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
                 
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'g-')
             plt.plot(range(steps+1),svals[1,j,:],'r-')
 
-
-        
-
-        
-        
-        print "maximization start"
+       
         
         estimate[0,k] = param
         
