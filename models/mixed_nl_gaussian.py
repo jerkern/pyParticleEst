@@ -309,14 +309,50 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         # TODO this A could have been changed!
         A = numpy.vstack((self.Ae, self.kf.A))
         predict_err = x_kplus - f - A.dot(self.kf.z)
-        zero_tmp = numpy.zeros((len(self.kf.z),len(self.eta)))
-        M_ext = numpy.hstack((zero_tmp, self.M_tN))
-        AM_ext = A.dot(M_ext)
-        l2 = predict_err.dot(predict_err.T)
-        l2 += A.dot(self.kf.P).dot(A.T) - AM_ext.T -AM_ext
-        # TODO: This term seems to have been missing?
-        l2[len(self.eta):,len(self.eta):] += x_next.kf.P
-        return (l2, A, M_ext, predict_err)    
+        
+        l2 = predict_err.dot(predict_err.T) +A.dot(self.kf.P).dot(A.T)
+        
+        tmp = -self.Ae.dot(self.M_tN)
+        l2[len(self.eta):,:len(self.eta)] += tmp
+        l2[:len(self.eta),len(self.eta):] += tmp.T
+        
+        tmp2 = x_next.kf.P - self.M_tN.T.dot(self.kf.A.T) - self.kf.A.dot(self.M_tN)        
+
+        l2[len(self.eta):,len(self.eta):] += tmp2
+        return (l2, predict_err)
+    
+    def calc_diff_l2(self, x_next):
+        
+        (l2, predict_err) = self.calc_l2(x_next)
+        A = numpy.vstack((self.Ae, self.kf.A))
+        
+        diff_l2 = list()
+        
+        for i in range(len(self.params)):
+            diff_l2_i = numpy.zeros(l2.shape)
+            grad_f = numpy.zeros((len(self.eta)+len(self.kf.z),1))
+            if (self.grad_fe != None):
+                grad_f[:len(self.eta)] = self.grad_fe[i]
+            if (self.grad_fz != None):
+                grad_f[len(self.eta):] = self.grad_fz[i]
+                    
+            grad_A = numpy.zeros(A.shape)
+            if (self.grad_Ae != None):
+                grad_A[:len(self.eta),:] = self.grad_Ae[i]
+            if (self.grad_Az != None):
+                grad_A[len(self.eta):,:] = self.grad_Az[i]
+                    
+            tmp = (grad_f + grad_A.dot(self.kf.z)).dot(predict_err.T)
+            diff_l2_i = -tmp - tmp.T
+            tmp = grad_A.dot(self.kf.P).dot(A.T)
+            diff_l2_i += tmp + tmp.T
+            tmp = -grad_A.dot(self.M_tN)
+            diff_l2_i[:,len(self.eta):] +=  tmp
+            diff_l2_i[len(self.eta):, :] += tmp.T
+        
+            diff_l2.append(diff_l2_i)
+            
+        return (l2,diff_l2)
         
     def eval_logp_xnext(self, x_next):
         """ Calculate a term of the I2 integral approximation
@@ -337,15 +373,14 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-        # Calculate l2 according to (16)    
-        (l2, A, M_ext, predict_err) = self.calc_l2(x_next)
+        # Calculate l2 according to (16)
+        (l2, diff_l2) = self.calc_diff_l2(x_next)
       
         Q = self.get_Q()
         
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
         for i in range(len(self.params)):
-            tmp = numpy.zeros((len(l2), 1))
             
             grad_Q = numpy.zeros(Q.shape)
             
@@ -361,26 +396,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
                 if (self.grad_Qz != None):
                     grad_Q[len(self.eta):, len(self.eta):] = self.grad_Qz[i]
 
-
-            diff_l2 = numpy.zeros(l2.shape)
-            grad_f = numpy.zeros((len(self.eta)+len(self.kf.z),1))
-            if (self.grad_fe != None):
-                grad_f[:len(self.eta)] = self.grad_fe[i]
-            if (self.grad_fz != None):
-                grad_f[len(self.eta):] = self.grad_fz[i]
-                    
-            grad_A = numpy.zeros(A.shape)
-            if (self.grad_Ae != None):
-                grad_A[:len(self.eta),:] = self.grad_Ae[i]
-            if (self.grad_Az != None):
-                grad_A[len(self.eta):,:] = self.grad_Az[i]
-                    
-            tmp = (grad_f + grad_A.dot(self.kf.z)).dot(predict_err.T)
-            tmp2 = grad_A.dot(M_ext)
-            tmp3 = grad_A.dot(self.kf.P).dot(A.T)
-            diff_l2 = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T
-                
-            grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
+            
+                            
+            grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2[i])
                 
         return grad
     
