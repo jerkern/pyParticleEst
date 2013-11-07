@@ -54,7 +54,6 @@ class GradientTest(param_est.ParamEstimation):
         for k in range(param_steps):    
             tmp = numpy.copy(self.params)
             tmp[param_id] = param_vals[k]
-            
             self.set_params(tmp)
             logpy[k] = self.eval_logp_y()
             logpxn[k] = self.eval_logp_xnext()
@@ -83,7 +82,7 @@ if __name__ == '__main__':
     correct = PartModel(eta0=e0, z0=z0,P0=P0, params=(theta_true,))
 
     # How many steps forward in time should our simulation run
-    steps = 200
+    steps = 130
     
 
     # Create arrays for storing some values for later plotting    
@@ -92,24 +91,24 @@ if __name__ == '__main__':
 
 
     # Create reference
+    e = numpy.random.normal(0.0, 1.0)
+    z = numpy.random.normal(1.0, 1.0)
     for i in range(steps):
-        
+
         # Extract linear states
-        vals[0,num,i]=correct.kf.z.reshape(-1)
+        vals[0,num,i]=e
         # Extract non-linear state
-        vals[1,num,i]=correct.eta[0,0]
+        vals[1,num,i]=z
+        
+        
+        e = e + theta_true * z + numpy.random.normal(0.0, 0.1)
+        z = z + numpy.random.normal(0.0, 0.1)
+        y = e
+        yvec[0,i] = y
 
-        # Drive the correct particle using the true input
-        noise = correct.sample_process_noise()
-        correct.update(u=None, noise=noise)
-        correct.kf.z += numpy.random.normal(0.0, Q[1])
-        # use the correct particle to generate the true measurement
-        yvec[0,i] = correct.eta[0,0]
-
-    
     # Store values for last time-step aswell    
-    vals[0,num,steps]=correct.kf.z.reshape(-1)
-    vals[1,num,steps]=correct.eta[0,0]
+    vals[0,num,steps]=e
+    vals[1,num,steps]=z
 
     y_noise = yvec.T.tolist()
     for i in range(len(y_noise)):
@@ -119,9 +118,9 @@ if __name__ == '__main__':
     gt = GradientTest(u=None, y=y_noise)
     gt.set_params(numpy.array((theta_true,)))
     
-    param_steps = 101
-    param_vals = numpy.linspace(-30.0, 30.0, param_steps)
-    gt.test(0, param_vals)
+    param_steps = 51
+    param_vals = numpy.linspace(-0.5, 0.5, param_steps)
+    gt.test(0, param_vals, nums=10)
 
     gt.plot_y.plot(1)
     gt.plot_xn.plot(2)
