@@ -31,7 +31,7 @@ class SmoothTrajectory(object):
             ind = None
             p_next = -numpy.Inf*numpy.ones(numpy.shape(pa.w))
             
-            if (rej_sampling and step.peak_fwd_density > 0.0):
+            if (rej_sampling and step.peak_fwd_density > -numpy.Inf):
                 cnt = 0
                 w = numpy.exp(pa.w)
                 while (cnt < len(p_next)/2.0): # Time-out limit
