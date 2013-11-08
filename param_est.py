@@ -4,7 +4,8 @@ import PF
 import PS
 import numpy
 import scipy.optimize
- 
+
+from multiprocessing import Pool
 class ParamEstInterface(object):
     """ Interface s for particles to be used with the parameter estimation
         algorithm presented in [1]
@@ -41,10 +42,20 @@ class ParamEstInterface(object):
             respect to the corresponding parameter"""
         pass
     
-def set_traj_params(straj, params):
+def set_traj_params(straj, params, ind=None):
     for i in range(len(straj)):
-            for j in range(len(straj[i].traj)):
+        if (ind == None):
+            ind = range(len(straj[i].traj))
+            for j in ind:
                 straj[i].traj[j].set_params(params)
+                
+estimator = None
+
+def calc_py(ind):
+    return estimator.eval_logp_y(ind)
+
+def calc_pxnext(ind):
+    return estimator.eval_logp_xnext(ind)
 
 class ParamEstimation(object):
     __metaclass__ = abc.ABCMeta
@@ -96,29 +107,64 @@ class ParamEstimation(object):
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001):
         
-        def fval(params):
-            set_traj_params(self.straj, params)
+        def fval_pooled(params_val):
+            # Stolen from,
+            # http://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks-in-python
+            def chunks(l, n):
+                return [l[i:i+n] for i in range(0, len(l), n)]
+
+            set_traj_params(self.straj, params_val)
+            
+            # Needed for the pool'ed functions
+            global estimator
+            estimator = self
+            pool = Pool()
+            N = len(self.straj[0].traj)
+            ind_chunks= chunks(range(N), 20)
+            res_py = pool.map(calc_py, ind_chunks)
+            
+            ind_chunks= chunks(range(N-1), 20)
+            res_pxnext = pool.map(calc_pxnext, ind_chunks)
+            pool.close()
+            pool.join()
+            (log_pval, d_log_pval) = self.eval_logp_x0()
+            
+            for i in res_py:
+                log_pval += i[0]
+                d_log_pval += i[1]
+                
+            for i in res_pxnext:
+                log_pval += i[0]
+                d_log_pval += i[1]
+            
+            return (-1.0*log_pval, -1.0*d_log_pval.ravel())
+            
+        def fval(params_val):
+            set_traj_params(self.straj, params_val)
             (log_py, d_log_py) = self.eval_logp_y()
-            (log_px0, d_log_px0) = self.eval_logp_x0()
             (log_pxnext, d_log_pxnext) = self.eval_logp_xnext()
+            (log_px0, d_log_px0) = self.eval_logp_x0()
             return (-1.0*(log_py + log_px0 + log_pxnext), -1.0*(d_log_py + d_log_px0 + d_log_pxnext).ravel())
-        
-        params = numpy.copy(param0)
+
+        params_local = numpy.copy(param0)
         Q = -numpy.Inf
         for _i in xrange(max_iter):
             Q_old = Q
-            self.set_params(params)
+            self.set_params(params_local)
             self.simulate(num_part, num_traj)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
-            res = scipy.optimize.minimize(fun=fval, x0=params, method='BFGS', jac=True)
-            params = res.x
-            (Q, Q_grad) = fval(params)
+            
+            res = scipy.optimize.minimize(fun=fval_pooled, x0=params_local, method='BFGS', jac=True)
+            
+            params_local = res.x
+
+            (Q, Q_grad) = fval(params_local)
             Q = -Q
             Q_grad = -Q_grad
-            print params, Q
+            print params_local, Q
             if (numpy.abs(Q - Q_old) < tol):
                 break
-        return params
+        return params_local
     
     def eval_prob(self):
         (log_py, d_log_py) = self.eval_logp_y()
@@ -138,24 +184,29 @@ class ParamEstimation(object):
             grad_logpx0 += grad
         return (logp_x0/M, grad_logpx0/M)
     
-    def eval_logp_y(self):
+    def eval_logp_y(self, ind=None):
         logp_y = 0.0
         grad_logpy = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
         for traj in self.straj:
-            for i in range(len(traj.traj)):
+            if (ind == None):
+                ind = range(len(traj.traj))
+            for i in ind:
                 if (traj.y[i] != None):
                     (val, grad) = traj.traj[i].eval_logp_y(traj.y[i])
                     logp_y += val
                     grad_logpy += grad
+        
         return (logp_y/M, grad_logpy/M)
     
-    def eval_logp_xnext(self):
+    def eval_logp_xnext(self, ind=None):
         logp_xnext = 0.0
         grad_logpxn = numpy.zeros((len(self.params.shape),1))
         M = len(self.straj)
         for traj in self.straj:
-            for i in range(len(traj.traj)-1):
+            if (ind == None):
+                ind = range(len(traj.traj)-1)
+            for i in ind:
                 (val, grad) = traj.traj[i].eval_logp_xnext(traj.traj[i+1])
                 logp_xnext += val
                 grad_logpxn += grad

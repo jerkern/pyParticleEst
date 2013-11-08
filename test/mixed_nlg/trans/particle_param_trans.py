@@ -22,7 +22,7 @@ class ParticleParamTrans(models.mixed_nl_gaussian.MixedNLGaussian):
                                                  e0 = eta0,
                                                  Az=Az, C=C, Ae=Ae,
                                                  R=R, Qe=Qe, Qz=Qz,
-                                                 fe=fe)
+                                                 fe=fe, params=params)
         
     def prep_update(self, u):
         """ Perform a time update of all states """
