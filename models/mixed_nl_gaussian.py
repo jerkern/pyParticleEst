@@ -17,7 +17,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
                                               Az=Az, C=C, 
                                               Qz=Qz, R=R,
                                               h_k=h, f_k=fz)
-        self.Ae = Ae
+        self.Ae = numpy.copy(Ae)
+        self.Az = numpy.copy(Az)
+        self.A = numpy.vstack((self.Ae, self.Az))
         self.Qe = Qe
         # Store a copy of these variables, needed in clin_dynamics
         self.Qz = numpy.copy(self.kf.Q)
@@ -31,14 +33,19 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         self.eta = numpy.copy(e0.reshape((-1,1)))
 
         if (Qez != None):
-            self.Qez = Qez
+            self.Qez = numpy.copy(Qez)
         else:
             self.Qez = numpy.zeros((len(e0),len(z0)))
+
+        self.Q = numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
+                               numpy.hstack((self.Qez.T, self.Qz))))
+        
         if (fe != None):
             self.fe = fe
         else:
             self.fe = numpy.zeros((len(self.eta), 1))
 
+        
         
         self.sampled_z = None
         self.z_tN = None
@@ -66,12 +73,29 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
 
         if (Ae != None):
             self.Ae = numpy.copy(Ae)
+        if (Az != None):
+            self.Az = numpy.copy(Az)
+        if (Ae != None or Az != None):
+            if (Ae == None):
+                Ae = self.Ae
+            if (Az == None):
+                Az = self.Az
+            self.A = numpy.vstack((Ae, Az))
         if (Qe != None):
             self.Qe = numpy.copy(Qe)
         if (Qez != None):
             self.Qez = numpy.copy(Qez)
         if (Qz != None):
             self.Qz = numpy.copy(self.kf.Q)
+        if (Qe != None or Qez != None or Qz != None):
+            if (Qe == None):
+                Qe = self.Qe
+            if (Qez == None):
+                Qez = self.Qez
+            if (Qz == None):
+                Qz = self.Qz
+            self.Q = numpy.vstack((numpy.hstack((Qe, Qez)),
+                               numpy.hstack((Qez.T, Qz))))
         if (fz != None):
             self.fz = numpy.copy(self.kf.f_k)
         if (fe != None):
@@ -129,30 +153,24 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         z_est = self.kf.predict()[0]
         x_est = numpy.vstack((eta_est,z_est))
-        Sigma = self.calc_sigma()
+        A = self.A
+        Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
         return kalman.lognormpdf(x_next,mu=x_est,S=Sigma)
     
-    def get_Q(self):
-        return numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
-                             numpy.hstack((self.Qez.T, self.Qz))))
-    
-
     def calc_suff_stats(self, next_part):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         # Create sample particle
         
-        lin_est = self.kf.z
         P = self.kf.P
-        A_ext = numpy.vstack((self.Ae, self.kf.A))
-        _lin_cov = self.kf.Q
-        Q = self.get_Q()
-        W = A_ext.T.dot(numpy.linalg.inv(Q))
+        Q = self.Q
+        A = self.A
+        W = A.T.dot(numpy.linalg.inv(Q))
         el = len(self.eta)
         Wa = W[:,:el]
         Wz = W[:,el:]
-        QPinv = numpy.linalg.inv(Q+A_ext.dot(P.dot(A_ext.transpose())))
-        Sigma = P-P.dot(A_ext.transpose().dot(QPinv)).dot(A_ext.dot(P))
-        c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(lin_est))
+        QPinv = numpy.linalg.inv(Q+A.dot(P.dot(A.T)))
+        Sigma = P-P.dot(A.T.dot(QPinv)).dot(A.dot(P))
+        c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(self.kf.z))
        
         z_tN = Sigma.dot(Wz.dot(next_part.z_tN))+c
         M_tN = Sigma.dot(Wz.dot(next_part.P_tN))
@@ -171,20 +189,14 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
 
         self.sampled_z = numpy.random.multivariate_normal(self.z_tN.ravel(),self.P_tN).ravel().reshape((-1,1))
     
-    def calc_sigma(self):
-        cov = self.get_Q()
-        A_ext = numpy.vstack((self.Ae, self.kf.A))
-        lin_P_ext = A_ext.dot(self.kf.P.dot(A_ext.transpose()))
-        Sigma = cov + lin_P_ext
-        return Sigma
-
     def measure(self, y):
         y=numpy.reshape(y, (-1,1))
         return super(MixedNLGaussian, self).measure(y)
     
     def fwd_peak_density(self, u):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
-        Sigma = self.calc_sigma()
+        A = self.A
+        Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
         zero = numpy.zeros((Sigma.shape[0],1))
         return kalman.lognormpdf(zero, zero, Sigma)
     
@@ -270,8 +282,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         # Calculate l1 according to (19a)
         l1 = self.calc_l1(z0, P0)
        
-        Q = self.get_Q()
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
+        (_tmp, ld) = numpy.linalg.slogdet(self.Q)
         tmp = numpy.linalg.solve(P0, l1)
         val = -0.5*(ld + numpy.trace(tmp)) 
         return val + self.eval_eta0_logpdf(self.eta)
@@ -306,8 +317,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def calc_l2(self, x_next):
         x_kplus = numpy.vstack((x_next.eta, x_next.z_tN))
         f = numpy.vstack((self.fe, self.fz))
-        # TODO this A could have been changed!
-        A = numpy.vstack((self.Ae, self.kf.A))
+
+        A = self.A
         predict_err = x_kplus - f - A.dot(self.z_tN)
         
         l2 = predict_err.dot(predict_err.T) +A.dot(self.P_tN).dot(A.T)
@@ -324,7 +335,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def calc_diff_l2(self, x_next):
         
         (l2, predict_err) = self.calc_l2(x_next)
-        A = numpy.vstack((self.Ae, self.kf.A))
+        A = self.A
         
         diff_l2 = list()
         
@@ -361,9 +372,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             
         l2 = self.calc_l2(x_next)[0]
       
-        Q = self.get_Q()
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
-        tmp = numpy.linalg.solve(Q, l2)
+        (_tmp, ld) = numpy.linalg.slogdet(self.Q)
+        tmp = numpy.linalg.solve(self.Q, l2)
         val = -0.5*(ld + numpy.trace(tmp))
         
         return val
@@ -376,13 +386,11 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         # Calculate l2 according to (16)
         (l2, diff_l2) = self.calc_diff_l2(x_next)
       
-        Q = self.get_Q()
-        
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
         for i in range(len(self.params)):
             
-            grad_Q = numpy.zeros(Q.shape)
+            grad_Q = numpy.zeros(self.Q.shape)
             
             if (self.grad_Qe != None or 
                 self.grad_Qez != None or 
@@ -398,7 +406,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
 
             
                             
-            grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2[i])
+            grad[i] = -0.5*self.calc_logprod_derivative(self.Q, grad_Q, l2, diff_l2[i])
                 
         return grad
     
