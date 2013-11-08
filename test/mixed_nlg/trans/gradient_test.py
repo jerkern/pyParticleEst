@@ -55,12 +55,9 @@ class GradientTest(param_est.ParamEstimation):
             tmp = numpy.copy(self.params)
             tmp[param_id] = param_vals[k]
             self.set_params(tmp)
-            logpy[k] = self.eval_logp_y()
-            logpxn[k] = self.eval_logp_xnext()
-            logpx0[k] = self.eval_logp_x0()
-            grad_lpy[:,k] = self.eval_grad_logp_y()
-            grad_lpxn[:,k] = self.eval_grad_logp_xnext()
-            grad_lpx0[:,k] = self.eval_grad_logp_x0()
+            (logpy[k],grad_lpy[:,k]) = self.eval_logp_y()
+            (logpxn[k], grad_lpxn[:,k])  = self.eval_logp_xnext()
+            (logpx0[k], grad_lpx0[:,k]) = self.eval_logp_x0()
 
         self.plot_y = GradPlot(param_vals, logpy, grad_lpy)
         self.plot_xn = GradPlot(param_vals, logpxn, grad_lpxn)
