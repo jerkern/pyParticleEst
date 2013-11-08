@@ -23,7 +23,7 @@ class ParticleParamTransEst(param_est.ParamEstimation):
 if __name__ == '__main__':
     
     num = 50
-    nums = 10
+    nums = 5
     
     theta_true = 0.1
     theta_guess = 0.3   
