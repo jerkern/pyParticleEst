@@ -32,6 +32,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         self.eta = numpy.copy(e0.reshape((-1,1)))
 
+        self.x_zeros = numpy.zeros((len(self.eta)+len(self.kf.z), 1))
+
         if (Qez != None):
             self.Qez = numpy.copy(Qez)
         else:
@@ -45,7 +47,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         else:
             self.fe = numpy.zeros((len(self.eta), 1))
 
-        
+        self.Sigma = None
         
         self.sampled_z = None
         self.z_tN = None
@@ -143,19 +145,25 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         return numpy.random.multivariate_normal(numpy.zeros(len(self.eta)), Sigma_a).reshape((-1,1))
 
+    def fwd_peak_density(self, u):
+        """ Implements the fwd_peak_density function for MixedNLGaussian models """
+        A = self.A
+        self.Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
+        return kalman.lognormpdf(self.x_zeros, self.x_zeros, self.Sigma)
         
     def next_pdf(self, next_part, u):
         """ Implements the next_pdf function for MixedNLGaussian models """
         
         #nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
         eta_est = self.pred_eta()
-        x_next = numpy.vstack((next_part.eta,next_part.sampled_z)).reshape((-1,1))
         
-        z_est = self.kf.predict()[0]
-        x_est = numpy.vstack((eta_est,z_est))
-        A = self.A
-        Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
-        return kalman.lognormpdf(x_next,mu=x_est,S=Sigma)
+        eta_diff = next_part.eta - eta_est
+        z_diff= next_part.sampled_z - self.kf.predict()[0]
+        
+        diff = numpy.vstack((eta_diff, z_diff)).reshape((-1,1))
+        # We can used cached self.Sigma since 'fwd_peak_density' will always be called first
+        #Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
+        return kalman.lognormpdf(diff,mu=self.x_zeros,S=self.Sigma)
     
     def calc_suff_stats(self, next_part):
         """ Implements the sample_smooth function for MixedNLGaussian models """
@@ -192,13 +200,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def measure(self, y):
         y=numpy.reshape(y, (-1,1))
         return super(MixedNLGaussian, self).measure(y)
-    
-    def fwd_peak_density(self, u):
-        """ Implements the fwd_peak_density function for MixedNLGaussian models """
-        A = self.A
-        Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
-        zero = numpy.zeros((Sigma.shape[0],1))
-        return kalman.lognormpdf(zero, zero, Sigma)
     
     def get_nonlin_state(self):
         return self.eta
