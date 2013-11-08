@@ -35,10 +35,10 @@ class GradientTest(param_est.ParamEstimation):
     def create_initial_estimate(self, params, num):
         self.params = params
         particles = numpy.empty(num, PartModel)
-        e0 = numpy.array([0.0,])
         z0 = numpy.array([0.0,])
         P0 = numpy.eye(1)
         for k in range(len(particles)):
+            e0 = numpy.array([numpy.random.normal(0.0,1.0),])
             particles[k] = PartModel(eta0=e0, z0=z0, P0=P0, params=params)
         return particles
     
@@ -77,13 +77,9 @@ if __name__ == '__main__':
     e0 = numpy.array([0.0, ])
     z0 = numpy.array([0.0, ])
     P0 = numpy.eye(1)
-    
-    # Create a reference which we will try to estimate using a RBPS
-    correct = PartModel(eta0=e0, z0=z0,P0=P0, params=(theta_true,))
 
     # How many steps forward in time should our simulation run
-    steps = 130
-    
+    steps = 200
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
@@ -119,7 +115,7 @@ if __name__ == '__main__':
     gt.set_params(numpy.array((theta_true,)))
     
     param_steps = 21
-    param_vals = numpy.linspace(0.09, 0.11, param_steps)
+    param_vals = numpy.linspace(0.05, 0.15, param_steps)
     gt.test(0, param_vals, nums=10)
 
     gt.plot_y.plot(1)
