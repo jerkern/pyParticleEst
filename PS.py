@@ -96,7 +96,7 @@ class SmoothTrajectory(object):
             if (self.y[i] != None):
                 # Estimate z_t
                 y = self.traj[i].prep_measure(self.y[i])
-                self.traj[i].clin_measure(y=y, next_part=self.traj[i+1])
+                self.traj[i].clin_measure(y=numpy.asarray(y).reshape((-1,1)), next_part=self.traj[i+1])
             
             # Update z_t and dynamics given information about eta_{t+1}
             etan = self.traj[i+1].get_nonlin_state()
@@ -110,7 +110,7 @@ class SmoothTrajectory(object):
         
         if (self.y[-1] != None):
             y = self.traj[-1].prep_measure(self.y[-1])
-            self.traj[-1].clin_measure(y, next_part=None)
+            self.traj[-1].clin_measure(numpy.asarray(y).reshape((-1,1)), next_part=None)
 
         # Backward smoothing
         for i in reversed(range(len(self.traj)-1)):
