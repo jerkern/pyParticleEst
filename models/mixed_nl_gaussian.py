@@ -320,8 +320,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         l2 = predict_err.dot(predict_err.T) +A.dot(self.P_tN).dot(A.T)
         
         tmp = -self.Ae.dot(self.M_tN)
-        l2[len(self.eta):,:len(self.eta)] += tmp
-        l2[:len(self.eta),len(self.eta):] += tmp.T
+        l2[len(self.eta):,:len(self.eta)] += tmp.T
+        l2[:len(self.eta),len(self.eta):] += tmp
         
         tmp2 = x_next.P_tN - self.M_tN.T.dot(self.P_tN) - self.kf.A.dot(self.M_tN)        
 
