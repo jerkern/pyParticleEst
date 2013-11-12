@@ -105,7 +105,8 @@ if __name__ == '__main__':
             for j in range(nums):
                 svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
                 svals[1,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
-                
+        
+        # Does this really look right?        
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'g-')
             plt.plot(range(steps+1),svals[1,j,:],'r-')
