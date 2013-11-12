@@ -80,7 +80,7 @@ class ParamEstimation(object):
         if (self.straj != None):
             set_traj_params(self.straj, params)
     
-    def simulate(self, num_part, num_traj):
+    def simulate(self, num_part, num_traj, update_before_predict=True):
         
         particles = self.create_initial_estimate(params=self.params, num=num_part)
         
@@ -91,13 +91,24 @@ class ParamEstimation(object):
         # set the resampling threshold to 0.67 (effective particles / total particles )
         self.pt = PF.ParticleTrajectory(pa,0.67)
         
-        # Run particle filter
-        for i in range(len(self.y)):
-            # Run PF using noise corrupted input signal
-            self.pt.update(self.u[i])
-        
-            # Use noise corrupted measurements
-            self.pt.measure(self.y[i])
+        if (update_before_predict):
+           
+            # Run particle filter
+            for i in range(len(self.y)):
+                # Run PF using noise corrupted input signal
+                self.pt.update(self.u[i])
+            
+                # Use noise corrupted measurements
+                self.pt.measure(self.y[i])
+        else:
+                        # Run particle filter
+            for i in range(len(self.y)):
+                # Use noise corrupted measurements
+                self.pt.measure(self.y[i])
+                # Run PF using noise corrupted input signal
+                self.pt.update(self.u[i])
+            
+                
             
         # Use the filtered estimates above to created smoothed estimates
         self.straj = PS.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
@@ -105,7 +116,7 @@ class ParamEstimation(object):
             (z0, P0) = self.straj[i].traj[0].get_z0_initial()
             self.straj[i].constrained_smoothing(z0, P0)
             
-    def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001):
+    def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, update_before_predict=True):
         
         def fval_pooled(params_val):
             # Stolen from,
@@ -144,17 +155,19 @@ class ParamEstimation(object):
             (log_py, d_log_py) = self.eval_logp_y()
             (log_pxnext, d_log_pxnext) = self.eval_logp_xnext()
             (log_px0, d_log_px0) = self.eval_logp_x0()
-            return (-1.0*(log_py + log_px0 + log_pxnext), -1.0*(d_log_py + d_log_px0 + d_log_pxnext).ravel())
+            val =  (-1.0*(log_py + log_px0 + log_pxnext), -1.0*(d_log_py + d_log_px0 + d_log_pxnext).ravel())
+            #print "fval %s : %f" % (params_val, val[0])
+            return val
 
         params_local = numpy.copy(param0)
         Q = -numpy.Inf
         for _i in xrange(max_iter):
             Q_old = Q
             self.set_params(params_local)
-            self.simulate(num_part, num_traj)
+            self.simulate(num_part, num_traj, update_before_predict)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             
-            res = scipy.optimize.minimize(fun=fval_pooled, x0=params_local, method='BFGS', jac=True)
+            res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=True, options=dict({'maxiter':5}))
             
             params_local = res.x
 
@@ -174,19 +187,19 @@ class ParamEstimation(object):
        
     def eval_logp_x0(self):
         logp_x0 = 0.0
-        grad_logpx0 = numpy.zeros((len(self.params.shape),1))
+        grad_logpx0 = numpy.zeros((len(self.params),))
         M = len(self.straj)
         for traj in self.straj:
             (z0, P0) = traj.traj[0].get_z0_initial()
             (grad_z0, grad_P0) = traj.traj[0].get_grad_z0_initial()
             (val, grad) = traj.traj[0].eval_logp_x0(z0, P0, grad_z0, grad_P0)
             logp_x0 += val
-            grad_logpx0 += grad
+            grad_logpx0 += grad.ravel()
         return (logp_x0/M, grad_logpx0/M)
     
     def eval_logp_y(self, ind=None):
         logp_y = 0.0
-        grad_logpy = numpy.zeros((len(self.params.shape),1))
+        grad_logpy = numpy.zeros((len(self.params),))
         M = len(self.straj)
         for traj in self.straj:
             if (ind == None):
@@ -195,13 +208,13 @@ class ParamEstimation(object):
                 if (traj.y[i] != None):
                     (val, grad) = traj.traj[i].eval_logp_y(traj.y[i])
                     logp_y += val
-                    grad_logpy += grad
+                    grad_logpy += grad.ravel()
         
         return (logp_y/M, grad_logpy/M)
     
     def eval_logp_xnext(self, ind=None):
         logp_xnext = 0.0
-        grad_logpxn = numpy.zeros((len(self.params.shape),1))
+        grad_logpxn = numpy.zeros((len(self.params),))
         M = len(self.straj)
         for traj in self.straj:
             if (ind == None):
@@ -209,5 +222,5 @@ class ParamEstimation(object):
             for i in ind:
                 (val, grad) = traj.traj[i].eval_logp_xnext(traj.traj[i+1])
                 logp_xnext += val
-                grad_logpxn += grad
+                grad_logpxn += grad.ravel()
         return (logp_xnext/M, grad_logpxn/M)
