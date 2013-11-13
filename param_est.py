@@ -122,7 +122,8 @@ class ParamEstimation(object):
             (z0, P0) = self.straj[i].traj[0].get_z0_initial()
             self.straj[i].constrained_smoothing(z0, P0)
             
-    def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, update_before_predict=True, callback=None):
+    def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
+                 update_before_predict=True, callback=None, callback_sim=None):
         
         def fval_traj_pooled(params_val):
             
@@ -193,6 +194,8 @@ class ParamEstimation(object):
             Q_old = Q
             self.set_params(params_local)
             self.simulate(num_part, num_traj, update_before_predict)
+            if (callback_sim != None):
+                callback_sim(self)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             
             res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=True, options=dict({'maxiter':10}))
