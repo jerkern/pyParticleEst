@@ -25,7 +25,7 @@ class LS2Est(param_est.ParamEstimation):
 if __name__ == '__main__':
     
     num = 50
-    nums = 1
+    nums = 5
     
     theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
    
