@@ -25,7 +25,7 @@ class LS2Est(param_est.ParamEstimation):
 if __name__ == '__main__':
     
     num = 50
-    nums = 10
+    nums = 1
     
     theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
    
@@ -42,9 +42,9 @@ if __name__ == '__main__':
     plt.ion()
     fig1 = plt.figure()
     fig2 = plt.figure()
-    fig3 = plt.figure()
-    fig4 = plt.figure()
-    fig5 = plt.figure()
+    
+    
+    max_iter = 1000
     
     for k in range(sims):
         print k
@@ -68,23 +68,54 @@ if __name__ == '__main__':
         plt.plot(x[1:],numpy.asarray(y)[:,:],'.')
         fig1.show()
         plt.draw()
-            
+        
+        params_it = numpy.zeros((max_iter, len(theta_guess)))
+        Q_it = numpy.zeros((max_iter))
+        it = 0
+        
+        def callback(params, Q):
+            global it
+            params_it[it,:] = params
+            Q_it[it] = Q
+            it = it+1
+            plt.figure(fig2.number)
+            plt.clf()
+            plt.plot(range(it), params_it[:it, 0], 'b-')
+            plt.plot((0.0, it), (theta_true[0], theta_true[0]), 'b--')
+            plt.plot(range(it), params_it[:it, 1], 'r-')
+            plt.plot((0.0, it), (theta_true[1], theta_true[1]), 'r--')
+            plt.plot(range(it), params_it[:it, 2], 'g-')
+            plt.plot((0.0, it), (theta_true[2], theta_true[2]), 'g--')
+            plt.plot(range(it), params_it[:it, 3], 'c-')
+            plt.plot((0.0, it), (theta_true[3], theta_true[3]), 'c--')
+            plt.plot(range(it), params_it[:it, 4], 'k-')
+            plt.plot((0.0, it), (theta_true[4], theta_true[4]), 'k--')
+            plt.show()
+            plt.draw()
+            return
+        
         # Create an array for our particles 
         ParamEstimator = LS2Est(u=None, y=y)
         ParamEstimator.set_params(theta_guess)
         #ParamEstimator.simulate(num, nums, False)
 
-        param = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=500,
-                                        update_before_predict=False)
+        param = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
+                                        update_before_predict=False, callback=callback)
         
         svals = numpy.zeros((4, nums, steps+1))
+ 
+        fig3 = plt.figure()
+        fig4 = plt.figure()
+        fig5 = plt.figure()
+        fig6 = plt.figure()
+ 
         
         for i in range(steps+1):
             for j in range(nums):
                 svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
                 svals[1:,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
                 
-        plt.figure(fig2.number)
+        plt.figure(fig3.number)
         plt.clf()
         # TODO, does these smoothed estimates really look ok??
         for j in range(nums):
@@ -92,25 +123,15 @@ if __name__ == '__main__':
             #plt.plot(range(steps+1),svals[1,j,:],'r-')
         plt.plot(x[:-1], e.T,'rx')
         #plt.plot(x[:-1], e,'r-')
-        fig2.show()
-        
-        plt.figure(fig3.number)
-        plt.clf()
-        # TODO, does these smoothed estimates really look ok??
-        for j in range(nums):
-            plt.plot(range(steps+1),svals[1,j,:],'g-')
-            #plt.plot(range(steps+1),svals[1,j,:],'r-')
-        plt.plot(x[:-1], z[0,:],'rx')
-        #plt.plot(x[:-1], e,'r-')
         fig3.show()
         
         plt.figure(fig4.number)
         plt.clf()
         # TODO, does these smoothed estimates really look ok??
         for j in range(nums):
-            plt.plot(range(steps+1),svals[2,j,:],'g-')
+            plt.plot(range(steps+1),svals[1,j,:],'g-')
             #plt.plot(range(steps+1),svals[1,j,:],'r-')
-        plt.plot(x[:-1], z[1,:],'rx')
+        plt.plot(x[:-1], z[0,:],'rx')
         #plt.plot(x[:-1], e,'r-')
         fig4.show()
         
@@ -120,9 +141,19 @@ if __name__ == '__main__':
         for j in range(nums):
             plt.plot(range(steps+1),svals[2,j,:],'g-')
             #plt.plot(range(steps+1),svals[1,j,:],'r-')
-        plt.plot(x[:-1], z[2,:],'rx')
+        plt.plot(x[:-1], z[1,:],'rx')
         #plt.plot(x[:-1], e,'r-')
         fig5.show()
+        
+        plt.figure(fig6.number)
+        plt.clf()
+        # TODO, does these smoothed estimates really look ok??
+        for j in range(nums):
+            plt.plot(range(steps+1),svals[2,j,:],'g-')
+            #plt.plot(range(steps+1),svals[1,j,:],'r-')
+        plt.plot(x[:-1], z[2,:],'rx')
+        #plt.plot(x[:-1], e,'r-')
+        fig6.show()
 
     
         plt.draw()
