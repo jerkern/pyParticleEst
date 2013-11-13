@@ -425,9 +425,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             if (self.grad_C != None):
                 meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
                 tmp2 = self.grad_C[i].dot(self.P_tN).dot(self.kf.C.T)
-                tmp = self.grad_C[i].dot(self.z_tN).dot(meas_diff)
+                tmp = self.grad_C[i].dot(self.z_tN).dot(meas_diff.T)
                 if (self.grad_h != None):
-                    tmp += self.grad_h[i]
+                    tmp += self.grad_h[i].dot(meas_diff.T)
                 dl3 += -tmp -tmp.T + tmp2 + tmp2.T
 
             if (grad_R != None): 
