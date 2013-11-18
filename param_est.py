@@ -123,7 +123,8 @@ class ParamEstimation(object):
             self.straj[i].constrained_smoothing(z0, P0)
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
-                 update_before_predict=True, callback=None, callback_sim=None):
+                 update_before_predict=True, callback=None, callback_sim=None,
+                 bounds=None):
         
         def fval_traj_pooled(params_val):
             
@@ -198,7 +199,8 @@ class ParamEstimation(object):
                 callback_sim(self)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             
-            res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=True, options=dict({'maxiter':10}))
+            res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=True, 
+                                          options=dict({'maxiter':10}), bounds=bounds)
             
             params_local = res.x
 
@@ -209,7 +211,7 @@ class ParamEstimation(object):
                 callback(params=params_local, Q=Q)
             if (numpy.abs(Q - Q_old) < tol):
                 break
-        return params_local
+        return (params_local, Q)
     
     def eval_prob(self):
         (log_py, d_log_py) = self.eval_logp_y()
@@ -242,7 +244,9 @@ class ParamEstimation(object):
                 ind = range(len(self.straj[k].traj))
             for i in ind:
                 if (self.straj[k].y[i] != None):
-                    (val, grad) = self.straj[k].traj[i].eval_logp_y(self.straj[k].y[i])
+                    y = self.straj[k].traj[i].prep_measure(self.straj[k].y[i])
+                    #y = self.straj[k].y[i].reshape((-1,1))
+                    (val, grad) = self.straj[k].traj[i].eval_logp_y(y)
                     logp_y += val
                     grad_logpy += grad.ravel()
         
