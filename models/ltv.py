@@ -6,7 +6,7 @@ import param_est
 
 
 #class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
-class LTV(part_utils.RBPSBase):
+class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
     """ Base class for particles of the type linear time varying with additive gaussian noise.
 
         Implement this type of system by extending this class and provide the methods for returning 
@@ -140,20 +140,7 @@ class LTV(part_utils.RBPSBase):
             
         return (grad_z0, grad_P0)
         
-    def eval_logp_x0(self, z0, P0):
-        """ Calculate a term of the I1 integral approximation
-        and its gradient as specified in [1]"""
-        
-        # Calculate l1 according to (19a)
-        l1 = self.calc_l1(z0, P0)
-       
-        Q = self.kf.Q
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
-        tmp = numpy.linalg.solve(P0, l1)
-        val = -0.5*(ld + numpy.trace(tmp)) 
-        return val
-
-    def eval_grad_logp_x0(self, z0, P0, diff_z0, diff_P0):
+    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -161,6 +148,11 @@ class LTV(part_utils.RBPSBase):
             
         # Calculate l1 according to (19a)
         l1 = self.calc_l1(z0, P0)
+        
+        Q = self.kf.Q
+        (_tmp, ld) = numpy.linalg.slogdet(Q)
+        tmp = numpy.linalg.solve(P0, l1)
+        val = -0.5*(ld + numpy.trace(tmp)) 
        
         grad = numpy.zeros(self.params.shape)
         # Calculate gradient
@@ -177,7 +169,7 @@ class LTV(part_utils.RBPSBase):
                 dP0 = numpy.zeros(P0.shape)
 
             grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
-        return grad
+        return (val, grad)
     
     
     def calc_l2(self, x_next):
@@ -193,20 +185,6 @@ class LTV(part_utils.RBPSBase):
         return (l2, A, M, predict_err)    
         
     def eval_logp_xnext(self, x_next):
-        """ Calculate a term of the I2 integral approximation
-        and its gradient as specified in [1]"""
-        # Calculate l2 according to (16)
-            
-        l2 = self.calc_l2(x_next)[0]
-      
-        Q = self.kf.Q
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
-        tmp = numpy.linalg.solve(Q, l2)
-        val = -0.5*(ld + numpy.trace(tmp))
-        
-        return val
-    
-    def eval_grad_logp_xnext(self, x_next):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -215,6 +193,9 @@ class LTV(part_utils.RBPSBase):
         (l2, A, M_ext, predict_err) = self.calc_l2(x_next)
       
         Q = self.kf.Q
+        (_tmp, ld) = numpy.linalg.slogdet(Q)
+        tmp = numpy.linalg.solve(Q, l2)
+        val = -0.5*(ld + numpy.trace(tmp))
         
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
@@ -242,7 +223,7 @@ class LTV(part_utils.RBPSBase):
                 
             grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
                 
-        return grad
+        return (val, grad)
     
     def calc_l3(self, y):
         meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
@@ -256,25 +237,13 @@ class LTV(part_utils.RBPSBase):
 
         # For later use
         R = self.kf.R
-        # Calculate l3 according to (19b)
-        l3 = self.calc_l3(y)
-        
-        (_tmp, ld) = numpy.linalg.slogdet(R)
-        tmp = numpy.linalg.solve(R, l3)
-        val = -0.5*(ld + numpy.trace(tmp))
-        
-        return val
-    
-    def eval_grad_logp_y(self, y):
-        """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
-
-        # For later use
-        R = self.kf.R
         grad_R = self.grad_R
         # Calculate l3 according to (19b)
         l3 = self.calc_l3(y)
-        
+        (_tmp, ld) = numpy.linalg.slogdet(R)
+        tmp = numpy.linalg.solve(R, l3)
+        val = -0.5*(ld + numpy.trace(tmp))
+                    
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
         for i in range(len(self.params)):
@@ -295,4 +264,4 @@ class LTV(part_utils.RBPSBase):
 
             grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
                 
-        return grad
+        return (val, grad)

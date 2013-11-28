@@ -87,7 +87,7 @@ if __name__ == '__main__':
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
         #ParamEstimator.simulate(num_part=num, num_traj=nums)
         print "maximization start"
-        param = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums)
+        (param, Q) = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums)
         
         # Extract data from trajectories for plotting
 #        i=0

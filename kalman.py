@@ -123,6 +123,11 @@ class KalmanSmoother(KalmanFilter):
     
         Extends the KalmanFilter class and provides an additional method for smoothing
         backwards in time """
+    
+    def __init__(self, z0, P0, **kwargs):
+        super(KalmanSmoother, self).__init__(z0=z0, P0=P0, **kwargs)
+        self.M = None
+        
     def smooth(self, x_next, P_next):
         """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
             the relation x_{k+1} = A*x_k + f_k +v_k
@@ -131,7 +136,9 @@ class KalmanSmoother(KalmanFilter):
         (x_np, P_np) = self.predict()
         J = self.P.dot(self.A.T.dot(np.linalg.inv(P_np)))
         x_smooth = self.z + J.dot(x_next-x_np)
-        P_smooth = self.P + J.dot(P_next - P_np).dot(J.T)
-        
+        #P_smooth = self.P + J.dot(P_next - P_np).dot(J.T)
+        P_smooth = self.P -J.dot(self.A).dot(self.P) + J.dot(P_next).dot(J.T)
+        M_smooth = -J.dot(P_next)
         self.z = x_smooth
         self.P = P_smooth
+        self.M = M_smooth

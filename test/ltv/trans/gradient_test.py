@@ -54,12 +54,9 @@ class GradientTest(param_est.ParamEstimation):
             tmp[param_id] = param_vals[k]
             
             self.set_params(tmp)
-            logpy[k] = self.eval_logp_y()
-            logpxn[k] = self.eval_logp_xnext()
-            logpx0[k] = self.eval_logp_x0()
-            grad_lpy[:,k] = self.eval_grad_logp_y()
-            grad_lpxn[:,k] = self.eval_grad_logp_xnext()
-            grad_lpx0[:,k] = self.eval_grad_logp_x0()
+            (logpy[k],grad_lpy[:,k]) = self.eval_logp_y()
+            (logpxn[k], grad_lpxn[:,k])  = self.eval_logp_xnext()
+            (logpx0[k], grad_lpx0[:,k]) = self.eval_logp_x0()
 
         self.plot_y = GradPlot(param_vals, logpy, grad_lpy)
         self.plot_xn = GradPlot(param_vals, logpxn, grad_lpxn)
@@ -103,13 +100,13 @@ if __name__ == '__main__':
     gt = GradientTest(u=None, y=ylist)
     gt.set_params(numpy.array((theta_guess,)))
     
-#    param_steps = 101
-#    param_vals = numpy.linspace(-5.0, 5.0, param_steps)
-#    gt.test(0, param_vals)
-#
-#    gt.plot_y.plot(1)
-#    gt.plot_xn.plot(2)
-#    gt.plot_x0.plot(3)
+    param_steps = 101
+    param_vals = numpy.linspace(-5.0, 5.0, param_steps)
+    gt.test(0, param_vals)
+
+    gt.plot_y.plot(1)
+    gt.plot_xn.plot(2)
+    gt.plot_x0.plot(3)
     
-    gt.simulate(1, 1)
-    gt.plot_estimate(states=states, y=ylist)
+#    gt.simulate(1, 1)
+#    gt.plot_estimate(states=states, y=ylist)
