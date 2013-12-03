@@ -99,8 +99,8 @@ if __name__ == '__main__':
         ParamEstimator.set_params(theta_guess)
         #ParamEstimator.simulate(num, nums, False)
 
-        param = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                        update_before_predict=False, callback=callback)
+        (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
+                                             update_before_predict=False, callback=callback)
         
         svals = numpy.zeros((4, nums, steps+1))
  
