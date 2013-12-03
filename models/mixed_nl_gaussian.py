@@ -311,19 +311,19 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     
     
     def calc_l2(self, x_next):
-        x_kplus = numpy.vstack((x_next.eta, x_next.z_tN))
+        x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
         f = numpy.vstack((self.fe, self.fz))
 
         A = self.A
-        predict_err = x_kplus - f - A.dot(self.z_tN)
+        predict_err = x_kplus - f - A.dot(self.kf.z)
         
-        l2 = predict_err.dot(predict_err.T) +A.dot(self.P_tN).dot(A.T)
+        l2 = predict_err.dot(predict_err.T) +A.dot(self.kf.P).dot(A.T)
         
-        tmp = -self.Ae.dot(self.M_tN)
+        tmp = -self.Ae.dot(self.kf.M)
         l2[len(self.eta):,:len(self.eta)] += tmp.T
         l2[:len(self.eta),len(self.eta):] += tmp
         
-        tmp2 = x_next.P_tN - self.M_tN.T.dot(self.P_tN) - self.kf.A.dot(self.M_tN)        
+        tmp2 = x_next.kf.P - self.kf.M.T.dot(self.kf.P) - self.kf.A.dot(self.kf.M)        
 
         l2[len(self.eta):,len(self.eta):] += tmp2
         return (l2, predict_err)
@@ -337,7 +337,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         
         for i in range(len(self.params)):
             diff_l2_i = numpy.zeros(l2.shape)
-            grad_f = numpy.zeros((len(self.eta)+len(self.z_tN),1))
+            grad_f = numpy.zeros((len(self.eta)+len(self.kf.z),1))
             if (self.grad_fe != None):
                 grad_f[:len(self.eta)] = self.grad_fe[i]
             if (self.grad_fz != None):
@@ -349,11 +349,11 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             if (self.grad_Az != None):
                 grad_A[len(self.eta):,:] = self.grad_Az[i]
                     
-            tmp = (grad_f + grad_A.dot(self.z_tN)).dot(predict_err.T)
+            tmp = (grad_f + grad_A.dot(self.kf.z)).dot(predict_err.T)
             diff_l2_i = -tmp - tmp.T
-            tmp = grad_A.dot(self.P_tN).dot(A.T)
+            tmp = grad_A.dot(self.kf.P).dot(A.T)
             diff_l2_i += tmp + tmp.T
-            tmp = -grad_A.dot(self.M_tN)
+            tmp = -grad_A.dot(self.kf.M)
             diff_l2_i[:,len(self.eta):] +=  tmp
             diff_l2_i[len(self.eta):, :] += tmp.T
         
@@ -400,7 +400,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
     def calc_l3(self, y):
         meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
         l3 = meas_diff.dot(meas_diff.T)
-        l3 += self.kf.C.dot(self.P_tN).dot(self.kf.C.T)
+        l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
         return l3
     
     def eval_logp_y(self, y):
@@ -424,8 +424,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             dl3 = numpy.zeros(l3.shape)
             if (self.grad_C != None):
                 meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
-                tmp2 = self.grad_C[i].dot(self.P_tN).dot(self.kf.C.T)
-                tmp = self.grad_C[i].dot(self.z_tN).dot(meas_diff.T)
+                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
+                tmp = self.grad_C[i].dot(self.kf.z).dot(meas_diff.T)
                 if (self.grad_h != None):
                     tmp += self.grad_h[i].dot(meas_diff.T)
                 dl3 += -tmp -tmp.T + tmp2 + tmp2.T

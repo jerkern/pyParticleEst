@@ -94,7 +94,7 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
        
         z_tN = Sigma.dot(W.dot(next_part.z_tN))+c
         M_tN = Sigma.dot(W.dot(next_part.P_tN))
-        P_tN = Sigma+M_tN.T.dot(Sigma)
+        P_tN = Sigma+M_tN.T.dot(W.T.dot(Sigma))
         
         return (z_tN, P_tN, M_tN)
     
@@ -125,8 +125,13 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
         return numpy.trace(numpy.linalg.solve(A,tmp2))
 
     def calc_l1(self, z0, P0):
-        z0_diff = self.kf.z - z0
-        l1 = z0_diff.dot(z0_diff.T) + self.kf.P
+        z = self.kf.z
+        P = self.kf.P
+        #z = self.z_tN
+        #P = self.P_tN
+        
+        z0_diff = z - z0
+        l1 = z0_diff.dot(z0_diff.T) + P
         return l1
 
     # Default implementation, for when initial state is independent 
@@ -155,11 +160,15 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
         val = -0.5*(ld + numpy.trace(tmp)) 
        
         grad = numpy.zeros(self.params.shape)
+        
+        z = self.kf.z
+        #z = self.z_tN
+        
         # Calculate gradient
         for i in range(len(self.params)):
 
             if (diff_z0 != None):
-                dl1 = -diff_z0[i].dot((self.kf.z-z0).T) - (self.kf.z-z0).dot(diff_z0[i].T)
+                dl1 = -diff_z0[i].dot((z-z0).T) - (z-z0).dot(diff_z0[i].T)
             else:
                 dl1 = numpy.zeros(l1.shape)
         
@@ -173,15 +182,23 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
     
     
     def calc_l2(self, x_next):
-        x_kplus = x_next.kf.z
+        z = self.kf.z
+        zn = x_next.kf.z
+        P = self.kf.P
+        Pn = x_next.kf.P
+        #z = self.z_tN
+        #zn = x_next.z_tN
+        #P = self.P_tN
+        #Pn = x_next.P_tN
+        
         f = self.kf.f_k
         # TODO this A could have been changed!
         A = self.kf.A
-        predict_err = x_kplus - f - A.dot(self.kf.z)
-        M = self.M_tN
+        predict_err = zn - f - A.dot(z)
+        M = self.kf.M
         AM = A.dot(M)
         l2 = predict_err.dot(predict_err.T)
-        l2 += x_next.kf.P + A.dot(self.kf.P).dot(A.T) - AM.T - AM
+        l2 += Pn + A.dot(P).dot(A.T) - AM.T - AM
         return (l2, A, M, predict_err)    
         
     def eval_logp_xnext(self, x_next):
@@ -197,6 +214,9 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
         tmp = numpy.linalg.solve(Q, l2)
         val = -0.5*(ld + numpy.trace(tmp))
         
+        z = self.kf.z
+        P = self.kf.P
+        
         # Calculate gradient
         grad = numpy.zeros(self.params.shape)
         for i in range(len(self.params)):
@@ -208,7 +228,7 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
                 grad_Q = self.grad_Q[i]
 
             diff_l2 = numpy.zeros(l2.shape)
-            grad_f = numpy.zeros((len(self.kf.z),1))
+            grad_f = numpy.zeros((len(z),1))
             if (self.grad_f != None):
                 grad_f = self.grad_f[i]
                     
@@ -216,9 +236,9 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
             if (self.grad_A != None):
                 grad_A = self.grad_A[i]
                     
-            tmp = (grad_f + grad_A.dot(self.kf.z)).dot(predict_err.T)
+            tmp = (grad_f + grad_A.dot(z)).dot(predict_err.T)
             tmp2 = grad_A.dot(M_ext)
-            tmp3 = grad_A.dot(self.kf.P).dot(A.T)
+            tmp3 = grad_A.dot(P).dot(A.T)
             diff_l2 = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T
                 
             grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
@@ -226,9 +246,11 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
         return (val, grad)
     
     def calc_l3(self, y):
+        P = self.kf.P
+        # P = self.P_tN
         meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
         l3 = meas_diff.dot(meas_diff.T)
-        l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
+        l3 += self.kf.C.dot(P).dot(self.kf.C.T)
         return l3
     
     def eval_logp_y(self, y):
