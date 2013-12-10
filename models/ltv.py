@@ -79,32 +79,8 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         return (next_cpart.t == self.t+1)
 
-    def calc_suff_stats(self, next_part):
-        """ Implements the sample_smooth function for MixedNLGaussian models """
-        # Create sample particle
-        
-        lin_est = self.kf.z
-        P = self.kf.P
-        A = self.kf.A
-        Q = self.kf.Q
-        W = A.T.dot(numpy.linalg.inv(Q))
-        QPinv = numpy.linalg.inv(Q+A.dot(P.dot(A.T)))
-        Sigma = P-P.dot(A.T.dot(QPinv)).dot(A.dot(P))
-        c = Sigma.dot(-W.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(lin_est))
-       
-        z_tN = Sigma.dot(W.dot(next_part.z_tN))+c
-        M_tN = Sigma.dot(W.dot(next_part.P_tN))
-        P_tN = Sigma+M_tN.T.dot(W.T.dot(Sigma))
-        
-        return (z_tN, P_tN, M_tN)
-    
     def sample_smooth(self, next_part):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        if (next_part != None):
-            (self.z_tN, self.P_tN, self.M_tN) = self.calc_suff_stats(next_part)
-        else:
-            self.z_tN = self.kf.z
-            self.P_tN = self.kf.P
         return
     
     def fwd_peak_density(self, u=None):
