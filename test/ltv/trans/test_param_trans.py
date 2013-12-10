@@ -4,6 +4,7 @@ import numpy
 import param_est
 
 import matplotlib.pyplot as plt
+import test.ltv.trans.particle_param_trans as particle_param_trans
 from test.ltv.trans.particle_param_trans import ParticleParamTrans # Our model definition
 
 z0 = numpy.array([0.0, 1.0, ])
@@ -48,56 +49,25 @@ if __name__ == '__main__':
     for k in range(sims):
         print k
         # Create reference
-        e = numpy.random.normal(0.0, 1.0)
-        z = numpy.random.normal(1.0, 1.0)
-        for i in range(steps):
+        (ylist, states) = particle_param_trans.generate_reference(z0, P0, theta_true, steps)
     
-            # Extract linear states
-            vals[0,num,i]=e
-            # Extract non-linear state
-            vals[1,num,i]=z
-            
-            
-            e = e + theta_true * z + numpy.random.normal(0.0, 0.1)
-            z = z + numpy.random.normal(0.0, 0.1)
-            y = e
-            yvec[0,i] = y
-    
-        # Store values for last time-step aswell    
-        vals[0,num,steps]=e
-        vals[1,num,steps]=z
-    
-        y_noise = yvec.T.tolist()
-        for i in range(len(y_noise)):
-            y_noise[i][0] += numpy.random.normal(0.0,R)
-        
-        print "estimation start"
-        
         plt.figure(fig1.number)
         plt.clf()
         x = numpy.asarray(range(steps+1))
-        plt.plot(x[1:],numpy.asarray(y_noise)[:,0],'b.')
-        plt.plot(range(steps+1),vals[0,num,:],'go')
-        plt.plot(range(steps+1),vals[1,num,:],'ro')
+        plt.plot(x[1:],numpy.asarray(ylist)[:,0],'b.')
+        plt.plot(range(steps+1),states[0,:],'go')
+        plt.plot(range(steps+1),states[1,:],'ro')
         plt.title("Param = %s" % theta_true)
+        plt.draw()
         fig1.show()
             
         # Create an array for our particles 
-        ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
+        ParamEstimator = ParticleParamTransEst(u=None, y=ylist)
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
         #ParamEstimator.simulate(num_part=num, num_traj=nums)
         print "maximization start"
         (param, Q) = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums)
         
-        # Extract data from trajectories for plotting
-#        i=0
-#        for step in ParamEstimator.pt:
-#            pa = step.pa
-#            for j in range(pa.num):
-#                vals[0,j,i]=pa.part[j].eta[0,0]
-#                vals[1,j,i]=pa.part[j].kf.z.reshape(-1)
-#            i += 1
-#        
         svals = numpy.zeros((2, nums, steps+1))
         
         for i in range(steps+1):
