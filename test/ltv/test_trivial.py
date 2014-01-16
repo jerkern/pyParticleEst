@@ -54,10 +54,10 @@ if __name__ == '__main__':
     for i in range(steps+1):
         for j in range(nums):
             svals[0,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
-            svals[1,j,i]=ParamEstimator.straj[j].traj[i].z_tN.ravel()
+            #svals[1,j,i]=ParamEstimator.straj[j].traj[i].z_tN.ravel()
             
             svals_p[0,j,i]=math.sqrt(ParamEstimator.straj[j].traj[i].kf.P[0,0])
-            svals_p[1,j,i]=math.sqrt(ParamEstimator.straj[j].traj[i].P_tN[0,0])
+            #svals_p[1,j,i]=math.sqrt(ParamEstimator.straj[j].traj[i].P_tN[0,0])
 
             
     for j in range(nums):

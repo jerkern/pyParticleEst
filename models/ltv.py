@@ -16,12 +16,11 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
         super(LTV, self).__init__(z0=z0, P0=P0,
                                   Az=A, C=C, 
                                   Qz=Q, R=R,
-                                  h_k=h, f_k=f)
+                                  h_k=h, f_k=f, t0=t0)
         
         self.z0 = numpy.copy(z0)
         self.P0 = numpy.copy(P0)
         self.t0 = t0
-        self.t = self.t0
         
         self.params = None
         self.grad_A = None
@@ -38,13 +37,13 @@ class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
     def calc_next_eta(self, u, noise):
         """ Update non-linear state using sampled noise,
         # the noise term here includes the uncertainty from z """
-        return self.t+1
+        return None
     
     def get_nonlin_state(self):
-        return self.t
+        return None
 
     def set_nonlin_state(self,inp):
-        self.t = numpy.copy(inp)
+        pass
         
     def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
         super(LTV, self).set_dynamics(Az=A, C=C, Qz=Q, R=R, f_k=f_k, h_k=h_k)

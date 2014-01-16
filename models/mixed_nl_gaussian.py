@@ -12,11 +12,12 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
     def __init__(self, z0, P0, e0, Az=None, C=None, Qz=None, R=None, fz=None,
-                 Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None):
+                 Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None, t0=0):
         super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
                                               Az=Az, C=C, 
                                               Qz=Qz, R=R,
-                                              h_k=h, f_k=fz)
+                                              h_k=h, f_k=fz,
+                                              t0=t0)
         self.Ae = numpy.copy(Ae)
         self.Az = numpy.copy(Az)
         self.A = numpy.vstack((self.Ae, self.Az))
@@ -24,11 +25,6 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         # Store a copy of these variables, needed in clin_dynamics
         self.Qz = numpy.copy(self.kf.Q)
         self.fz = numpy.copy(self.kf.f_k)
-        
-        # Sore z0, P0 needed for default implementation of 
-        # get_z0_initial and get_grad_z0_initial
-        self.z0 = numpy.copy(z0)
-        self.P0 = numpy.copy(P0)
         
         self.eta = numpy.copy(e0.reshape((-1,1)))
 
@@ -180,9 +176,11 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         Wz = W[:,el:]
         QPinv = numpy.linalg.inv(Q+A.dot(P.dot(A.T)))
         Sigma = P-P.dot(A.T.dot(QPinv)).dot(A.dot(P))
-        c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(self.kf.z))
-       
-        z_tN = Sigma.dot(Wz.dot(next_part.z_tN))+c
+        if (numpy.linalg.det(P) != 0.0):
+            c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(self.kf.z))
+            z_tN = Sigma.dot(Wz.dot(next_part.z_tN))+c
+        else:
+            z_tN = self.kf.z
         M_tN = Sigma.dot(Wz.dot(next_part.P_tN))
         P_tN = Sigma+M_tN.T.dot(Sigma)
         

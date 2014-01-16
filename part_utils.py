@@ -29,12 +29,19 @@ class RBPFBase(ParticleFilteringInterface):
     
     def __init__(self, z0, P0, 
                  Az=None, Bz=None, C=None,
-                  Qz=None, R=None, f_k=None, h_k=None):
+                  Qz=None, R=None, f_k=None, h_k=None,
+                  t0=0):
         
         self.kf = kalman.KalmanSmoother(z0=z0, P0=P0,
                                         A=Az, C=C, 
                                         Q=Qz, R=R,
                                         f_k=f_k, h_k=h_k)
+        
+        # Sore z0, P0 needed for default implementation of 
+        # get_z0_initial and get_grad_z0_initial
+        self.z0 = numpy.copy(z0)
+        self.P0 = numpy.copy(P0)
+        self.t = t0
     
     def set_dynamics(self, Az=None, C=None, Qz=None, R=None, f_k=None, h_k=None):
 
@@ -44,16 +51,17 @@ class RBPFBase(ParticleFilteringInterface):
     def update(self, u, noise):
         """ Update estimate using noise as input """
         etan = self.calc_next_eta(u, noise)
-        # Update linear estimate and dynamics by using etan as measurement
+        # Update linear estimate with data from measurement of next non-linear
+        # state 
         self.meas_eta_next(etan)
+        # Update linear dynamics with knowledge of the next state,
+        # e.g. if the is noise correlations
         lin_est = self.cond_predict(etan)
+        
+        # Store the results
         self.set_nonlin_state(etan)
         self.set_lin_est(lin_est)
-
-    @abc.abstractmethod
-    def cond_dynamics(self, eta_next):
-        """ Condition dynamics on future state 'eta_next'. """
-        pass
+        self.t = self.t + 1.0
     
     @abc.abstractmethod
     def calc_next_eta(self, u, noise):
@@ -61,13 +69,12 @@ class RBPFBase(ParticleFilteringInterface):
     
     @abc.abstractmethod
     def meas_eta_next(self, eta_next):
-        """ Update estimate using observation of next state """
+        """ Update linear estimate using observation 
+            of next non-linear state """
         pass
 
     def cond_predict(self, eta_next=None):
-        """ Kalman update of the linear states conditioned on the non-linear trajectory estimate,
-            Before calling this method clin_dynamics should be called to update the dynamics
-            according to the conditioning on the non-linear trajectory """
+        """ Predict linear-guassian states z_{t+1|t} conditioned on eta_{t+1} """
         (z, P) = self.kf.predict()
         return (z.reshape((-1,1)), P)
 
@@ -103,6 +110,11 @@ class RBPFBase(ParticleFilteringInterface):
     @abc.abstractmethod
     def get_nonlin_state(self):
         """ Return the non-linear state estimates """
+        
+    # Default implementation, for when initial state is independent 
+    # of parameters
+    def get_z0_initial(self):
+        return (self.z0, self.P0)
         
 
 class ParticleSmoothingInterface(ParticleFilteringInterface):
