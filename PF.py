@@ -83,25 +83,7 @@ class ParticleFilter(object):
             new_weights[k] = pa.part[k].measure(y)
 
         if (self.lp_hack == None):
-            # Check so that the approximation hasn't degenerated
-            s = sum(numpy.exp(new_weights))
-    #        assert s != 0.0
-            
-            if (s != 0.0):
-                #new_weights /= s
-                
-                tmp = pa.w + new_weights
-                
-                # Scale all values so the biggest is equal to log(1) = 0 
-                tmp -= max(tmp)
-                if (sum(numpy.exp(tmp)) != 0.0):
-                    pa.w = tmp
-                else:
-                    print "Filter has degenerated completely!"
-            else:
-                print "All particles bad! (should trigger assert, but disabled)"
-    
-
+            pa.w = pa.w + new_weights
 
         else:
             # lowpass filter hack work-around, not mathematically correct
@@ -110,7 +92,6 @@ class ParticleFilter(object):
                 new_weights = new_weights/s
                 pa.w = numpy.log((1-self.lp_hack)*numpy.exp(pa.w) + self.lp_hack*numpy.exp(new_weights))
 
-        #pa.w /= sum(pa.w)
         # Keep the weights from going to -Inf
         pa.w -= numpy.max(pa.w)
         

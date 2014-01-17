@@ -9,7 +9,7 @@ import scipy.sparse.linalg as spln
 def lognormpdf(x,mu,S):
     """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
     nx = len(S)
-    norm_coeff = -0.5*(nx*math.log(2*math.pi)+np.linalg.slogdet(S)[1])
+    norm_coeff = nx*math.log(2*math.pi)+np.linalg.slogdet(S)[1]
     
     err = x-mu
     if (sp.issparse(S)):
@@ -17,7 +17,7 @@ def lognormpdf(x,mu,S):
     else:
         numerator = np.linalg.solve(S, err).T.dot(err)
 
-    return norm_coeff-numerator
+    return -0.5*(norm_coeff+numerator)
 
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
@@ -115,7 +115,6 @@ class KalmanFilter(object):
 
         # Return the probability of the received measurement
         return lognormpdf(0, err, S)
-    
 
 
 class KalmanSmoother(KalmanFilter):

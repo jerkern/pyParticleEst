@@ -60,15 +60,16 @@ def calc_h(eta):
     return 0.05*eta**2
 
 class ParticleLSB(models.mixed_nl_gaussian.MixedNLGaussian):
-    """ Implement a simple system by extending the MixedNLGaussian class """
+    """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self):
         """ Define all model variables """
+        
+        # No uncertainty in initial state
         eta = numpy.array([[0.0],])
         z0 =  numpy.array([[0.0],
                            [0.0],
                            [0.0],
                            [0.0]])
-        
         P0 = 0.0*numpy.eye(4)
         
         Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
@@ -84,23 +85,21 @@ class ParticleLSB(models.mixed_nl_gaussian.MixedNLGaussian):
         Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
         R = numpy.diag([0.1,])
 
-        # Linear states handled by base-class
-        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)), P0=P0,
-                                                 e0 = eta,
-                                                 Az=Az, C=C, Ae=Ae,
-                                                 R=R, Qe=Qe, Qz=Qz,
-                                                 fe=fe, h=h)
+        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)),
+                                         P0=P0, e0 = eta,
+                                         Az=Az, C=C, Ae=Ae,
+                                         R=R, Qe=Qe, Qz=Qz,
+                                         fe=fe, h=h)
         
     def prep_update(self, u):
-        """ Perform a time update of all states """
+        """ Update system dynamics based on current state, called
+            before the predict step """
         (Ae, fe) = calc_Ae_fe(self.eta, self.t)
         self.set_dynamics(fe=fe, Ae=Ae)
         
     def prep_measure(self, y):
-        """ Perform a measurement update """
+        """ ppdate system dynamics based on current state, called
+            before the measurement step """
         h = calc_h(self.eta)
         self.set_dynamics(h=h)
         return y
-    
-    def next_pdf(self, next_cpart, u):
-        return super(ParticleLSB,self).next_pdf(next_cpart, None)
