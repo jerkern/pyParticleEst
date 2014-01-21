@@ -158,6 +158,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         eta_diff = next_part.eta - eta_est
         z_diff= next_part.sampled_z - self.kf.predict()[0]
         
+        if (self.Sigma == None):
+            self.fwd_peak_density(u) 
+        
         diff = numpy.vstack((eta_diff, z_diff)).reshape((-1,1))
         # We can used cached self.Sigma since 'fwd_peak_density' will always be called first
         #Sigma = self.Q + A.dot(self.kf.P).dot(A.T)

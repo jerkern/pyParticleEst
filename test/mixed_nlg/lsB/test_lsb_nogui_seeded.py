@@ -43,6 +43,7 @@ if __name__ == '__main__':
     C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
     for k in range(sims):
         # Create reference
+        numpy.random.seed(k)
         (y, e, z) = particle_lsb.generate_dataset(steps)
 
         # Create an array for our particles 
@@ -59,28 +60,21 @@ if __name__ == '__main__':
         # Use average of trajectories
         svals_mean = numpy.mean(svals,1)
 
-        for i in range(steps):
-            theta = 25.0+C_theta.dot(z[:,i].reshape((-1,1)))
-            sqr_err_eta[k,i] = (svals_mean[0,i] - e[0,i])**2
-            sqr_err_theta[k,i] = (svals_mean[1,i] - theta)**2
-            for j in range(nums):
-                sqr_err_eta_single[k,j,i] = (svals[0,j,i] - e[0,i])**2
-                sqr_err_theta_single[k,j,i] = (svals[1,j,i] - theta)**2
-            
-        mse_eta = numpy.mean(sqr_err_eta[:k+1,:], 0)
-        mse_theta = numpy.mean(sqr_err_theta[:k+1,:], 0)
-        rmse_eta = numpy.sqrt(mse_eta)
-        rmse_theta = numpy.sqrt(mse_theta)
-        print "RMSE (%d): eta=%f theta=%f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
+        theta = 25.0+C_theta.dot(z.reshape((4,-1)))
+        sqr_err_eta[k,:] = (svals_mean[0,:-1] - e[0,:])**2
+        sqr_err_theta[k,:] = (svals_mean[1,:-1] - theta)**2
+
+#        for i in range(steps):
+#            theta = 25.0+C_theta.dot(z[:,i].reshape((-1,1)))
+#            sqr_err_eta[k,i] = (svals_mean[0,i] - e[0,i])**2
+#            sqr_err_theta[k,i] = (svals_mean[1,i] - theta)**2
+#            for j in range(nums):
+#                sqr_err_eta_single[k,j,i] = (svals[0,j,i] - e[0,i])**2
+#                sqr_err_theta_single[k,j,i] = (svals[1,j,i] - theta)**2
+        
+        
+        rmse_eta = numpy.sqrt(numpy.mean(sqr_err_eta[k,:]))
+        rmse_theta = numpy.sqrt(numpy.mean(sqr_err_theta[k,:]))
+        print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
          
     
-    mse_eta = numpy.mean(sqr_err_eta, 0)
-    mse_theta = numpy.mean(sqr_err_theta, 0)
-    rmse_eta = numpy.sqrt(mse_eta)
-    rmse_theta = numpy.sqrt(mse_theta)
-    
-    print "RMSE: eta=%f theta=%f" % (numpy.mean(rmse_eta), numpy.mean(rmse_theta))   
-    print "RMSE, individual: eta=%f theta=%f" % (numpy.sqrt(numpy.mean(sqr_err_eta_single.ravel())),
-                                                 numpy.sqrt(numpy.mean(sqr_err_theta_single.ravel())))
-    print "RMSE, all: eta=%f, theta=%f" % (numpy.sqrt(numpy.mean(sqr_err_eta.ravel())),
-                                                 numpy.sqrt(numpy.mean(sqr_err_theta.ravel())))

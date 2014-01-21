@@ -49,6 +49,7 @@ if __name__ == '__main__':
         #theta_guess = numpy.copy(theta_true)
         
         # Create reference
+        numpy.random.seed(86)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    
     
