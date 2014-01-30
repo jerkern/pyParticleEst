@@ -59,6 +59,7 @@ class SmoothTrajectory(object):
                 w += p_next
                 # Normalize
                 try:
+                    w = w - numpy.max(w)
                     w_norm = numpy.exp(w)
                     w_norm /= numpy.sum(w_norm)
                 except FloatingPointError:

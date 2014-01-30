@@ -9,6 +9,7 @@ import math
 import matplotlib.pyplot as plt
 import test.mixed_nlg.lsB.particle_lsb as particle_lsb
 import param_est
+import scipy.io
 
 class LS2Est(param_est.ParamEstimation):
         
@@ -24,9 +25,6 @@ if __name__ == '__main__':
     num = 300
     nums = 10
     
-    theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
-   
-
     # How many steps forward in time should our simulation run
     steps = 100
     sims = 1
@@ -37,7 +35,7 @@ if __name__ == '__main__':
     estimate = numpy.zeros((5,sims))
     
     plt.ion()
-    
+    C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
     for k in range(sims):
         print k
         theta_guess = numpy.array((numpy.random.uniform(0.0, 2.0),
@@ -62,87 +60,44 @@ if __name__ == '__main__':
         ParamEstimator.simulate(num, nums, False)
 
         
-        svals = numpy.zeros((5, nums, steps+1))
-        vals = numpy.zeros((5, num, steps+1))
+        svals = numpy.zeros((2, nums, steps+1))
+        vals = numpy.zeros((2, num, steps+1))
  
-        fig3 = plt.figure()
-        fig4 = plt.figure()
-        fig5 = plt.figure()
-        fig6 = plt.figure()
-        fig7 = plt.figure()
-        
         for i in range(steps+1):
             for j in range(nums):
                 svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
-                svals[1:,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
+                svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i].kf.z)
             for j in range(num):
                 vals[0,j,i]=ParamEstimator.pt[i].pa.part[j].get_nonlin_state().ravel()
-                vals[1:,j,i]=ParamEstimator.pt[i].pa.part[j].kf.z.ravel()
+                vals[1,j,i]=25.0+C_theta.dot(ParamEstimator.pt[i].pa.part[j].kf.z)
                 
         svals_mean = numpy.mean(svals,1)
-        plt.figure(fig3.number)
-        plt.clf()
+        plt.figure()
 
         for j in range(num):   
-            plt.plot(range(steps+1),vals[0,j,:],'m.')
+            plt.plot(range(steps+1),vals[0,j,:],'.', markersize=3.0, color='#BBBBBB')
+        plt.plot(x[:-1], e.T,'k-',markersize=1.0)
         for j in range(nums):
-            plt.plot(range(steps+1),svals[0,j,:],'g-')
-        plt.plot(range(steps+1),svals_mean[0,:],'b-')
-        plt.plot(x[:-1], e.T,'r-')
-        #plt.plot(x[:-1], e,'r-')
-        fig3.show()
+            plt.plot(range(steps+1),svals[0,j,:],'--', markersize=2.0, color='#999999', dashes=(7,50))
+        #plt.plot(range(steps+1),svals_mean[0,:],'--', markersize=1.0, color='1.0')
+
+        #plt.savefig('rbps_fail_xi.eps', bbox_inches='tight')
+        plt.show()
         
-        plt.figure(fig4.number)
-        plt.clf()
-        # TODO, does these smoothed estimates really look ok??
+        plt.figure()
         for j in range(num):   
-            plt.plot(range(steps+1),vals[1,j,:],'m.')
+            plt.plot(range(steps+1),vals[1,j,:],'.', markersize=3.0, color='#BBBBBB')
+        plt.plot(x[:-1], (25.0+C_theta.dot(z)).ravel(),'k-',markersize=1.0)
         for j in range(nums):
-            plt.plot(range(steps+1),svals[1,j,:],'g-')
-        plt.plot(range(steps+1),svals_mean[1,:],'b-')
-        plt.plot(x[:-1], z[0,:],'r-')
-        #plt.plot(x[:-1], e,'r-')
-        fig4.show()
-        
-        plt.figure(fig5.number)
-        plt.clf()
-        # TODO, does these smoothed estimates really look ok??
-        for j in range(num):   
-            plt.plot(range(steps+1),vals[2,j,:],'m.')
-        for j in range(nums):
-            plt.plot(range(steps+1),svals[2,j,:],'g-')
-        plt.plot(range(steps+1),svals_mean[2,:],'b-')
-        plt.plot(x[:-1], z[1,:],'r-')
-        #plt.plot(x[:-1], e,'r-')
-        fig5.show()
-        
-        plt.figure(fig6.number)
-        plt.clf()
-        # TODO, does these smoothed estimates really look ok??
-        for j in range(num):   
-            plt.plot(range(steps+1),vals[3,j,:],'m.')
-        for j in range(nums):
-            plt.plot(range(steps+1),svals[3,j,:],'g-')
+            plt.plot(range(steps+1),svals[1,j,:],'--', markersize=2.0, color='#999999', dashes=(10,25))
+        #plt.plot(range(steps+1),svals_mean[1,:],'--', markersize=1.0, color='1.0')
+        #plt.savefig('rbps_fail_theta.eps', bbox_inches='tight')
+        plt.show()
 
-        plt.plot(range(steps+1),svals_mean[3,:],'b-')
-        plt.plot(x[:-1], z[2,:],'r-')
-        #plt.plot(x[:-1], e,'r-')
-        fig6.show()
-
-        plt.figure(fig7.number)
-        plt.clf()
-        # TODO, does these smoothed estimates really look ok??
-        for j in range(num):   
-            plt.plot(range(steps+1),vals[4,j,:],'m.')
-        for j in range(nums):
-            plt.plot(range(steps+1),svals[4,j,:],'g-')
-
-        plt.plot(range(steps+1),svals_mean[4,:],'b-')
-        plt.plot(x[:-1], z[3,:],'r-')
-        #plt.plot(x[:-1], e,'r-')
-        fig7.show()
- 
         plt.draw()
+        # Export data for plotting in matlab
+        scipy.io.savemat('test_lsb.mat', {'svals_mean': svals_mean, 'vals': vals, 
+                                          'svals': svals, 'y': y, 'z': z, 'e':e})
     
     plt.ioff()
     plt.show()
