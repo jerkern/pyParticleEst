@@ -17,21 +17,21 @@ class LS2Est(param_est.ParamEstimation):
         for k in range(len(particles)):
             e = numpy.array([numpy.random.normal(0.0,1.0),]).reshape((-1,1))
             z0 = numpy.zeros((3,1))
-            P0 = 0.00001*numpy.eye(3,3)
+            P0 = 0.0*numpy.eye(3,3)
             particles[k] = particle_ls2.ParticleLS2(eta0=e, z0=z0, P0=P0, params=params)
         return particles
 
 if __name__ == '__main__':
     
     num = 50
-    nums = 5
+    nums = 16
     
     theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
    
 
     # How many steps forward in time should our simulation run
     steps = 200
-    sims = 5
+    sims = 20
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
@@ -58,6 +58,6 @@ if __name__ == '__main__':
         (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
                                              update_before_predict=False, callback=None)
         
-        print param
+        print "%.4f %.4f %.4f %.4f %.4f" % tuple(param)
         
     print "exit"
