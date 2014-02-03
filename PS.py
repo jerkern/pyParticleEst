@@ -104,7 +104,8 @@ class SmoothTrajectory(object):
             self.traj[i].meas_eta_next(etan)
             # Predict z_{t+1} given information about eta_{t+1}, save
             # conditional dynamics for later use in the smoothing step
-            self.traj[i].cond_dynamics(etan)
+            # Cond dynamics are already calculated during the sample_smooth step
+            #self.traj[i].cond_dynamics(etan)
             lin_est = self.traj[i].kf.predict()
             self.traj[i+1].set_lin_est(lin_est)
 
