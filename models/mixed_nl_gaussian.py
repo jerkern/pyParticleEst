@@ -172,7 +172,7 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         if (next_part != None):
             self.meas_eta_next(next_part.eta)
             self.cond_dynamics(next_part.eta)
-            self.kf.smooth(next_part.kf.z, next_part.kf.P)
+            self.kf.measure_full(next_part.sampled_z, self.kf.f_k, self.kf.A, self.kf.Q)
 
         self.sampled_z = numpy.random.multivariate_normal(self.kf.z.ravel(),self.kf.P).ravel().reshape((-1,1))
     
