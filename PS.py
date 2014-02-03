@@ -102,10 +102,10 @@ class SmoothTrajectory(object):
             # Update z_t and dynamics given information about eta_{t+1}
             etan = self.traj[i+1].get_nonlin_state()
             self.traj[i].meas_eta_next(etan)
-            # Predict z_{t+1} given information about eta_{t+1}, save
-            # conditional dynamics for later use in the smoothing step
-            # Cond dynamics are already calculated during the sample_smooth step
-            #self.traj[i].cond_dynamics(etan)
+# Cond dynamics are already calculated during the sample_smooth step
+#            # Predict z_{t+1} given information about eta_{t+1}, save
+#            # conditional dynamics for later use in the smoothing step
+#            #self.traj[i].cond_dynamics(etan)
             lin_est = self.traj[i].kf.predict()
             self.traj[i+1].set_lin_est(lin_est)
 
