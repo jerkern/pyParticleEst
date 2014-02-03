@@ -156,7 +156,8 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         eta_est = self.pred_eta()
         
         eta_diff = next_part.eta - eta_est
-        z_diff= next_part.sampled_z - self.kf.predict()[0]
+        #z_diff= next_part.sampled_z - self.kf.predict()[0]
+        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
         
         if (self.Sigma == None):
             self.fwd_peak_density(u) 
@@ -166,39 +167,14 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         #Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
         return kalman.lognormpdf(diff,mu=self.x_zeros,S=self.Sigma)
     
-    def calc_suff_stats(self, next_part):
-        """ Implements the sample_smooth function for MixedNLGaussian models """
-        # Create sample particle
-        
-        P = self.kf.P
-        Q = self.Q
-        A = self.A
-        W = A.T.dot(numpy.linalg.inv(Q))
-        el = len(self.eta)
-        Wa = W[:,:el]
-        Wz = W[:,el:]
-        QPinv = numpy.linalg.inv(Q+A.dot(P.dot(A.T)))
-        Sigma = P-P.dot(A.T.dot(QPinv)).dot(A.dot(P))
-        if (numpy.linalg.det(P) != 0.0):
-            c = Sigma.dot(Wa.dot(next_part.eta-self.fe)-Wz.dot(self.kf.f_k)+numpy.linalg.inv(P).dot(self.kf.z))
-            z_tN = Sigma.dot(Wz.dot(next_part.z_tN))+c
-        else:
-            z_tN = self.kf.z
-        M_tN = Sigma.dot(Wz.dot(next_part.P_tN))
-        P_tN = Sigma+M_tN.T.dot(Sigma)
-        
-        return (z_tN, P_tN, M_tN)
-    
-    
     def sample_smooth(self, next_part):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         if (next_part != None):
-            (self.z_tN, self.P_tN, self.M_tN) = self.calc_suff_stats(next_part)
-        else:
-            self.z_tN = self.kf.z
-            self.P_tN = self.kf.P
+            self.meas_eta_next(next_part.eta)
+            self.cond_dynamics(next_part.eta)
+            self.kf.smooth(next_part.kf.z, next_part.kf.P)
 
-        self.sampled_z = numpy.random.multivariate_normal(self.z_tN.ravel(),self.P_tN).ravel().reshape((-1,1))
+        self.sampled_z = numpy.random.multivariate_normal(self.kf.z.ravel(),self.kf.P).ravel().reshape((-1,1))
     
     def measure(self, y):
         y=numpy.reshape(y, (-1,1))
