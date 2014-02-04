@@ -16,15 +16,13 @@ class LS2Est(param_est.ParamEstimation):
         
         for k in range(len(particles)):
             e = numpy.array([numpy.random.normal(0.0,1.0),]).reshape((-1,1))
-            z0 = numpy.zeros((3,1))
-            P0 = 0.000001*numpy.eye(3,3)
-            particles[k] = particle_ls2.ParticleLS2(eta0=e, z0=z0, P0=P0, params=params)
+            particles[k] = particle_ls2.ParticleLS2(eta0=e, params=params)
         return particles
 
 if __name__ == '__main__':
     
     num = 50
-    nums = 16
+    nums = 10
     
     theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
    
@@ -48,6 +46,7 @@ if __name__ == '__main__':
                                    numpy.random.uniform(0.0, math.pi/2.0)))
         
         # Create reference
+        numpy.random.seed(k)
         (y, e, z) = particle_ls2.generate_dataset(theta_true, steps)
    
         # Create an array for our particles 

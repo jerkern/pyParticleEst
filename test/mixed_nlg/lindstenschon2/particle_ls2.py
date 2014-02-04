@@ -7,6 +7,7 @@ Created on Nov 11, 2013
 import numpy
 import math
 import models.mixed_nl_gaussian
+import kalman
 
 def sign(x):
     if (x < 0.0):
@@ -58,7 +59,7 @@ def generate_dataset(params, length):
 
 class ParticleLS2(models.mixed_nl_gaussian.MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
-    def __init__(self, eta0, z0, P0, params):
+    def __init__(self, eta0, params):
         """ Define all model variables """
         Ae = numpy.array([[params[1], 0.0, 0.0]])
         Az = numpy.asarray(((1.0, params[2], 0.0), 
@@ -70,7 +71,8 @@ class ParticleLS2(models.mixed_nl_gaussian.MixedNLGaussian):
                              params[3]*math.cos(params[4]))))
         
         C = numpy.array([[0.0, 0.0, 0.0], [1.0, -1.0, 1.0]])
-        
+        z0 = numpy.zeros((3,1))
+        P0 = 0.0*numpy.eye(3,3)
         Qe= numpy.diag([ 0.01,])
         Qz = numpy.diag([ 0.01, 0.01, 0.01])
         R = numpy.diag([0.1, 0.1])
@@ -97,6 +99,18 @@ class ParticleLS2(models.mixed_nl_gaussian.MixedNLGaussian):
     
     def next_pdf(self, next_cpart, u):
         return super(ParticleLS2,self).next_pdf(next_cpart, None)
+    
+    # Override this method since there is no uncertainty in z0    
+    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
+        """ Calculate gradient of a term of the I1 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""    
+            
+        e0 = numpy.asarray((0.0,)).reshape((-1,1))
+        P0 = numpy.asarray((1.0,)).reshape((-1,1))
+        return (kalman.lognormpdf(self.eta, e0, P0),
+                numpy.zeros(self.params.shape))
 
     def set_params(self, params):
         """ New set of parameters """
