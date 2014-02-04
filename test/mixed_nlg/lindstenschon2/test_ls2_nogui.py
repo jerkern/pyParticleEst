@@ -46,7 +46,7 @@ if __name__ == '__main__':
                                    numpy.random.uniform(0.0, math.pi/2.0)))
         
         # Create reference
-        numpy.random.seed(k)
+        #numpy.random.seed(k)
         (y, e, z) = particle_ls2.generate_dataset(theta_true, steps)
    
         # Create an array for our particles 
