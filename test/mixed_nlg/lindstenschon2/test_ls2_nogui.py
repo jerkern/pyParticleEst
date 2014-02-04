@@ -17,7 +17,7 @@ class LS2Est(param_est.ParamEstimation):
         for k in range(len(particles)):
             e = numpy.array([numpy.random.normal(0.0,1.0),]).reshape((-1,1))
             z0 = numpy.zeros((3,1))
-            P0 = 0.0*numpy.eye(3,3)
+            P0 = 0.000001*numpy.eye(3,3)
             particles[k] = particle_ls2.ParticleLS2(eta0=e, z0=z0, P0=P0, params=params)
         return particles
 
