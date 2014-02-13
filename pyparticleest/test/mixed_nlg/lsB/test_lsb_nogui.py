@@ -5,10 +5,9 @@ Created on Nov 11, 2013
 '''
 
 import numpy
-import math
 import matplotlib.pyplot as plt
-import test.mixed_nlg.lsB.particle_lsb as particle_lsb
-import param_est
+import pyparticleest.test.mixed_nlg.lsB.particle_lsb as particle_lsb
+import pyparticleest.param_est as param_est
 
 class LSBEst(param_est.ParamEstimation):
         

@@ -6,8 +6,8 @@ Created on Nov 11, 2013
 
 import numpy
 import math
-import models.mixed_nl_gaussian
-import kalman
+from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
+import pyparticleest.kalman as kalman
 
 def sign(x):
     if (x < 0.0):
@@ -57,7 +57,7 @@ def generate_dataset(params, length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLS2(models.mixed_nl_gaussian.MixedNLGaussian):
+class ParticleLS2(MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, eta0, params):
         """ Define all model variables """

@@ -4,10 +4,10 @@ Created on Nov 11, 2013
 @author: ajn
 '''
 
-import param_est
+import pyparticleest.param_est as param_est
 import numpy
 import matplotlib.pyplot as plt
-import test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
+import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
 
 class GradPlot():
     def __init__(self, params, vals, diff):

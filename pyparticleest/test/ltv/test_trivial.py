@@ -4,13 +4,13 @@ Created on Nov 29, 2013
 @author: ajn
 '''
 
-import param_est
+import pyparticleest.param_est as param_est
 import numpy
 import math
 import matplotlib.pyplot as plt
 
-from test.ltv.particle_trivial import ParticleTrivial # Our model definition
-import test.ltv.particle_trivial as particle_trivial
+from pyparticleest.test.ltv.particle_trivial import ParticleTrivial # Our model definition
+import pyparticleest.test.ltv.particle_trivial as particle_trivial
 
 z0 = numpy.array([0.0, ])
 P0 = numpy.eye(1)

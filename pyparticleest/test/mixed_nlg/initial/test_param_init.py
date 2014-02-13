@@ -1,11 +1,11 @@
 #!/usr/bin/python
 
 import numpy
-import param_est
+import pyparticleest.param_est as param_est
 
 import matplotlib.pyplot as plt
-import test.mixed_nlg.initial.particle_param_init as particle_param_init
-from particle_param_init import ParticleParamInit as PartModel
+import pyparticleest.test.mixed_nlg.initial.particle_param_init as particle_param_init
+from pyparticleest.test.mixed_nlg.initial.particle_param_init import ParticleParamInit as PartModel
 
 P0 = 100.0*numpy.eye(1)
 Qz = numpy.diag([0.01])

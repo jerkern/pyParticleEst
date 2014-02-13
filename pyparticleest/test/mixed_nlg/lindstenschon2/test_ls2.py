@@ -7,8 +7,8 @@ Created on Nov 11, 2013
 import numpy
 import math
 import matplotlib.pyplot as plt
-import test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
-import param_est
+import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
+import pyparticleest.param_est as param_est
 
 class LS2Est(param_est.ParamEstimation):
         

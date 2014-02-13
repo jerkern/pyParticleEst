@@ -3,7 +3,7 @@
 import numpy
 import math
 import copy
-import PF
+import pyparticleest.pf as pf
 
 class SmoothTrajectory(object):
     """ Store smoothed trajectory """
@@ -35,7 +35,7 @@ class SmoothTrajectory(object):
                 cnt = 0
                 w = numpy.exp(pa.w)
                 while (cnt < len(p_next)/2.0): # Time-out limit
-                    tmp_ind = PF.sample(w,1)[0]
+                    tmp_ind = pf.sample(w,1)[0]
                     p = pa.part[tmp_ind].next_pdf(self.traj[cur_ind+1],
                                                   step.u)
                     accept = numpy.random.uniform()
@@ -66,7 +66,7 @@ class SmoothTrajectory(object):
                     # All weights zero, for robustness just draw a random sample
                     w_norm  = (0.0*w + 1.0)/len(w)
                      
-                ind = PF.sample(w_norm,1)[0]
+                ind = pf.sample(w_norm,1)[0]
 
             # Select 'previous' particle
             prev_part = pa.part[ind]
@@ -147,7 +147,7 @@ def extract_smooth_approx(straj, ind):
     for i in range(len(straj)):
         part[i] = copy.deepcopy(straj[i].traj[ind])
         
-    pa = PF.ParticleApproximation(particles=part)
+    pa = pf.ParticleApproximation(particles=part)
     
     return pa
         

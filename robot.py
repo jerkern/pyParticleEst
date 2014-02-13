@@ -4,7 +4,7 @@ from __future__ import division
 import math
 import numpy
 import scipy.stats
-import part_utils
+import pyparticleest.part_utils
 
 
 class ExactDifferentialRobot(object):
@@ -115,7 +115,7 @@ class ExactDifferentialRobot(object):
         self.state[2] = self.state[2] + os[2]
         
 
-class DifferentialRobot(part_utils.ParticleFilteringBase):
+class DifferentialRobot(pyparticleest.part_utils.ParticleFilteringInterface):
     """ Differential drive robot """
 
     def __init__(self, l, d, enc_noise, theta_noise, enc_noise_lin=0.0,

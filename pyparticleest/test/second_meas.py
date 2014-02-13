@@ -6,11 +6,11 @@ Created on Sep 20, 2013
 
 #!/usr/bin/python
 
-import PF
+import pyparticleest.pf as pf
 import numpy
 
 import matplotlib.pyplot as plt
-from test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
+from pyparticleest.test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
 
 if __name__ == '__main__':
     
@@ -66,11 +66,11 @@ if __name__ == '__main__':
     for k in range(num):
             particles[k] = ParticleParamTrans(eta0=e0, z0=z0, P0=P0, params=params)
     
-    pa = PF.ParticleApproximation(particles=particles)
+    pa = pf.ParticleApproximation(particles=particles)
     
     # Initialise a particle filter with our particle approximation of the initial state,
     # set the resampling threshold to 0.67 (effective particles / total particles )
-    pt = PF.ParticleTrajectory(pa,0.67)
+    pt = pf.ParticleTrajectory(pa,0.67)
   
     print "filtering start"
     

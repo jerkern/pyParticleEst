@@ -1,9 +1,9 @@
 """ Class for mixed linear/non-linear models with additive gaussian noise """
 
 import numpy
-import kalman
-import part_utils
-import param_est
+import pyparticleest.kalman as kalman
+import pyparticleest.part_utils as part_utils
+import pyparticleest.param_est as param_est
 
 
 class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):

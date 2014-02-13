@@ -3,12 +3,12 @@ Created on Sep 17, 2013
 
 @author: ajn
 '''
-import param_est
+import pyparticleest.param_est as param_est
 import numpy
 import matplotlib.pyplot as plt
 
-from test.ltv.trans.particle_param_trans import ParticleParamTrans as PartModel # Our model definition
-import test.ltv.trans.particle_param_trans as particle_param_trans
+from pyparticleest.test.ltv.trans.particle_param_trans import ParticleParamTrans as PartModel # Our model definition
+import pyparticleest.test.ltv.trans.particle_param_trans as particle_param_trans
 
 class ParticleParamTransEst(param_est.ParamEstimation):
         

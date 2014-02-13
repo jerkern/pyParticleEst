@@ -4,7 +4,7 @@ Created on Nov 29, 2013
 @author: ajn
 '''
 import numpy
-import models.ltv
+from pyparticleest.models.ltv import LTV
 
 R = numpy.array([[0.5]])
 Q = numpy.diag([ 0.1,])
@@ -31,7 +31,7 @@ def generate_reference(z0, P0, theta_true, steps):
         ylist.append(y)
     return (ylist, states)
 
-class ParticleTrivial(models.ltv.LTV):
+class ParticleTrivial(LTV):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, z0, P0, params):
         """ Define all model variables """

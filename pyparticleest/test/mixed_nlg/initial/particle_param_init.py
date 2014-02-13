@@ -1,5 +1,5 @@
 import numpy
-import models.mixed_nl_gaussian
+from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
 
 def generate_reference(P0, Qz, R, params, steps):
     A = numpy.asarray(((1.0),))
@@ -23,7 +23,7 @@ def generate_reference(P0, Qz, R, params, steps):
     return (ylist, states)
 
 
-class ParticleParamInit(models.mixed_nl_gaussian.MixedNLGaussian):
+class ParticleParamInit(MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, P0, Qz, R, params):
         """ Define all model variables """

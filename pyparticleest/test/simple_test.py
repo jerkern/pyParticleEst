@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import PF
-import PS
+import pyparticleest.pf as pf
+import pyparticleest.ps as ps
 import numpy
 
 import matplotlib.pyplot as plt
@@ -25,11 +25,11 @@ if __name__ == '__main__':
         particles[k] = SimpleParticle(z0, numpy.random.uniform(2, 3))
     
     # Create a particle approximation object from our particles
-    pa = PF.ParticleApproximation(particles=particles)
+    pa = pf.ParticleApproximation(particles=particles)
     
     # Initialise a particle filter with our particle approximation of the initial state,
     # set the resampling threshold to 0.67 (effective particles / total particles )
-    pt = PF.ParticleTrajectory(pa,0.67)
+    pt = pf.ParticleTrajectory(pa,0.67)
     
     # How many steps forward in time should our simulation run
     steps = 20
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         
     # Use the filtered estimates above to created smoothed estimates
     nums = 10 # Number of backward trajectories to generate
-    straj = PS.do_smoothing(pt, nums)   # Do sampled smoothing
+    straj = ps.do_smoothing(pt, nums)   # Do sampled smoothing
     for st in straj:
         st.constrained_smoothing(z0=z0,
                                  P0=100000*numpy.diag([1.0, 1.0]))

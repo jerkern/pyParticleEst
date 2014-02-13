@@ -1,7 +1,7 @@
 import numpy
-import mixed_nl_gaussian
+from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
 
-class SimpleParticle(mixed_nl_gaussian.MixedNLGaussian):
+class SimpleParticle(MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, x0, c):
         """ Define all model variables """

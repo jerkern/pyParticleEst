@@ -2,8 +2,8 @@
 
 import abc
 import numpy
-import kalman
-import part_utils
+import pyparticleest.kalman as kalman
+import pyparticleest.part_utils as part_utils
 
 class Hierarchial(part_utils.RBPSBase):
     """ Base class for particles of the type hierarchial which have a linear/guassian system conditioned on the

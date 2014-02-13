@@ -1,8 +1,8 @@
 """ Class for mixed linear/non-linear models with additive gaussian noise """
 
 import numpy
-import part_utils
-import param_est
+import pyparticleest.part_utils as part_utils
+import pyparticleest.param_est as param_est
 
 
 #class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):

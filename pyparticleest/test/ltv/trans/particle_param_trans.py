@@ -1,5 +1,5 @@
 import numpy
-import models.ltv
+from pyparticleest.models.ltv import LTV
 
 R = numpy.array([[0.01]])
 Q = numpy.diag([ 0.01, 0.1])
@@ -25,7 +25,7 @@ def generate_reference(z0, P0, theta_true, steps):
         ylist.append(y)
     return (ylist, states)
 
-class ParticleParamTrans(models.ltv.LTV):
+class ParticleParamTrans(LTV):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, z0, P0, params):
         """ Define all model variables """

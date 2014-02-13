@@ -1,7 +1,7 @@
 """ Parameter estimation methods"""
 import abc
-import PF
-import PS
+import pyparticleest.pf as pf
+import pyparticleest.ps as ps
 import numpy
 import scipy.optimize
 
@@ -91,11 +91,11 @@ class ParamEstimation(object):
         particles = self.create_initial_estimate(params=self.params, num=num_part)
         
         # Create a particle approximation object from our particles
-        pa = PF.ParticleApproximation(particles=particles)
+        pa = pf.ParticleApproximation(particles=particles)
     
         # Initialise a particle filter with our particle approximation of the initial state,
         # set the resampling threshold to 0.67 (effective particles / total particles )
-        self.pt = PF.ParticleTrajectory(pa,0.67)
+        self.pt = pf.ParticleTrajectory(pa,0.67)
         
         if (update_before_predict):
            
@@ -117,7 +117,7 @@ class ParamEstimation(object):
                 
             
         # Use the filtered estimates above to created smoothed estimates
-        self.straj = PS.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
+        self.straj = ps.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
         for i in range(len(self.straj)):
             (z0, P0) = self.straj[i].traj[0].get_z0_initial()
             self.straj[i].constrained_smoothing(z0, P0)

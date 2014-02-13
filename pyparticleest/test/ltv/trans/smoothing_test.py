@@ -4,13 +4,13 @@ Created on Nov 28, 2013
 @author: ajn
 '''
 
-import param_est
+import pyparticleest.param_est as param_est
 import numpy
 import math
 import matplotlib.pyplot as plt
 
-from test.ltv.trans.particle_param_trans import ParticleParamTrans # Our model definition
-import test.ltv.trans.particle_param_trans as particle_param_trans
+from pyparticleest.test.ltv.trans.particle_param_trans import ParticleParamTrans # Our model definition
+import pyparticleest.test.ltv.trans.particle_param_trans as particle_param_trans
 
 z0 = numpy.array([0.0, 1.0, ])
 P0 = numpy.eye(2)

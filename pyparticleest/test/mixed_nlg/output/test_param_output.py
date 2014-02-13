@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
-import PF
-import PS
 import numpy
-import param_est
+import pyparticleest.param_est as param_est
 
 import matplotlib.pyplot as plt
 import particle_param_output

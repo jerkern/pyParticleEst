@@ -3,12 +3,12 @@ Created on Sep 17, 2013
 
 @author: ajn
 '''
-import param_est
+import pyparticleest.param_est as param_est
 import numpy
 import matplotlib.pyplot as plt
 
 import particle_param_output
-from test.mixed_nlg.output.particle_param_output import ParticleParamOutput as PartModel # Our model definition
+from pyparticleest.test.mixed_nlg.output.particle_param_output import ParticleParamOutput as PartModel # Our model definition
 
 class GradPlot():
     def __init__(self, params, vals, diff):

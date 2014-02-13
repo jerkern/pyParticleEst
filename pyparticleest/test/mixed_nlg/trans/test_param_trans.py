@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
 import numpy
-import param_est
+import pyparticleest.param_est as param_est
 
 import matplotlib.pyplot as plt
-from test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
+from pyparticleest.test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
 
 e0 = numpy.array([0.0, ])
 z0 = numpy.array([1.0, ])
