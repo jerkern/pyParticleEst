@@ -194,7 +194,22 @@ class ParamEstimation(object):
         for _i in xrange(max_iter):
             Q_old = Q
             self.set_params(params_local)
-            self.simulate(num_part, num_traj, update_before_predict)
+            if (numpy.isscalar(num_part)):
+                nump = num_part
+            else:
+                if (_i < len(num_part)):
+                    nump = num_part[_i]
+                else:
+                    nump = num_part[-1]
+            if (numpy.isscalar(num_traj)):
+                numt = num_traj
+            else:
+                if (_i < len(num_traj)):
+                    numt = num_traj[_i]
+                else:
+                    numt = num_traj[-1]
+            
+            self.simulate(nump, numt, update_before_predict)
             if (callback_sim != None):
                 callback_sim(self)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
