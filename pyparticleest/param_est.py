@@ -215,7 +215,7 @@ class ParamEstimation(object):
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
             
             res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=True, 
-                                          options=dict({'maxiter':10}), bounds=bounds)
+                                          options=dict({'maxiter':10, 'maxfun':100}), bounds=bounds,)
             
             params_local = res.x
 
