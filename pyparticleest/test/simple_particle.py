@@ -21,7 +21,7 @@ class SimpleParticle(MixedNLGaussian):
         
         # These could be made time-varying or otherwise dependent on the nonlinear states
         self.Q_in = numpy.diag([ 0.12, 0.12])
-        Qe= numpy.diag([ 0.01,])
+        Qe= numpy.diag([ 0.005,])
         Qz = numpy.diag([ 0.0000001, 0.0000001])+self.B.dot(self.Q_in.dot(self.B.T)) # Noise is acting on input
         Qez = numpy.zeros((1,2))
         fe = numpy.copy(eta)

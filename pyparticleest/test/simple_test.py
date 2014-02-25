@@ -7,9 +7,14 @@ import numpy
 import matplotlib.pyplot as plt
 from simple_particle import SimpleParticle # Our model definition
 
+def wmean(logw, val):
+    w = numpy.exp(logw)
+    w = w / sum(w)
+    return numpy.sum(w*val.ravel())
+
 if __name__ == '__main__':
     
-    num = 50
+    num = 100
     
     # Create a reference which we will try to estimate using a RBPS
     correct = SimpleParticle(numpy.array([1.0, -0.5]),2.5)
@@ -29,7 +34,8 @@ if __name__ == '__main__':
     
     # Initialise a particle filter with our particle approximation of the initial state,
     # set the resampling threshold to 0.67 (effective particles / total particles )
-    pt = pf.ParticleTrajectory(pa,0.67)
+    pt = pf.ParticleTrajectory(pa,0.67,filter='PF')
+    pta = pf.ParticleTrajectory(pa,0.67,filter='APF')
     
     # How many steps forward in time should our simulation run
     steps = 20
@@ -70,7 +76,9 @@ if __name__ == '__main__':
     vals[:2,num,steps]=correct.kf.z.reshape(-1)
     vals[2,num,steps]=correct.eta[0,0]
     
-        
+    
+    y_noise = numpy.copy(yvec).reshape((-1,))
+    
     # Run particle filter using the above generated data
     for i in range(steps):
         
@@ -79,18 +87,24 @@ if __name__ == '__main__':
         tmp = numpy.random.normal((0.0,0.0),(0.1,0.1)).reshape((-1,1))
         
         # Run PF using noise corrupted input signal
-        pt.update(u+tmp)
-        
+        u_in = u+tmp
+        y_noise[i] = yvec[i]+numpy.random.normal(0.0,1.)
         # Use noise corrupted measurements
-        pt.measure(yvec[i]+numpy.random.normal(0.0,1.))
+        
+        pt.forward(u_in, y_noise[i])
+        pta.forward(u_in, y_noise[i])
+        
         
     # Use the filtered estimates above to created smoothed estimates
     nums = 10 # Number of backward trajectories to generate
     straj = ps.do_smoothing(pt, nums)   # Do sampled smoothing
+    straja = ps.do_smoothing(pt, nums)   # Do sampled smoothing
     for st in straj:
         st.constrained_smoothing(z0=z0,
                                  P0=100000*numpy.diag([1.0, 1.0]))
     
+    mean_pt = numpy.zeros((3, steps+1))
+    mean_pta = numpy.zeros((3, steps+1))
     # Extract data from trajectories for plotting
     i=0
     for step in pt:
@@ -98,6 +112,9 @@ if __name__ == '__main__':
         for j in range(pa.num):
             vals[:2,j,i]=pa.part[j].kf.z.reshape(-1)
             vals[2,j,i]=pa.part[j].eta[0,0]
+        mean_pt[0,i] = wmean(pa.w, vals[0,:-1,i])
+        mean_pt[1,i] = wmean(pa.w, vals[1,:-1,i])
+        mean_pt[2,i] = wmean(pa.w, vals[2,:-1,i])
         i += 1
         
     for j in range(num):
@@ -105,24 +122,51 @@ if __name__ == '__main__':
         plt.plot(range(steps+1),vals[1,j,:],'r.')
         plt.plot(range(steps+1),vals[2,j,:],'k.')
     
+    plt.plot(range(steps+1),mean_pt[0,:],'gx')
+    plt.plot(range(steps+1),mean_pt[1,:],'rx')
+    plt.plot(range(steps+1),mean_pt[2,:],'kx')
     
-    svals = numpy.zeros((3, nums, steps+1))
+    # Extract data from trajectories for plotting
+    i=0
+    for step in pta:
+        pa = step.pa
+        for j in range(pa.num):
+            vals[:2,j,i]=pa.part[j].kf.z.reshape(-1)
+            vals[2,j,i]=pa.part[j].eta[0,0]
+        mean_pta[0,i] = wmean(pa.w, vals[0,:-1,i])
+        mean_pta[1,i] = wmean(pa.w, vals[1,:-1,i])
+        mean_pta[2,i] = wmean(pa.w, vals[2,:-1,i])
+        i += 1
+        
+    for j in range(num):
+        plt.plot(numpy.arange(0.2,steps+1.2,1),vals[0,j,:],'g.')
+        plt.plot(numpy.arange(0.2,steps+1.2,1),vals[1,j,:],'r.')
+        plt.plot(numpy.arange(0.2,steps+1.2,1),vals[2,j,:],'k.')
+
+    plt.plot(numpy.arange(0.2,steps+1.2,1),mean_pta[0,:],'gx')
+    plt.plot(numpy.arange(0.2,steps+1.2,1),mean_pta[1,:],'rx')
+    plt.plot(numpy.arange(0.2,steps+1.2,1),mean_pta[2,:],'kx')
     
-    for i in range(steps+1):
-        for j in range(nums):
-            svals[:2,j,i]=straj[j].traj[i].kf.z.ravel()
-            svals[2,j,i]=straj[j].traj[i].get_nonlin_state().ravel()
-            
-    for j in range(nums):
-        plt.plot(range(steps+1),svals[0,j,:],'g-')
-        plt.plot(range(steps+1),svals[1,j,:],'r-')
-        plt.plot(range(steps+1),svals[2,j,:],'k-')
-            
-        
-        
-    plt.plot(range(steps+1),vals[0,num,:],'go')
-    plt.plot(range(steps+1),vals[1,num,:],'ro')
-    plt.plot(range(steps+1),vals[2,num,:],'ko')
+    
+    
+#    svals = numpy.zeros((3, nums, steps+1))
+#    
+#    for i in range(steps+1):
+#        for j in range(nums):
+#            svals[:2,j,i]=straj[j].traj[i].kf.z.ravel()
+#            svals[2,j,i]=straj[j].traj[i].get_nonlin_state().ravel()
+#            
+#    for j in range(nums):
+#        plt.plot(range(steps+1),svals[0,j,:],'g-')
+#        plt.plot(range(steps+1),svals[1,j,:],'r-')
+#        plt.plot(range(steps+1),svals[2,j,:],'k-')
+#            
+#        
+#        
+    plt.plot(numpy.arange(0.1,steps+1.1,1),vals[0,num,:],'go')
+    plt.plot(numpy.arange(0.1,steps+1.1,1),vals[1,num,:],'ro')
+    plt.plot(numpy.arange(0.1,steps+1.1,1),vals[2,num,:],'ko')
+    plt.plot(numpy.arange(1.1,steps+1.1,1), y_noise/2.5, 'bo')
     fig1.show()
     plt.show()
     

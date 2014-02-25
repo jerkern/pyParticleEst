@@ -1,6 +1,7 @@
 """ Class for mixed linear/non-linear models with additive gaussian noise """
 
 import numpy
+import copy
 import pyparticleest.kalman as kalman
 import pyparticleest.part_utils as part_utils
 import pyparticleest.param_est as param_est
@@ -180,6 +181,24 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         y=numpy.reshape(y, (-1,1))
         return super(MixedNLGaussian, self).measure(y)
     
+    def eval_1st_stage_weight(self, u,y):
+        eta_old = copy.deepcopy(self.get_nonlin_state())
+        lin_old = copy.deepcopy(self.get_lin_est())
+        t_old = self.t
+        self.prep_update(u)
+        noise = numpy.zeros_like(self.eta)
+        self.update(u, noise)
+        
+        yn = self.prep_measure(y)
+        logpy = self.measure(yn)
+        
+        # Restore state
+        self.set_lin_est(lin_old)
+        self.set_nonlin_state(eta_old)
+        self.t = t_old
+        
+        return logpy
+        
     def get_nonlin_state(self):
         return self.eta
 

@@ -20,8 +20,8 @@ def generate_dataset(length):
     Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
     R = numpy.diag([0.1,])
     
-    e_vec = numpy.zeros((1, length))
-    z_vec = numpy.zeros((4, length))
+    e_vec = numpy.zeros((1, length+1))
+    z_vec = numpy.zeros((4, length+1))
     
     e = numpy.array([[0.0,]])
     z = numpy.zeros((4,1))
@@ -32,9 +32,9 @@ def generate_dataset(length):
     y = numpy.zeros((1, length))
     t = 0
     h = calc_h(e)
-    y[:,0] = (h + C.dot(z)).ravel()
+    #y[:,0] = (h + C.dot(z)).ravel()
     
-    for i in range(1,length):
+    for i in range(1,length+1):
         (Ae, fe) = calc_Ae_fe(e, t)
         
         e = fe + Ae.dot(z) + numpy.random.multivariate_normal(numpy.zeros((1,)),Qe)
@@ -44,7 +44,7 @@ def generate_dataset(length):
         z = Az.dot(z) + wz
         t = t + 1
         h = calc_h(e)
-        y[:,i] = (h + C.dot(z)+ + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
+        y[:,i-1] = (h + C.dot(z) + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
         e_vec[:,i] = e.ravel()
         z_vec[:,i] = z.ravel()
     

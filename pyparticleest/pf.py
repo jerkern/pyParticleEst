@@ -35,7 +35,12 @@ class ParticleFilter(object):
         
         self.res = res
         self.lp_hack = lp_hack
-        
+    
+    def forward(self, u, y, pa):
+        pa = self.update(u, pa, inplace=False)
+        (pa, resampled) = self.measure(y, pa, inplace=True)
+        return (pa, resampled)
+    
     def update(self, u, pa, inplace=True):
         """ Update particle approximation using u as kinematic input.
             
@@ -108,6 +113,66 @@ class ParticleFilter(object):
         return (pa, resampled)
         
 
+class AuxiliaryParticleFilter(object):
+    """ Auxiliary Particle Filer class, creates filter estimates by calling appropriate
+        methods in the supplied particle objects and handles resampling when
+        a specified threshold is reach """
+    
+    def __init__(self, res):
+        """ Create particle filter.
+        res - 0 or 1 if resampling on or off """
+        self.res = res
+    
+    def forward(self, u, y, pa):
+        """ Update particle approximation using u as kinematic input.
+            
+            If inplace=True the particles are update then returned,
+            otherwise a new ParticleApproximation is first created
+            leaving the original one intact """
+        
+        u = numpy.reshape(u,(-1,1))
+        pa_old = pa
+        pa = copy.deepcopy(pa)
+        
+        # Prepare the particle for the update, eg. for 
+        # mixed linear/non-linear calculate the variables that
+        # depend on the current state
+        for k in range(pa.num):
+            pa_old.part[k].prep_update(u)
+            pa.part[k].prep_update(u)
+        
+        l1w = numpy.zeros((pa.num,))
+        
+        for k in range(pa.num):
+            l1w[k] =  pa.part[k].eval_1st_stage_weight(u,y)
+            
+            
+        # Keep the weights from going to -Inf
+        pa.w = pa.w + l1w
+        pa.w -= numpy.max(pa.w)
+        w = numpy.exp(pa.w)
+        w /= sum(w)
+        
+        pa.N_eff = 1 / sum(w ** 2)
+        
+        if (self.res and pa.N_eff < self.res*pa.num):
+            pa.resample()
+      
+        for k in range(pa.num):
+            v = pa.part[k].sample_process_noise(u)
+            pa.part[k].update(u, v)
+        
+        l2w = numpy.zeros((pa.num,))
+        for k in range(pa.num):
+            yp = pa.part[k].prep_measure(y)
+            l2w[k] = pa.part[k].measure(yp)
+            
+        pa.w = pa.w + l2w - l1w
+        pa.w -= numpy.max(pa.w)
+        return (pa, True)
+    
+        
+
 class TrajectoryStep(object):
     """ Store particle approximation, input, output and timestamp for
         a single time index in a trajectory """
@@ -124,27 +189,25 @@ class ParticleTrajectory(object):
     """ Store particle trajectories, each time instance is saved
         as a TrajectoryStep object """
         
-    def __init__(self, pa, resample=2.0/3.0, t0=0, lp_hack = None):
+    def __init__(self, pa, resample=2.0/3.0, t0=0, filter='PF'):
         """ Initialize the trajectory with a ParticleApproximation """
         self.traj = [TrajectoryStep(pa, t=t0),]
         
-        self.pf = ParticleFilter(res=resample,lp_hack=lp_hack)
+        if (filter == 'PF'):
+            self.pf = ParticleFilter(res=resample)
+        elif (filter == 'APF'):
+            self.pf = AuxiliaryParticleFilter(res=resample)
+        else:
+            raise ValueError('Bad filter type')
         self.len = 1
         return
     
-    def update(self, u):
-        """ Use input u to move the system one step forward in time """
-        pa_nxt = self.pf.update(u, self.traj[-1].pa, False)
-        assert self.traj[-1].u == None # Only on input per time instance
+    def forward(self, u, y):
         self.traj[-1].u = u
+        (pa_nxt, resampled) = self.pf.forward(u, y, self.traj[-1].pa)
         self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1))
-        self.len = len(self.traj)
-                
-    def measure(self, y):
-        """ Update the current time index with measurement y """
-        assert self.traj[-1].y == None# Only one measurement per time instance
-        (_pa, resampled) = self.pf.measure(y, self.traj[-1].pa, True)
         self.traj[-1].y = y
+        self.len = len(self.traj)
         return resampled
         
     def prep_rejection_sampling(self):
