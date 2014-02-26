@@ -37,8 +37,14 @@ class ParticleFilter(object):
         self.lp_hack = lp_hack
     
     def forward(self, u, y, pa):
-        pa = self.update(u, pa, inplace=False)
-        (pa, resampled) = self.measure(y, pa, inplace=True)
+        pa = copy.deepcopy(pa)
+        resampled = False
+        if (self.res and pa.N_eff < self.res*pa.num):
+            pa.resample()
+            resampled = True
+        
+        pa = self.update(u, pa)
+        pa = self.measure(y, pa)
         return (pa, resampled)
     
     def update(self, u, pa, inplace=True):
@@ -105,12 +111,7 @@ class ParticleFilter(object):
         w /= sum(w)
         pa.N_eff = 1 / sum(w ** 2)
         
-        resampled = False
-        if (self.res and pa.N_eff < self.res*pa.num):
-            pa.resample()
-            resampled = True
-        
-        return (pa, resampled)
+        return pa
         
 
 class AuxiliaryParticleFilter(object):
