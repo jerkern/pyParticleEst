@@ -39,7 +39,7 @@ if __name__ == '__main__':
     for k in range(sims):
         print k
         # Create reference
-        numpy.random.seed(86)
+        numpy.random.seed(1)
         #numpy.random.seed(10)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    

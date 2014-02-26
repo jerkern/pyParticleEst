@@ -34,8 +34,8 @@ if __name__ == '__main__':
     
     # Initialise a particle filter with our particle approximation of the initial state,
     # set the resampling threshold to 0.67 (effective particles / total particles )
-    pt = pf.ParticleTrajectory(pa,0.67,filter='PF')
-    pta = pf.ParticleTrajectory(pa,0.67,filter='APF')
+    pt = pf.ParticleTrajectory(pa,0.9,filter='PF')
+    pta = pf.ParticleTrajectory(pa,0.9,filter='APF')
     
     # How many steps forward in time should our simulation run
     steps = 20

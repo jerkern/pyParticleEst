@@ -182,9 +182,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         return super(MixedNLGaussian, self).measure(y)
     
     def eval_1st_stage_weight(self, u,y):
-        eta_old = copy.deepcopy(self.get_nonlin_state())
-        lin_old = copy.deepcopy(self.get_lin_est())
-        t_old = self.t
+#        eta_old = copy.deepcopy(self.get_nonlin_state())
+#        lin_old = copy.deepcopy(self.get_lin_est())
+#        t_old = self.t
         self.prep_update(u)
         noise = numpy.zeros_like(self.eta)
         self.update(u, noise)
@@ -193,9 +193,9 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         logpy = self.measure(yn)
         
         # Restore state
-        self.set_lin_est(lin_old)
-        self.set_nonlin_state(eta_old)
-        self.t = t_old
+#        self.set_lin_est(lin_old)
+#        self.set_nonlin_state(eta_old)
+#        self.t = t_old
         
         return logpy
         

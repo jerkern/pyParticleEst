@@ -144,7 +144,8 @@ class AuxiliaryParticleFilter(object):
         l1w = numpy.zeros((pa.num,))
         
         for k in range(pa.num):
-            l1w[k] =  pa.part[k].eval_1st_stage_weight(u,y)
+            tmp = copy.deepcopy(pa.part[k])
+            l1w[k] =  tmp.eval_1st_stage_weight(u,y)
             
             
         # Keep the weights from going to -Inf
@@ -156,7 +157,8 @@ class AuxiliaryParticleFilter(object):
         pa.N_eff = 1 / sum(w ** 2)
         
         if (self.res and pa.N_eff < self.res*pa.num):
-            pa.resample()
+            new_ind = pa.resample()
+            l1w = l1w[new_ind]
       
         for k in range(pa.num):
             v = pa.part[k].sample_process_noise(u)
@@ -292,6 +294,7 @@ class ParticleApproximation(object):
         self.part = new_part
         self.num = N
         self.N_eff = 1 / sum(numpy.exp(self.w) ** 2)
+        return new_ind
         
     def sample(self):
         """ Draw one particle at random with probability corresponding to its weight """

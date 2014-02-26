@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     # How many steps forward in time should our simulation run
     steps = 100
-    sims = 1000
+    sims = 10
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
         # Create an array for our particles 
         ParamEstimator = LSBEst(u=None, y=y)
-        ParamEstimator.simulate(num, nums, False)
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF')
 
         svals = numpy.zeros((2, nums, steps+1))
         
