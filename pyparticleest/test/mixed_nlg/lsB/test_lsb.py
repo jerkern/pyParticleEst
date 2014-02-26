@@ -17,7 +17,7 @@ class LS2Est(param_est.ParamEstimation):
         particles = numpy.empty(num, particle_lsb.ParticleLSB)
         
         for k in range(len(particles)):
-            particles[k] = particle_lsb.ParticleLSB()
+            particles[k] = particle_lsb.ParticleLSB_JN()
         return particles
 
 if __name__ == '__main__':

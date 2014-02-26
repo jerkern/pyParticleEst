@@ -103,3 +103,56 @@ class ParticleLSB(mixed_nl_gaussian.MixedNLGaussian):
         h = calc_h(self.eta)
         self.set_dynamics(h=h)
         return y
+    
+class ParticleLSB_JN(ParticleLSB):
+    """ Model 60 & 61 from Lindsten & Schon (2011) """
+    def __init__(self):
+        """ Define all model variables """
+        
+        # No uncertainty in initial state
+        eta = numpy.array([[0.0],])
+        z0 =  numpy.array([[0.0],
+                           [0.0],
+                           [0.0],
+                           [0.0]])
+        P0 = 0.0*numpy.eye(4)
+        
+        Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
+                          [2.0, 0.0, 0.0, 0.0],
+                          [0.0, 1.0, 0.0, 0.0],
+                          [0.0, 0.0, 0.5, 0.0]])
+        
+        (Ae, fe) = calc_Ae_fe(eta, 0)
+        h = calc_h(eta)
+        C = numpy.array([[0.0, 0.0, 0.0, 0.0]])
+        
+        Qe= numpy.diag([ 0.005])
+        Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
+        R = numpy.diag([0.1,])
+
+        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)),
+                                         P0=P0, e0 = eta,
+                                         Az=Az, C=C, Ae=Ae,
+                                         R=R, Qe=Qe, Qz=Qz,
+                                         fe=fe, h=h)
+        
+    def eval_1st_stage_weight(self, u,y):
+#        eta_old = copy.deepcopy(self.get_nonlin_state())
+#        lin_old = copy.deepcopy(self.get_lin_est())
+#        t_old = self.t
+        self.prep_update(u)
+        noise = numpy.zeros_like(self.eta)
+        self.update(u, noise)
+        
+        dh = numpy.asarray(((0.05*2*self.eta,),))
+        
+        yn = self.prep_measure(y)
+        self.kf.R = self.kf.R + dh*self.Qe*dh
+        logpy = self.measure(yn)
+        
+        # Restore state
+#        self.set_lin_est(lin_old)
+#        self.set_nonlin_state(eta_old)
+#        self.t = t_old
+        
+        return logpy
