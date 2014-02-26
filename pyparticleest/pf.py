@@ -133,6 +133,7 @@ class AuxiliaryParticleFilter(object):
         u = numpy.reshape(u,(-1,1))
         pa_old = pa
         pa = copy.deepcopy(pa)
+        resampled = False
         
         # Prepare the particle for the update, eg. for 
         # mixed linear/non-linear calculate the variables that
@@ -159,6 +160,7 @@ class AuxiliaryParticleFilter(object):
         if (self.res and pa.N_eff < self.res*pa.num):
             new_ind = pa.resample()
             l1w = l1w[new_ind]
+            resampled = True
       
         for k in range(pa.num):
             v = pa.part[k].sample_process_noise(u)
@@ -171,7 +173,7 @@ class AuxiliaryParticleFilter(object):
             
         pa.w = pa.w + l2w - l1w
         pa.w -= numpy.max(pa.w)
-        return (pa, True)
+        return (pa, resampled)
     
         
 

@@ -87,7 +87,7 @@ class ParamEstimation(object):
             set_traj_params(self.straj, params)
     
     def simulate(self, num_part, num_traj, filter='PF', res=0.67):
-        
+        resamplings=0
         particles = self.create_initial_estimate(params=self.params, num=num_part)
         
         # Create a particle approximation object from our particles
@@ -100,13 +100,15 @@ class ParamEstimation(object):
         # Run particle filter
         for i in range(len(self.y)):
             # Run PF using noise corrupted input signal
-            self.pt.forward(self.u[i], self.y[i])
+            if (self.pt.forward(self.u[i], self.y[i])):
+                resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates
         self.straj = ps.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
         for i in range(len(self.straj)):
             (z0, P0) = self.straj[i].traj[0].get_z0_initial()
             self.straj[i].constrained_smoothing(z0, P0)
+        return resamplings
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
                  update_before_predict=True, callback=None, callback_sim=None,

@@ -38,7 +38,7 @@ def do_test(num, nums, filter, y, e, z, k, steps):
         filter='APF'
     else:
         ParamEstimator = LSBEst(u=None, y=y)
-    ParamEstimator.simulate(num, nums, res=0.67, filter=filter)
+    resamplings = ParamEstimator.simulate(num, nums, res=0.67, filter=filter)
 
     svals = numpy.zeros((2, nums, steps+1))
     
@@ -56,10 +56,10 @@ def do_test(num, nums, filter, y, e, z, k, steps):
 
     rmse_eta = numpy.sqrt(numpy.mean(sqr_err_eta))
     rmse_theta = numpy.sqrt(numpy.mean(sqr_err_theta))
-    return (numpy.mean(rmse_eta), numpy.mean(rmse_theta))
+    return (numpy.mean(rmse_eta), numpy.mean(rmse_theta), resamplings)
          
 if __name__ == '__main__':
-    num_range = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300]
+    num_range = [5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 250, 300, 500]
     steps = 100
     sims = 1000
     
@@ -69,19 +69,26 @@ if __name__ == '__main__':
     rmse_theta_pf = numpy.zeros((sims, len(num_range)))
     rmse_theta_apf = numpy.zeros((sims, len(num_range)))
     rmse_theta_jn = numpy.zeros((sims, len(num_range)))
+    
+    resamplings_pf = numpy.zeros((sims, len(num_range)))
+    resamplings_apf = numpy.zeros((sims, len(num_range)))
+    resamplings_jn = numpy.zeros((sims, len(num_range)))
     for i in range(len(num_range)):
         for k in range(sims):
             numpy.random.seed(k)
             (y, e, z) = particle_lsb.generate_dataset(steps)
-            (rmse_eta_pf[k,i], rmse_theta_pf[k,i]) = do_test(num_range[i], 5, 'PF', y, e, z, k, steps)
-            (rmse_eta_apf[k,i], rmse_theta_apf[k,i]) = do_test(num_range[i], 5, 'APF', y, e, z, k, steps)
-            (rmse_eta_jn[k,i], rmse_theta_jn[k,i]) = do_test(num_range[i], 5, 'APF_JN', y, e, z, k, steps)
+            (rmse_eta_pf[k,i], rmse_theta_pf[k,i], resamplings_pf[k,i]) = do_test(num_range[i], 5, 'PF', y, e, z, k, steps)
+            (rmse_eta_apf[k,i], rmse_theta_apf[k,i], resamplings_apf[k,i]) = do_test(num_range[i], 5, 'APF', y, e, z, k, steps)
+            (rmse_eta_jn[k,i], rmse_theta_jn[k,i], resamplings_jn[k,i]) = do_test(num_range[i], 5, 'APF_JN', y, e, z, k, steps)
             
-        print "nums = %d, pf = %f/%f, apf=%f/%f, jn=%f/%f" % (num_range[i],
+        print "N = %d, pf = %.4f/%.4f, apf=%.4f/%.4f, jn=%.4f/%.4f, resamplings=%.2f/%.2f/%.2f" % (num_range[i],
                                                     numpy.mean(rmse_eta_pf[:,i]),
                                                     numpy.mean(rmse_theta_pf[:,i]),
                                                     numpy.mean(rmse_eta_apf[:,i]),
                                                     numpy.mean(rmse_theta_apf[:,i]),
                                                     numpy.mean(rmse_eta_jn[:,i]),
-                                                    numpy.mean(rmse_theta_jn[:,i]))
+                                                    numpy.mean(rmse_theta_jn[:,i]),
+                                                    numpy.mean(resamplings_pf[:,i]),
+                                                    numpy.mean(resamplings_apf[:,i]),
+                                                    numpy.mean(resamplings_jn[:,i]))
     
