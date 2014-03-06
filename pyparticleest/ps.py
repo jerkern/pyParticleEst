@@ -5,7 +5,7 @@ import math
 import copy
 import pyparticleest.pf as pf
 
-def bsi_full(pa, model, next, u):
+def bsi_full(pa, model, next, u, opt):
     p_next = model.next_pdf(next, u, pa.part)
             
     w = pa.w + p_next
@@ -15,7 +15,9 @@ def bsi_full(pa, model, next, u):
     return pf.sample(w_norm, 1)
 
 
-def rs_sampler(pa, model, next, u, maxpdf, max_iter):
+def rs_sampler(pa, model, next, u, opt):
+    maxpdf = opt['maxpdf']
+    max_iter = opt['max_iter']
     ind = pf.sample(pa.w, max_iter)
     test = numpy.log(numpy.random.uniform(size=max_iter))
     N = len(pa.part)
@@ -25,7 +27,7 @@ def rs_sampler(pa, model, next, u, maxpdf, max_iter):
         if (not_tested[ind[i]]):
             not_tested[ind[i]] = False
             p_next[ind[i]] = model.next_pdf(next, u, pa.part[ind[i]:ind[i]+1])
-        if test[i] < p_next[ind[i]]/maxpdf[ind[i]]:
+        if test[i] < p_next[ind[i]]/maxpdf:
             # Accept sample
             return ind[i]
     if (not_tested.any()):
@@ -57,18 +59,16 @@ class SmoothTrajectory(object):
         self.u = [pt[-1].u, ]
         self.y = [pt[-1].y, ]
         self.t = [pt[-1].t, ]
-        
+        opt = dict()
         if (method=='normal'):
             sampler = bsi_full
         elif (method=='mh'):
             R = options['R']
             pass
         elif (method=='rs'):
-            maxpdf = options['maxpdf']
             N = len(pt[-1].pa.part)
-            def sampler_tmp(pa, model, next, u):
-                return rs_sampler(pa, model, next, u, maxpdf, max_iter=int(1.5*N))
-            sampler = sampler_tmp
+            opt['max_iter'] = int(0.67*N)
+            sampler = rs_sampler
         else:
             raise ValueError('Unknown sampler: %s' % method)
         
@@ -76,7 +76,9 @@ class SmoothTrajectory(object):
 
             step = pt[cur_ind]
             pa = step.pa
-            ind = sampler(pa, pt.pf.model, self.traj[cur_ind+1], step.u)
+            if (method=='rs'):
+                opt['maxpdf'] = options['maxpdf'][cur_ind]
+            ind = sampler(pa, pt.pf.model, self.traj[cur_ind+1], step.u, opt=opt)
             # Select 'previous' particle
             self.traj[cur_ind] = pt.pf.model.sample_smooth(self.traj[cur_ind+1], step.u, pa.part[ind:(ind+1)])
             self.u.append(step.u)
