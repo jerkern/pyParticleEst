@@ -4,20 +4,40 @@
 import numpy as np
 import math
 import scipy.sparse as sp
-import scipy.sparse.linalg as spln
+from numba import jit, double
+#import scipy.sparse.linalg as spln
 
+l2pi = math.log(2*math.pi)
 def lognormpdf(x,mu,S):
     """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
-    nx = len(S)
-    norm_coeff = nx*math.log(2*math.pi)+np.linalg.slogdet(S)[1]
-    
     err = x-mu
-    if (sp.issparse(S)):
-        numerator = spln.spsolve(S, err).T.dot(err)
-    else:
-        numerator = np.linalg.solve(S, err).T.dot(err)
+    return -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err).T.dot(err))
 
-    return -0.5*(norm_coeff+numerator)
+def lognormpdf_vec(xl,mul,Sl):
+    """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
+    N = len(xl)
+    res = np.empty(N, dtype=float)
+
+    for i in range(N):
+        err = xl[i]-mul[i]
+        S = Sl[i]
+        res[i] = -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err).T.dot(err))
+    return res
+
+lognormpdf_jit = jit(double[:,:](double[:,:], double[:,:,:]))(lognormpdf_vec)
+
+#@autojit
+#def lognormpdf_vec(xl,mul,Sl):
+#    """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
+#    N = len(xl)
+#    res = np.empty(N, dtype=float)
+#    for i in xrange(N):
+#        err = xl[i]-mul[i]
+#        res[i] = -0.5*(Sl[i].shape[0]*l2pi+np.linalg.slogdet(Sl[i])[1]+np.linalg.solve(Sl[i], err).T.dot(err))
+#    return res
+
+#@jit(double[:](double[:,:],double[:,:],double[:,:,:]))
+
 
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
@@ -29,20 +49,12 @@ class KalmanFilter(object):
         e_k ~ N(0,R)
         """
         
-    def __init__(self, z0, P0, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
+    def __init__(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
         """ z_{k+1} = A*z_{k}+f_k + v_k
         y_k = C*z_k + h_k + e_k 
         v_k ~ N(0,Q)
         e_k ~ N(0,R)
-        x0 = x_0, P0 = P_0
-        P is the variance of the estimate
-        
-        x0 and P0 are mandatory, the matrices can be overriden at each time instant
-        if desired, for instance if the system dynamics are time-varying
         """
-        self.z = np.copy(z0) # Estimated state
-        self.P = np.copy(P0)     # Estimated covariance
-
         self.A = None
         self.C = None
         self.R = None      # Measurement noise covariance
@@ -78,15 +90,22 @@ class KalmanFilter(object):
     def predict(self):
         return self.predict_full(A=self.A, f_k=self.f_k, Q=self.Q)
     
-    def predict_full(self, A, f_k, Q):
+    def predict_full_inplace(self, z, P, A, f_k, Q):
         """ Calculate next state estimate without actually updating
             the internal variables """
-        z = f_k + A.dot(self.z)     # Calculate the next state
-        P = A.dot(self.P).dot(A.T) + Q  # Calculate the estimated variance  
+        z[:] = f_k + A.dot(z)     # Calculate the next state
+        P[:,:] = A.dot(P).dot(A.T) + Q  # Calculate the estimated variance  
         return (z, P)
     
-    def measurement_diff(self, y, C, h_k=None):
-        yhat = C.dot(self.z)
+    def predict_full(self, z, P, A, f_k, Q):
+        """ Calculate next state estimate without actually updating
+            the internal variables """
+        z = f_k + A.dot(z)     # Calculate the next state
+        P = A.dot(P).dot(A.T) + Q  # Calculate the estimated variance  
+        return (z, P)
+    
+    def measurement_diff(self, y, z, C, h_k=None):
+        yhat = C.dot(z)
         if (h_k != None):
             yhat += h_k
         return (y-yhat)
@@ -97,21 +116,21 @@ class KalmanFilter(object):
 
         return self.measure_full(y, h_k=self.h_k, C=self.C, R=self.R)
 
-    def measure_full(self, y, h_k, C, R):
+    def measure_full(self, y, z, P, C, h_k, R):
         
-        S = C.dot(self.P).dot(C.T)+R
+        S = C.dot(P).dot(C.T)+R
 
         if (sp.issparse(S)):
             Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
             Sinv = np.linalg.inv(Sd)
-            K = self.P.dot(C.T).dot(sp.csr_matrix(Sinv))
+            K = P.dot(C.T).dot(sp.csr_matrix(Sinv))
         else:
             Sinv = np.linalg.inv(S)
-            K = self.P.dot(C.T).dot(Sinv)
+            K = P.dot(C.T).dot(Sinv)
         
-        err = self.measurement_diff(y, C, h_k)
-        self.z += K.dot(err)  
-        self.P -= K.dot(C).dot(self.P)
+        err = self.measurement_diff(y, z, C, h_k)
+        z[:] += K.dot(err)  
+        P[:,:] -= K.dot(C).dot(P)
 
         # Return the probability of the received measurement
         return lognormpdf(0, err, S)

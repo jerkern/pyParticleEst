@@ -1,8 +1,8 @@
 """ Particle filtering implementation """
 
 import numpy
+import math
 import copy
-
 
 def sample(w, n):
     """ Return n random indices, where the probability if index
@@ -27,14 +27,14 @@ class ParticleFilter(object):
         methods in the supplied particle objects and handles resampling when
         a specified threshold is reach """
     
-    def __init__(self, res = 0, lp_hack = None):
+    def __init__(self, model, res = 0):
         """ Create particle filter.
         res - 0 or 1 if resampling on or off
         lp_hack - switches to a (mathematically incorrect) mode of lowpass
                 filtering weights instead of multiplying them """
         
         self.res = res
-        self.lp_hack = lp_hack
+        self.model = model
     
     def forward(self, u, y, pa):
         pa = copy.deepcopy(pa)
@@ -59,16 +59,15 @@ class ParticleFilter(object):
         # Prepare the particle for the update, eg. for 
         # mixed linear/non-linear calculate the variables that
         # depend on the current state
-        for k in range(pa.num):
-            pa.part[k].prep_update(u)
+#        for k in range(pa.num):
+#            pa.part[k].prep_update(u)
         
         if (not inplace):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
             
-        for k in range(pa.num):
-            v = pa.part[k].sample_process_noise(u)
-            pa.part[k].update(u, v)
+        v = self.model.sample_process_noise(u, pa.part)
+        self.model.update(u, v, pa.part)
         
         return pa 
     
@@ -84,25 +83,10 @@ class ParticleFilter(object):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
 
+        #y = pa.part[k].prep_measure(r)
+        new_weights = self.model.measure(r, pa.part)
         
-        new_weights = numpy.empty(pa.num, numpy.float)
-        for k in range(pa.num):
-            # Allow particle to update any internal variables 
-            # depending on the current state and to do any
-            # pre-processing of the mesurements.
-            y = pa.part[k].prep_measure(r)
-            new_weights[k] = pa.part[k].measure(y)
-
-        if (self.lp_hack == None):
-            pa.w = pa.w + new_weights
-
-        else:
-            # lowpass filter hack work-around, not mathematically correct
-            s = sum(numpy.exp(new_weights))
-            if (s != 0.0):
-                new_weights = new_weights/s
-                pa.w = numpy.log((1-self.lp_hack)*numpy.exp(pa.w) + self.lp_hack*numpy.exp(new_weights))
-
+        pa.w = pa.w + new_weights
         # Keep the weights from going to -Inf
         pa.w -= numpy.max(pa.w)
         
@@ -194,16 +178,19 @@ class ParticleTrajectory(object):
     """ Store particle trajectories, each time instance is saved
         as a TrajectoryStep object """
         
-    def __init__(self, pa, resample=2.0/3.0, t0=0, filter='PF'):
+    def __init__(self, model, N, resample=2.0/3.0, t0=0, filter='PF'):
         """ Initialize the trajectory with a ParticleApproximation """
+        particles = model.create_initial_estimate(N)
+        pa = ParticleApproximation(particles=particles)
         self.traj = [TrajectoryStep(pa, t=t0),]
         
-        if (filter == 'PF'):
-            self.pf = ParticleFilter(res=resample)
-        elif (filter == 'APF'):
-            self.pf = AuxiliaryParticleFilter(res=resample)
-        else:
-            raise ValueError('Bad filter type')
+        self.pf = ParticleFilter(model=model, res=resample)
+#        if (filter == 'PF'):
+#            self.pf = ParticleFilter(model=model, res=resample)
+#        elif (filter == 'APF'):
+#            self.pf = AuxiliaryParticleFilter(res=resample)
+#        else:
+#            raise ValueError('Bad filter type')
         self.len = 1
         return
     
@@ -244,6 +231,31 @@ class ParticleTrajectory(object):
             signals.append(TrajectoryStep(pa=None, u=self.traj[k].u, y=self.traj[k].y, t=self.traj[k].t))
             
         return signals
+    
+    def perform_smoothing(self, M, method="normal"):
+        """ return an array of smoothed trajectories 
+            M - number of smoothed trajectories """
+        from pyparticleest.ps import SmoothTrajectory
+        
+        # Calculate coefficients needed for rejection sampling in the backward smoothing
+#        if (rej_sampling):
+#            self.prep_rejection_sampling()
+        options={}
+        if (method == 'rs'):
+            coeffs = numpy.empty(self.len, dtype=float)
+            for k in range(self.len):
+                coeffs[k] = math.exp(self.pf.model.next_pdf_max(self.traj[k].u, self.traj[k].pa.part)) 
+            options['maxpdf'] = coeffs
+        if (method == 'mh'):
+            options['R'] = 30
+            
+        straj = numpy.empty(M, SmoothTrajectory)
+        #print "smoothing"
+        for i in range(M):
+            #print "%d/%d" % (i,M)
+            straj[i] = SmoothTrajectory(self, method=method, options=options)
+            
+        return straj
 
 class ParticleApproximation(object):
     """ Contains collection of particles approximating a pdf
@@ -291,8 +303,8 @@ class ParticleApproximation(object):
         new_ind = sample(numpy.exp(self.w), N)
         new_part = numpy.empty(N, type(self.part[0]))
         for k in range(numpy.shape(new_ind)[0]):
-            new_part[k] = copy.deepcopy(self.part[new_ind[k]])
-
+            new_part[k] = copy.copy(self.part[new_ind[k]])
+        
         self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
         self.part = new_part
         self.num = N
@@ -307,13 +319,3 @@ class ParticleApproximation(object):
         """ Find n-best particles """
         indices = numpy.argsort(self.w)
         return indices[range(n)]
-
-    def calc_fwd_peak_density(self, u):
-        """ Calculate the maximum over all possible perturbed inputs u of the
-            pdf for the next time step """
-        coeffs = numpy.empty(self.num, float)
-        for k in range(self.num):
-            coeffs[k] = self.part[k].fwd_peak_density(u)
-            
-        return numpy.max(coeffs)
-
