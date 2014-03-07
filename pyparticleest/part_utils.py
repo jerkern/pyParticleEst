@@ -92,14 +92,14 @@ class HierarchicalBase(ParticleFilteringInterface):
         N = len(particles)
         (Az, fz, Qz) = self.get_lin_pred_dynamics(u, particles)
         if (Az == None):
-            #Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
-            Az=N*(self.kf.A,)
+            Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
+            #Az=N*(self.kf.A,)
         if (fz == None):
-            #fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
-            fz=N*(self.kf.f_k,)
+            fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
+            #fz=N*(self.kf.f_k,)
         if (Qz == None):
-            #Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
-            Qz=N*(self.kf.Q,)
+            Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
+            #Qz=N*(self.kf.Q,)
         for i in xrange(len(zl)):
             # Predict z_{t+1}
             (zl[i], Pl[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
@@ -116,14 +116,14 @@ class HierarchicalBase(ParticleFilteringInterface):
         N = len(particles)
         (y, Cz, hz, Rz) = self.get_lin_meas_dynamics(y, particles)
         if (Cz == None):
-            #Cz=numpy.repeat(self.kf.C[numpy.newaxis,:,:], N, axis=0)
-            Cz=N*(self.kf.C,)
+            Cz=numpy.repeat(self.kf.C[numpy.newaxis,:,:], N, axis=0)
+            #Cz=N*(self.kf.C,)
         if (hz == None):
-            #hz=numpy.repeat(self.kf.h_k[numpy.newaxis,:,:], N, axis=0)
-            hz=N*(self.kf.h_k,)
+            hz=numpy.repeat(self.kf.h_k[numpy.newaxis,:,:], N, axis=0)
+            #hz=N*(self.kf.h_k,)
         if (Rz == None):
-            #Rz=numpy.repeat(self.kf.R[numpy.newaxis,:,:], N, axis=0)
-            Rz=N*(self.kf.R,)
+            Rz=numpy.repeat(self.kf.R[numpy.newaxis,:,:], N, axis=0)
+            #Rz=N*(self.kf.R,)
             
         lyz = numpy.empty_like(lyxi)
         for i in xrange(len(zl)):
@@ -142,14 +142,14 @@ class HierarchicalBase(ParticleFilteringInterface):
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
         if (Az == None):
-            #Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
-            Az=N*(self.kf.A,)
+            Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
+            #Az=N*(self.kf.A,)
         if (fz == None):
-            #fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
-            fz=N*(self.kf.f_k,)
+            fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
+            #fz=N*(self.kf.f_k,)
         if (Qz == None):
-            #Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
-            Qz=N*(self.kf.Q,)
+            Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
+            #Qz=N*(self.kf.Q,)
         for i in xrange(len(zl)):
             # Predict z_{t+1}
             (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
@@ -166,14 +166,14 @@ class HierarchicalBase(ParticleFilteringInterface):
         if (next_part != None):
             (Az, fz, Qz) = self.get_lin_pred_dynamics(u, particle)
             if (Az == None):
-                #Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], 1, axis=0)
-                Az=(self.kf.A,)
+                Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], 1, axis=0)
+                #Az=(self.kf.A,)
             if (fz == None):
-                #fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], 1, axis=0)
-                fz=(self.kf.f_k,)
+                fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], 1, axis=0)
+                #fz=(self.kf.f_k,)
             if (Qz == None):
-                #Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], 1, axis=0)
-                Qz=(self.kf.Q,)
+                Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], 1, axis=0)
+                #Qz=(self.kf.Q,)
             self.kf.measure_full(next_part[1].reshape((-1,1)), zl[0], Pl[0], C=Az[0], h_k=fz[0], R=Qz[0])
         
         xi = copy.copy(xil[0])
