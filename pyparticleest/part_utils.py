@@ -234,134 +234,129 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
     def next_pdf_xi_max(self, u, particles):
         pass
 
-#class RBPFBase(ParticleFilteringInterface):
-#    """ Base class for Rao-Blackwellized particles """
-#    __metaclass__ = abc.ABCMeta
-#    
-#    def __init__(self, Az=None, fz=None, Qz=None,
-#                 C=None ,hz=None, R=None, 
-#                 Axi=None, fxi=None, t0=0):
-#        
-#        self.kf = kalman.KalmanSmoother(A=Az, C=C, 
-#                                        Q=Qz, R=R,
-#                                        f_k=fz, h_k=hz)
-#        
-#        # Sore z0, P0 needed for default implementation of 
-#        # get_z0_initial and get_grad_z0_initial
-#        self.t = t0
-#    
-#    def get_rb_nonlin_pred_dynamics(self, u, particles):
-#        """ Return matrices describing affine relation of next
-#            nonlinear state conditioned on current linear state
-#            
-#            \xi_{t+1]} = A_xi * z_t + f_xi + v_xi, v_xi ~ N(0,Q_xi)
-#            
-#            Return (A_xi, f_xi, Q_xi) where each element is a list
-#            with the corresponding matrix for each particle. None indicates
-#            that the matrix is identical for all particles and the value stored
-#            in this class should be used instead
-#            """
-#        return (None, None, None)
-#    
-#    def get_rb_cond_pred_dynamics(self, u, xi_next, particles):
-#        """ Return matrices describing affine relation of next
-#            nonlinear state conditioned on current linear state
-#            
-#            \z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
-#            
-#            conditioned on the value of xi_{t+1}. 
-#            (Not the same as the dynamics unconditioned on xi_{t+1})
-#            when for example there is a noise correlation between the 
-#            linear and nonlinear state dynamics) 
-#            """
-#        return (None, None, None)
-#    
-#    def get_rb_meas_dynamics(self, y, particles):
+class RBPFBase(HierarchicalBase):
+    """ Base class for Rao-Blackwellized particles """
+    __metaclass__ = abc.ABCMeta
+    
+    def __init__(self, Axi=None, fxi=None, Qxi=None,
+                 **kwargs):
+        
+        self.Axi = numpy.copy(Axi)
+        self.fxi = numpy.copy(fxi)
+        self.Qxi = numpy.copy(Qxi)
+        
+        super(RBPFBase, self).__init__(**kwargs)
+    
+    def get_nonlin_pred_dynamics(self, u, particles):
+        """ Return matrices describing affine relation of next
+            nonlinear state conditioned on current linear state
+            
+            \xi_{t+1]} = A_xi * z_t + f_xi + v_xi, v_xi ~ N(0,Q_xi)
+            
+            Return (A_xi, f_xi, Q_xi) where each element is a list
+            with the corresponding matrix for each particle. None indicates
+            that the matrix is identical for all particles and the value stored
+            in this class should be used instead
+            """
+        return (None, None, None)
+    
+    def get_condlin_pred_dynamics(self, u, xi_next, particles):
+        """ Return matrices describing affine relation of next
+            nonlinear state conditioned on current linear state
+            
+            \z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
+            
+            conditioned on the value of xi_{t+1}. 
+            (Not the same as the dynamics unconditioned on xi_{t+1})
+            when for example there is a noise correlation between the 
+            linear and nonlinear state dynamics) 
+            """
+        return (None, None, None)
+    
+# This is not implemented  
+#    def get_condlin_meas_dynamics(self, y, xi_next, particles):
 #        return (y, None, None, None)
-#    
-#    def get_rb_cond_meas_dynamics(self, y, xi_next, particles):
-#        return (y, None, None, None)
-#    
-#    def update(self, u, noise, particles):
-#        """ Update estimate using noise as input """
-#        xin = self.calc_xi_next(u, noise, particles)
-#        N = len(particles)
-#        # Update linear estimate with data from measurement of next non-linear
-#        # state 
-#        (zl, Pl) = self.get_lin_states(particles)
-#        (Ae, fe, Qe) = self.get_rb_nonlin_pred_dynamics(particles, u)
-#        
-#        # This is probably not so nice performance-wise, but will
-#        # work initially to profile where the bottlenecks are.
-#        if (Ae == None):
-#            Ae=N*(self.Ae,)
-#        if (fe == None):
-#            fe=N*(self.fe,)
-#        if (Qe == None):
-#            Qe= N*(self.Qe)
-#        for i in xrange(N):
-#            self.kf.measure_full(zl[i], Pl[i], xin, fe[i], Ae[i], Qe[i])
-#        
-#        (Az, fz, Qz) = self.get_rb_cond_pred_dynamics(u, xin, particles)
-#        for i in xrange(len(zl)):
-#            # Predict z_{t+1}
-#            self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
-#            pass
-#        
-#        # Predict next states conditioned on eta_next
-#        self.set_states(particles, xin, zl, Pl)
-#        self.t = self.t + 1.0
-#    
-#    def measure(self, y, particles):
-#        """ Return the log-pdf value of the measurement """
-#        N = len(particles)
-#        return self.kf.measure(y=y)
-#    
-#    @abc.abstractmethod
-#    def calc_xi_next(self, particles, u, noise):
-#        pass
-#    
-#    @abc.abstractmethod
-#    def meas_eta_next(self, eta_next):
-#        """ Update linear estimate using observation 
-#            of next non-linear state """
-#        pass
-#
-#    @abc.abstractmethod
-#    def set_lin_states(self, particles, z_list, P_list):
-#        """ Set the estimate of the Rao-Blackwellized states """
-#        pass
-# 
-#    @abc.abstractmethod
-#    def get_lin_states(self, particles):
-#        """ Return the estimate of the Rao-Blackwellized states.
-#            Must return two variables, the first a list containing all the
-#            expected values, the second a list of the corresponding covariance
-#            matrices"""
-#        pass
-#
-#    def cond_predict(self, eta_next=None):
-#        """ Predict linear-guassian states z_{t+1|t} conditioned on eta_{t+1} """
-#        (z, P) = self.kf.predict()
-#        return (z.reshape((-1,1)), P)
-#
-#    def clin_update(self, next_part=None):
-#        self.kf.time_update()
-#    
-#    def prep_measure(self, y):
-#        """ Pre-processing of measurement y """
-#        return y
-#    
-#
-#
-#    def prep_update(self, u):
-#        """ Update dynamics with u as input """
-#        pass
-#    
-#
-#           
-#        
-#
+    
+    def update(self, u, noise, particles):
+        """ Update estimate using noise as input """
+        xin = self.calc_xi_next(u, noise, particles)
+        N = len(particles)
+        # Update linear estimate with data from measurement of next non-linear
+        # state 
+        (zl, Pl) = self.get_lin_states(particles)
+        (Ax, fx, Qx) = self.get_nonlin_pred_dynamics(particles, u)
+        
+        # This is probably not so nice performance-wise, but will
+        # work initially to profile where the bottlenecks are.
+        if (Ax == None):
+            Ax=N*(self.Ax,)
+        if (fx == None):
+            fx=N*(self.fx,)
+        if (Qx == None):
+            Qx= N*(self.Qx)
+        for i in xrange(N):
+            self.kf.measure_full(zl[i], Pl[i], xin, fx[i], Ax[i], Qx[i])
+        
+        (Az, fz, Qz) = self.get_condlin_pred_dynamics(u, xin, particles)
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
+            pass
+        
+        # Predict next states conditioned on eta_next
+        self.set_states(particles, xin, zl, Pl)
+        self.t = self.t + 1.0
+    
+    def measure(self, y, particles):
+        """ Return the log-pdf value of the measurement """
+        N = len(particles)
+        return self.kf.measure(y=y)
+    
+    @abc.abstractmethod
+    def calc_xi_next(self, particles, u, noise):
+        pass
+    
+    @abc.abstractmethod
+    def meas_eta_next(self, eta_next):
+        """ Update linear estimate using observation 
+            of next non-linear state """
+        pass
+
+    @abc.abstractmethod
+    def set_lin_states(self, particles, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        pass
+ 
+    @abc.abstractmethod
+    def get_lin_states(self, particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        pass
+
+    def cond_predict(self, eta_next=None):
+        """ Predict linear-guassian states z_{t+1|t} conditioned on eta_{t+1} """
+        (z, P) = self.kf.predict()
+        return (z.reshape((-1,1)), P)
+
+    def clin_update(self, next_part=None):
+        self.kf.time_update()
+    
+    def prep_measure(self, y):
+        """ Pre-processing of measurement y """
+        return y
+    
+
+
+    def prep_update(self, u):
+        """ Update dynamics with u as input """
+        pass
+    
+
+           
+        
+
 
     
 
