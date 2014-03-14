@@ -51,9 +51,9 @@ class FFBSiRSInterface(FFBSiInterface):
     def next_pdf_max(self, u, particles):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
-
-class HierarchicalBase(ParticleFilteringInterface):
-    """ Base class for Rao-Blackwellization of hierarchical models """
+    
+class RBPFBase(ParticleFilteringInterface):
+    """ Base class for Rao-Blackwellized particles """
     __metaclass__ = abc.ABCMeta
     
     def __init__(self, Az=None, fz=None, Qz=None,
@@ -66,6 +66,32 @@ class HierarchicalBase(ParticleFilteringInterface):
         # Sore z0, P0 needed for default implementation of 
         # get_z0_initial and get_grad_z0_initial
         self.t = t0
+    
+    def get_nonlin_pred_dynamics(self, u, particles):
+        """ Return matrices describing affine relation of next
+            nonlinear state conditioned on current linear state
+            
+            xi_{t+1]} = A_xi * z_t + f_xi + v_xi, v_xi ~ N(0,Q_xi)
+            
+            Return (A_xi, f_xi, Q_xi) where each element is a list
+            with the corresponding matrix for each particle. None indicates
+            that the matrix is identical for all particles and the value stored
+            in this class should be used instead
+            """
+        return (None, None, None)
+    
+    def get_condlin_pred_dynamics(self, u, xi_next, particles):
+        """ Return matrices describing affine relation of next
+            nonlinear state conditioned on current linear state
+            
+            z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
+            
+            conditioned on the value of xi_{t+1}. 
+            (Not the same as the dynamics unconditioned on xi_{t+1})
+            when for example there is a noise correlation between the 
+            linear and nonlinear state dynamics) 
+            """
+        return (None, None, None)
     
     def get_lin_pred_dynamics(self, u, particles):
         """ Return matrices describing affine relation of next
@@ -80,9 +106,60 @@ class HierarchicalBase(ParticleFilteringInterface):
             """
         return (None, None, None)
     
-    def get_lin_meas_dynamics(self, y, particles):
+    def get_meas_dynamics(self, y, particles):
         return (y, None, None, None)
     
+# This is not implemented  
+#    def get_condlin_meas_dynamics(self, y, xi_next, particles):
+#        return (y, None, None, None)
+    
+    def update(self, u, noise, particles):
+        """ Update estimate using noise as input """
+        # Calc (xi_{t+1} | xi_t, z_t, y_t)
+        xin = self.calc_xi_next(particles=particles, noise=noise, u=u)
+        # Calc (z_t | xi_{t+1}, y_t)
+        self.meas_xi_next(particles=particles, xi_next=xin, u=u)
+        # Calc (z_{t+1} | xi_{t+1}, y_t)
+        self.cond_predict(particles=particles, xi_next=xin, u=u)
+        
+        (_xil, zl, Pl) = self.get_states(particles)
+        self.set_states(particles, xin, zl, Pl)
+        self.t = self.t + 1.0
+
+
+#    
+#class RBPSBase(RBPFBase, ParticleSmoothingInterface):
+#    __metaclass__ = abc.ABCMeta
+#    
+##    def __init__(self, z0, P0, 
+##                 Az=None, Bz=None, C=None,
+##                  Qz=None, R=None, f_k=None, h_k=None):
+##        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
+##                                      Qz=Qz, R=R, f_k=f_k, h_k=h_k)
+#        
+#    def clin_measure(self, y, next_part=None):
+#        """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
+#        self.kf.measure(y)
+#
+#    def clin_smooth(self, next_part):
+#        """ Kalman smoothing of the linear states conditioned on the next particles linear states
+#            Before calling this method clin_dynamics should be called to update the dynamics
+#            according to the conditioning on the non-linear trajectory """
+#        tmp = (next_part.get_lin_est())
+#        self.kf.smooth(tmp[0], tmp[1])
+#
+#
+
+class HierarchicalBase(RBPFBase):
+    """ Base class for Rao-Blackwellization of hierarchical models """
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, **kwargs):
+        
+        super(HierarchicalBase, self).__init__(**kwargs)
+        # Sore z0, P0 needed for default implementation of 
+        # get_z0_initial and get_grad_z0_initial
+
     def update(self, u, noise, particles):
         """ Update estimate using noise as input """
         xin = self.calc_xi_next(u, noise, particles)
@@ -234,153 +311,231 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
     def next_pdf_xi_max(self, u, particles):
         pass
 
-class RBPFBase(HierarchicalBase):
-    """ Base class for Rao-Blackwellized particles """
-    __metaclass__ = abc.ABCMeta
+
+
+class MixedNLGaussian(RBPFBase):
+    """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
-    def __init__(self, Axi=None, fxi=None, Qxi=None,
-                 **kwargs):
-        
+        Implement this type of system by extending this class and provide the methods for returning 
+        the system matrices at each time instant  """
+    def __init__(self, Az=None, C=None, Qz=None, R=None, fz=None,
+                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None, t0=0):
         self.Axi = numpy.copy(Axi)
         self.fxi = numpy.copy(fxi)
         self.Qxi = numpy.copy(Qxi)
-        
-        super(RBPFBase, self).__init__(**kwargs)
-    
-    def get_nonlin_pred_dynamics(self, u, particles):
-        """ Return matrices describing affine relation of next
-            nonlinear state conditioned on current linear state
-            
-            \xi_{t+1]} = A_xi * z_t + f_xi + v_xi, v_xi ~ N(0,Q_xi)
-            
-            Return (A_xi, f_xi, Q_xi) where each element is a list
-            with the corresponding matrix for each particle. None indicates
-            that the matrix is identical for all particles and the value stored
-            in this class should be used instead
-            """
-        return (None, None, None)
-    
-    def get_condlin_pred_dynamics(self, u, xi_next, particles):
-        """ Return matrices describing affine relation of next
-            nonlinear state conditioned on current linear state
-            
-            \z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
-            
-            conditioned on the value of xi_{t+1}. 
-            (Not the same as the dynamics unconditioned on xi_{t+1})
-            when for example there is a noise correlation between the 
-            linear and nonlinear state dynamics) 
-            """
-        return (None, None, None)
-    
-# This is not implemented  
-#    def get_condlin_meas_dynamics(self, y, xi_next, particles):
-#        return (y, None, None, None)
-    
-    def update(self, u, noise, particles):
-        """ Update estimate using noise as input """
-        xin = self.calc_xi_next(u, noise, particles)
+        self.Qxiz = numpy.copy(Qxiz)
+        return super(MixedNLGaussian, self).__init__(Az=Az, C=C, 
+                                              Qz=Qz, R=R,
+                                              hz=h, fz=fz,
+                                              t0=t0)
+
+    def sample_process_noise(self, particles, u=None): 
+        """ Return sampled process noise for the non-linear states """
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles, u)
+        (_xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
-        # Update linear estimate with data from measurement of next non-linear
-        # state 
-        (zl, Pl) = self.get_lin_states(particles)
-        (Ax, fx, Qx) = self.get_nonlin_pred_dynamics(particles, u)
-        
         # This is probably not so nice performance-wise, but will
         # work initially to profile where the bottlenecks are.
-        if (Ax == None):
-            Ax=N*(self.Ax,)
-        if (fx == None):
-            fx=N*(self.fx,)
-        if (Qx == None):
-            Qx= N*(self.Qx)
+        if (Axi == None):
+            Axi=N*(self.Axi,)
+        if (fxi == None):
+            fxi=N*(self.fxi,)
+        if (Qxi == None):
+            Qxi= N*(self.Qxi,)
+                    
+        dim=len(_xil[0])
+        noise = numpy.empty((N,dim))
+        zeros = numpy.zeros(dim)
         for i in xrange(N):
-            self.kf.measure_full(zl[i], Pl[i], xin, fx[i], Ax[i], Qx[i])
+            Sigma = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
+            noise[i] =  numpy.random.multivariate_normal(zeros, Sigma).ravel()    
+        return noise
+
+    def calc_xi_next(self, particles, noise, u=None):
+        """ Update non-linear state using sampled noise,
+        # the noise term here includes the uncertainty from z """
+        xi_pred = self.pred_xi(particles=particles, u=u)
+        xi_next = xi_pred + noise
+   
+        return xi_next
+
+    def pred_xi(self, particles, u=None):
+        N = len(particles)
+        (Axi, fxi, _Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
+        (xil, zl, _Pl) = self.get_states(particles)
+        dim=len(xil[0])
+        xi_next = numpy.empty((N,dim))
+        # This is probably not so nice performance-wise, but will
+        # work initially to profile where the bottlenecks are.
+        if (Axi == None):
+            Axi=N*(self.Axi,)
+        if (fxi == None):
+            fxi=N*(self.fxi,)
+        for i in xrange(N):
+            xi_next[i] =  Axi[i].dot(zl[i]) + fxi[i]
+        return xi_next
+    
+    def meas_xi_next(self, particles, xi_next, u=None):
+        """ Update estimate using observation of next state """
+        # This is what is sometimes called "the second measurement update"
+        # for Rao-Blackwellized particle filters
         
-        (Az, fz, Qz) = self.get_condlin_pred_dynamics(u, xin, particles)
+        N = len(particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
+        if (Axi == None):
+            Axi=N*(self.Axi,)
+        if (fxi == None):
+            fxi=N*(self.fxi,)
+        if (Qxi == None):
+            Qxi= N*(self.Qxi,)
         for i in xrange(len(zl)):
-            # Predict z_{t+1}
-            self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
-            pass
+            self.kf.measure_full(y=xi_next[i], z=zl[i], P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
         
         # Predict next states conditioned on eta_next
-        self.set_states(particles, xin, zl, Pl)
-        self.t = self.t + 1.0
+        self.set_states(particles, xil, zl, Pl)
     
+    def get_cross_covariance(self, particles, u):
+        N = len(particles)
+        Qxiz = N*(self.Qxiz,)
+        return Qxiz
+    
+    def calc_cond_dynamics(self, particles, xi_next, u=None):
+        #Compensate for noise correlation
+        N = len(particles)
+        #(xil, zl, Pl) = self.get_states(particles)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles=particles, u=u)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        
+        if (Axi == None):
+            Axi = N*(self.Axi,)
+        if (fxi == None):
+            fxi = N*(self.fxi,)
+        if (Qxi == None):
+            Qxi = N*(self.Qxi,)
+        if (Az == None):
+            Az = N*(self.kf.A,)
+        if (fz == None):
+            fz = N*(self.kf.f_k,)
+        if (Qz == None):
+            Qz = N*(self.kf.Q,)
+        
+        Acond = list()
+        fcond = list()
+        Qcond = list()
+        
+        for i in xrange(N):
+            #TODO linalg.solve instead?
+            tmp = Qxiz[i].T.dot(numpy.linalg.inv(Qxi[i]))
+            Acond.append(Az[i] - tmp.dot(Axi[i]))
+            fcond.append(fz[i] +  tmp.dot(xi_next[i] - fxi[i]))
+            # TODO, shouldn't Qz be affected? Why wasn't it before?
+            Qcond.append(Qz[i] - tmp.dot(Qxiz[i]).dot(tmp.T))
+            #Qcond.append(Qz[i])
+        
+        return (Acond, fcond, Qcond)
+    
+    def cond_predict(self, particles, xi_next, u=None):
+        #Compensate for noise correlation
+        (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u)
+        N = len(particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        for i in xrange(len(zl)):
+            (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
+        
+        # Predict next states conditioned on eta_next
+        self.set_states(particles, xil, zl, Pl)
+        
     def measure(self, y, particles):
         """ Return the log-pdf value of the measurement """
-        N = len(particles)
-        return self.kf.measure(y=y)
-    
-    @abc.abstractmethod
-    def calc_xi_next(self, particles, u, noise):
-        pass
-    
-    @abc.abstractmethod
-    def meas_eta_next(self, eta_next):
-        """ Update linear estimate using observation 
-            of next non-linear state """
-        pass
-
-    @abc.abstractmethod
-    def set_lin_states(self, particles, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
-        pass
- 
-    @abc.abstractmethod
-    def get_lin_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
-        pass
-
-    def cond_predict(self, eta_next=None):
-        """ Predict linear-guassian states z_{t+1|t} conditioned on eta_{t+1} """
-        (z, P) = self.kf.predict()
-        return (z.reshape((-1,1)), P)
-
-    def clin_update(self, next_part=None):
-        self.kf.time_update()
-    
-    def prep_measure(self, y):
-        """ Pre-processing of measurement y """
-        return y
-    
-
-
-    def prep_update(self, u):
-        """ Update dynamics with u as input """
-        pass
-    
-
-           
         
+        (_xil, zl, Pl) = self.get_states(particles)
+        N = len(particles)
+        (y, Cz, hz, Rz) = self.get_meas_dynamics(y=y, particles=particles)
+        if (Cz == None):
+            Cz=N*(self.kf.C,)
+        if (hz == None):
+            hz=N*(self.kf.h_k,)
+        if (Rz == None):
+            Rz=N*(self.kf.R,)
+            
+        lyz = numpy.empty(N)
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
+        
+        return lyz
 
-
-    
-
-
-#    
-#class RBPSBase(RBPFBase, ParticleSmoothingInterface):
-#    __metaclass__ = abc.ABCMeta
-#    
-##    def __init__(self, z0, P0, 
-##                 Az=None, Bz=None, C=None,
-##                  Qz=None, R=None, f_k=None, h_k=None):
-##        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
-##                                      Qz=Qz, R=R, f_k=f_k, h_k=h_k)
+    def fwd_peak_density(self, particles, u=None):
+        """ Implements the fwd_peak_density function for MixedNLGaussian models """
+        N = len(particles)
+        pmax = numpy.empty(N)
+        (Axi, _fxi, Qxi) = self.get_nonlin_pred_dynamics(u, particles)
+        (Az, _fz, Qz) = self.get_lin_pred_dynamics(u, particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        Qxiz = self.get_cross_covariance(u, particles)
+        dim=len(xil[0])+len(zl[0])
+        zeros = numpy.zeros((dim,1))
+        for i in xrange(N):
+            A = numpy.vstack((Axi[i], Az[i]))
+            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
+                              numpy.hstack((Qxiz[i].T, Qz[i]))))
+            self.Sigma = Q + A.dot(Pl[i]).dot(A.T)
+            pmax[i] = kalman.lognormpdf(zeros, zeros, self.Sigma)
+        return 
+        
+#    def next_pdf(self, next_part, u, particles):
+#        """ Implements the next_pdf function for MixedNLGaussian models """
 #        
-#    def clin_measure(self, y, next_part=None):
-#        """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
-#        self.kf.measure(y)
+#        #nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
+#        eta_est = self.pred_eta()
+#        
+#        eta_diff = next_part.eta - eta_est
+#        #z_diff= next_part.sampled_z - self.kf.predict()[0]
+#        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
+#        
+#        if (self.Sigma == None):
+#            self.fwd_peak_density(u) 
+#        
+#        diff = numpy.vstack((eta_diff, z_diff)).reshape((-1,1))
+#        # We can used cached self.Sigma since 'fwd_peak_density' will always be called first
+#        #Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
+#        return kalman.lognormpdf(diff,mu=self.x_zeros,S=self.Sigma)
+#    
+#    def sample_smooth(self, next_part):
+#        """ Implements the sample_smooth function for MixedNLGaussian models """
+#        if (next_part != None):
+#            self.meas_eta_next(next_part.eta)
+#            self.cond_dynamics(next_part.eta)
+#            self.kf.measure_full(next_part.sampled_z, self.kf.f_k, self.kf.A, self.kf.Q)
 #
-#    def clin_smooth(self, next_part):
-#        """ Kalman smoothing of the linear states conditioned on the next particles linear states
-#            Before calling this method clin_dynamics should be called to update the dynamics
-#            according to the conditioning on the non-linear trajectory """
-#        tmp = (next_part.get_lin_est())
-#        self.kf.smooth(tmp[0], tmp[1])
-#
-#
+#        self.sampled_z = numpy.random.multivariate_normal(self.kf.z.ravel(),self.kf.P).ravel().reshape((-1,1))
+#    
+#    def measure(self, y):
+#        y=numpy.reshape(y, (-1,1))
+#        return super(MixedNLGaussian, self).measure(y)
+    
+#    def eval_1st_stage_weight(self, u,y):
+##        eta_old = copy.deepcopy(self.get_nonlin_state())
+##        lin_old = copy.deepcopy(self.get_lin_est())
+##        t_old = self.t
+#        self.prep_update(u)
+#        noise = numpy.zeros_like(self.eta)
+#        self.update(u, noise)
+#        
+#        yn = self.prep_measure(y)
+#        logpy = self.measure(yn)
+#        
+#        # Restore state
+##        self.set_lin_est(lin_old)
+##        self.set_nonlin_state(eta_old)
+##        self.t = t_old
+#        
+#        return logpy
+        
+    def get_nonlin_state(self, particles):
+        return self.eta
 
+    def set_nonlin_state(self, particles):
+        self.eta = numpy.copy(inp)

@@ -66,8 +66,8 @@ class ParticleFilter(object):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
             
-        v = self.model.sample_process_noise(u, pa.part)
-        self.model.update(u, v, pa.part)
+        v = self.model.sample_process_noise(u=u, particles=pa.part)
+        self.model.update(u=u, noise=v, particles=pa.part)
         
         return pa 
     
@@ -84,7 +84,7 @@ class ParticleFilter(object):
             pa = pa_out
 
         #y = pa.part[k].prep_measure(r)
-        new_weights = self.model.measure(r, pa.part)
+        new_weights = self.model.measure(y=r, particles=pa.part)
         
         pa.w = pa.w + new_weights
         # Keep the weights from going to -Inf
