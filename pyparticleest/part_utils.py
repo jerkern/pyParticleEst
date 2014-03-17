@@ -36,19 +36,19 @@ class FFBSiInterface(ParticleFilteringInterface):
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
-    def next_pdf(self, next_cpart, u, particles):
+    def next_pdf(self, particles, next_cpart, u=None):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
     
     @abc.abstractmethod
-    def sample_smooth(self, next_part, particles):
+    def sample_smooth(self, particles, next_part):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         pass
 
 class FFBSiRSInterface(FFBSiInterface):
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def next_pdf_max(self, u, particles):
+    def next_pdf_max(self, particles, u=None):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
     
@@ -59,7 +59,7 @@ class RBPFBase(ParticleFilteringInterface):
     def __init__(self, Az=None, fz=None, Qz=None,
                  C=None ,hz=None, R=None, t0=0):
         
-        self.kf = kalman.KalmanFilter(A=Az, C=C, 
+        self.kf = kalman.KalmanSmoother(A=Az, C=C, 
                                         Q=Qz, R=R,
                                         f_k=fz, h_k=hz)
         
@@ -127,16 +127,19 @@ class RBPFBase(ParticleFilteringInterface):
         self.t = self.t + 1.0
 
 
-#    
-#class RBPSBase(RBPFBase, ParticleSmoothingInterface):
-#    __metaclass__ = abc.ABCMeta
-#    
-##    def __init__(self, z0, P0, 
-##                 Az=None, Bz=None, C=None,
-##                  Qz=None, R=None, f_k=None, h_k=None):
-##        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
-##                                      Qz=Qz, R=R, f_k=f_k, h_k=h_k)
-#        
+    
+class RBPSBase(RBPFBase, FFBSiInterface):
+    __metaclass__ = abc.ABCMeta
+    
+#    def __init__(self, z0, P0, 
+#                 Az=None, Bz=None, C=None,
+#                  Qz=None, R=None, f_k=None, h_k=None):
+#        super(RBPSBase,self).__init__(z0=z0, P0=P0, Az=Az, C=C,
+#                                      Qz=Qz, R=R, f_k=f_k, h_k=h_k)
+    @abc.abstractmethod
+    def get_rb_initial(self, xi_initial):
+        pass    
+    
 #    def clin_measure(self, y, next_part=None):
 #        """ Kalman measurement of the linear states conditioned on the non-linear trajectory estimate """
 #        self.kf.measure(y)
@@ -147,8 +150,8 @@ class RBPFBase(ParticleFilteringInterface):
 #            according to the conditioning on the non-linear trajectory """
 #        tmp = (next_part.get_lin_est())
 #        self.kf.smooth(tmp[0], tmp[1])
-#
-#
+
+
 
 class HierarchicalBase(RBPFBase):
     """ Base class for Rao-Blackwellization of hierarchical models """
@@ -162,12 +165,12 @@ class HierarchicalBase(RBPFBase):
 
     def update(self, u, noise, particles):
         """ Update estimate using noise as input """
-        xin = self.calc_xi_next(u, noise, particles)
+        xin = self.calc_xi_next(particles, u, noise)
         # Update linear estimate with data from measurement of next non-linear
         # state 
         (_xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics(u, particles)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles, u)
         if (Az == None):
             Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
             #Az=N*(self.kf.A,)
@@ -209,11 +212,11 @@ class HierarchicalBase(RBPFBase):
         
         return lyxi + lyz
     
-    def next_pdf(self, next_cpart, u, particles):
+    def next_pdf(self, particles, next_cpart, u=None):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         N = len(particles)
-        lpxi = self.next_pdf_xi(next_cpart[0], u, particles).ravel()
-        (Az, fz, Qz) = self.get_lin_pred_dynamics(u, particles)
+        lpxi = self.next_pdf_xi(particles, next_cpart[0], u).ravel()
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles, u)
         lpz = numpy.empty_like(lpxi)
         (xil, zl, Pl) = self.get_states(particles)
         zln = numpy.empty_like(zl)
@@ -237,11 +240,11 @@ class HierarchicalBase(RBPFBase):
         #lpz = kalman.lognormpdf_jit(zl, mul, Pl)
         return lpxi + lpz
     
-    def sample_smooth(self, next_part, u, particle):
+    def sample_smooth(self, particle, next_part, u):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         (xil, zl, Pl) = self.get_states(particle)
         if (next_part != None):
-            (Az, fz, Qz) = self.get_lin_pred_dynamics(u, particle)
+            (Az, fz, Qz) = self.get_lin_pred_dynamics(particle, u)
             if (Az == None):
                 Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], 1, axis=0)
                 #Az=(self.kf.A,)
@@ -259,11 +262,11 @@ class HierarchicalBase(RBPFBase):
         return (xi, z)
 
     @abc.abstractmethod
-    def next_pdf_xi(self, next_xi, u, particles):
+    def next_pdf_xi(self, particles, next_xi, u):
         pass
     
     @abc.abstractmethod
-    def calc_xi_next(self, u, noise, particles):
+    def calc_xi_next(self, particles, u, noise):
         pass
     
     @abc.abstractmethod
@@ -287,10 +290,10 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
     def __init__(self, **kwargs):
         super(HierarchicalRSBase, self).__init__(**kwargs)
         
-    def next_pdf_max(self, u, particles):
+    def next_pdf_max(self, particles, u=None):
         N = len(particles)
-        lpxi = self.next_pdf_xi_max(u, particles)
-        (Az, _fz, Qz) = self.get_lin_pred_dynamics(u, particles)
+        lpxi = self.next_pdf_xi_max(particles, u)
+        (Az, _fz, Qz) = self.get_lin_pred_dynamics(particles, u)
         lpz = numpy.empty_like(lpxi)
         (_xil, _zl, Pl) = self.get_states(particles)
         if (Az == None):
@@ -308,12 +311,12 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
         return lpmax
     
     @abc.abstractmethod
-    def next_pdf_xi_max(self, u, particles):
+    def next_pdf_xi_max(self, particles, u=None):
         pass
 
 
 
-class MixedNLGaussian(RBPFBase):
+class MixedNLGaussian(RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
         Implement this type of system by extending this class and provide the methods for returning 
@@ -429,10 +432,10 @@ class MixedNLGaussian(RBPFBase):
             #TODO linalg.solve instead?
             tmp = Qxiz[i].T.dot(numpy.linalg.inv(Qxi[i]))
             Acond.append(Az[i] - tmp.dot(Axi[i]))
+            #Acond.append(Az[i])
             fcond.append(fz[i] +  tmp.dot(xi_next[i] - fxi[i]))
             # TODO, shouldn't Qz be affected? Why wasn't it before?
-            Qcond.append(Qz[i] - tmp.dot(Qxiz[i]).dot(tmp.T))
-            #Qcond.append(Qz[i])
+            Qcond.append(Qz[i])
         
         return (Acond, fcond, Qcond)
     
@@ -447,10 +450,10 @@ class MixedNLGaussian(RBPFBase):
         # Predict next states conditioned on eta_next
         self.set_states(particles, xil, zl, Pl)
         
-    def measure(self, y, particles):
+    def measure(self, particles, y):
         """ Return the log-pdf value of the measurement """
         
-        (_xil, zl, Pl) = self.get_states(particles)
+        (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
         (y, Cz, hz, Rz) = self.get_meas_dynamics(y=y, particles=particles)
         if (Cz == None):
@@ -464,7 +467,8 @@ class MixedNLGaussian(RBPFBase):
         for i in xrange(len(zl)):
             # Predict z_{t+1}
             lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
-        
+            
+        self.set_states(particles, xil, zl, Pl)
         return lyz
 
     def fwd_peak_density(self, particles, u=None):
@@ -485,32 +489,58 @@ class MixedNLGaussian(RBPFBase):
             pmax[i] = kalman.lognormpdf(zeros, zeros, self.Sigma)
         return 
         
-#    def next_pdf(self, next_part, u, particles):
-#        """ Implements the next_pdf function for MixedNLGaussian models """
-#        
-#        #nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
-#        eta_est = self.pred_eta()
-#        
-#        eta_diff = next_part.eta - eta_est
+    def next_pdf(self, particles, next_part, u=None):
+        """ Implements the next_pdf function for MixedNLGaussian models """
+        
+        N = len(particles)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles=particles, u=u)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        (xil, zl, Pl) = self.get_states(particles)
+        if (Axi == None):
+            Axi = N*(self.Axi,)
+        if (fxi == None):
+            fxi = N*(self.fxi,)
+        if (Qxi == None):
+            Qxi = N*(self.Qxi,)
+        if (Az == None):
+            Az = N*(self.kf.A,)
+        if (fz == None):
+            fz = N*(self.kf.f_k,)
+        if (Qz == None):
+            Qz = N*(self.kf.Q,)
+        
+        lpx = numpy.empty(N)
+        x_next = numpy.vstack(next_part)
 #        #z_diff= next_part.sampled_z - self.kf.predict()[0]
 #        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
-#        
-#        if (self.Sigma == None):
-#            self.fwd_peak_density(u) 
-#        
-#        diff = numpy.vstack((eta_diff, z_diff)).reshape((-1,1))
-#        # We can used cached self.Sigma since 'fwd_peak_density' will always be called first
-#        #Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
-#        return kalman.lognormpdf(diff,mu=self.x_zeros,S=self.Sigma)
-#    
-#    def sample_smooth(self, next_part):
-#        """ Implements the sample_smooth function for MixedNLGaussian models """
-#        if (next_part != None):
-#            self.meas_eta_next(next_part.eta)
-#            self.cond_dynamics(next_part.eta)
-#            self.kf.measure_full(next_part.sampled_z, self.kf.f_k, self.kf.A, self.kf.Q)
-#
-#        self.sampled_z = numpy.random.multivariate_normal(self.kf.z.ravel(),self.kf.P).ravel().reshape((-1,1))
+        
+        for i in xrange(N):
+            A = numpy.vstack((Axi[i], Az[i]))
+            f = numpy.vstack((fxi[i], fz[i]))
+            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
+                              numpy.hstack((Qxiz[i].T, Qz[i]))))
+            xp = f + A.dot(zl[i])
+            Sigma = A.dot(Pl[i]).dot(A.T) + Q
+            lpx[i] = kalman.lognormpdf(x_next,mu=xp,S=Sigma)
+        
+        return lpx
+    
+    def sample_smooth(self, particles, next_part, u=None):
+        """ Implements the sample_smooth function for MixedNLGaussian models """
+        part = numpy.copy(particles[0])
+        (xil, zl, Pl) = self.get_states([part,])
+        if (next_part != None):
+            self.meas_xi_next([part,], next_part[0])
+            (Acond, fcond, Qcond) = self.calc_cond_dynamics([part,], next_part[0], u)
+            (xil, zl, Pl) = self.get_states([part,])
+            self.kf.measure_full(next_part[1], zl[0], Pl[0],
+                                 C=Acond[0], h_k=fcond[0], R=Qcond[0])
+
+        xi = copy.copy(xil[0]).reshape((-1,1))
+        z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((-1,1))
+            
+        return (xi, z)
 #    
 #    def measure(self, y):
 #        y=numpy.reshape(y, (-1,1))

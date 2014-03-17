@@ -117,7 +117,6 @@ class KalmanFilter(object):
         return self.measure_full(y, h_k=self.h_k, C=self.C, R=self.R)
 
     def measure_full(self, y, z, P, C, h_k, R):
-        
         S = C.dot(P).dot(C.T)+R
 
         if (sp.issparse(S)):
@@ -129,9 +128,8 @@ class KalmanFilter(object):
             K = P.dot(C.T).dot(Sinv)
         
         err = self.measurement_diff(y, z, C, h_k)
-        z[:] += K.dot(err)  
-        P[:,:] -= K.dot(C).dot(P)
-
+        z[:] = z + K.dot(err)  
+        P[:,:] = P - K.dot(C).dot(P)
         # Return the probability of the received measurement
         return lognormpdf(0, err, S)
 
@@ -142,20 +140,18 @@ class KalmanSmoother(KalmanFilter):
         Extends the KalmanFilter class and provides an additional method for smoothing
         backwards in time """
     
-    def __init__(self, z0, P0, **kwargs):
-        super(KalmanSmoother, self).__init__(z0=z0, P0=P0, **kwargs)
-        self.M = None
+#    def __init__(self, z0, P0, **kwargs):
+#        super(KalmanSmoother, self).__init__(z0=z0, P0=P0, **kwargs)
+#        self.M = None
         
-    def smooth(self, x_next, P_next):
+    def smooth(self, z, P, z_next, P_next, A, f, Q):
         """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
             the relation x_{k+1} = A*x_k + f_k +v_k
             v_k ~ (0,Q)"""
         
-        (x_np, P_np) = self.predict()
-        J = self.P.dot(self.A.T.dot(np.linalg.inv(P_np)))
-        x_smooth = self.z + J.dot(x_next-x_np)
-        P_smooth = self.P + J.dot((P_next - P_np).dot(J.T))
+        (z_np, P_np) = self.predict_full(z, P, A, f, Q)
+        J = P.dot(A.T.dot(np.linalg.inv(P_np)))
+        z_smooth = z + J.dot(z_next-z_np)
+        P_smooth = P + J.dot((P_next - P_np).dot(J.T))
         M_smooth = J.dot(P_next)
-        self.z = x_smooth
-        self.P = P_smooth
-        self.M = M_smooth
+        return (z_smooth, P_smooth, M_smooth)
