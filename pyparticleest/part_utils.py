@@ -471,14 +471,26 @@ class MixedNLGaussian(RBPSBase):
         self.set_states(particles, xil, zl, Pl)
         return lyz
 
-    def fwd_peak_density(self, particles, u=None):
+    def next_pdf_max(self, particles, u=None):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
         N = len(particles)
         pmax = numpy.empty(N)
-        (Axi, _fxi, Qxi) = self.get_nonlin_pred_dynamics(u, particles)
-        (Az, _fz, Qz) = self.get_lin_pred_dynamics(u, particles)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles=particles, u=u)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
         (xil, zl, Pl) = self.get_states(particles)
-        Qxiz = self.get_cross_covariance(u, particles)
+        if (Axi == None):
+            Axi = N*(self.Axi,)
+        if (fxi == None):
+            fxi = N*(self.fxi,)
+        if (Qxi == None):
+            Qxi = N*(self.Qxi,)
+        if (Az == None):
+            Az = N*(self.kf.A,)
+        if (fz == None):
+            fz = N*(self.kf.f_k,)
+        if (Qz == None):
+            Qz = N*(self.kf.Q,)
         dim=len(xil[0])+len(zl[0])
         zeros = numpy.zeros((dim,1))
         for i in xrange(N):
@@ -487,7 +499,8 @@ class MixedNLGaussian(RBPSBase):
                               numpy.hstack((Qxiz[i].T, Qz[i]))))
             self.Sigma = Q + A.dot(Pl[i]).dot(A.T)
             pmax[i] = kalman.lognormpdf(zeros, zeros, self.Sigma)
-        return 
+        
+        return numpy.max(pmax)
         
     def next_pdf(self, particles, next_part, u=None):
         """ Implements the next_pdf function for MixedNLGaussian models """

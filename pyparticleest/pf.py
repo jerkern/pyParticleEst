@@ -244,7 +244,8 @@ class ParticleTrajectory(object):
         if (method == 'rs'):
             coeffs = numpy.empty(self.len, dtype=float)
             for k in range(self.len):
-                coeffs[k] = math.exp(self.pf.model.next_pdf_max(self.traj[k].u, self.traj[k].pa.part)) 
+                coeffs[k] = math.exp(self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,
+                                                                u=self.traj[k].u)) 
             options['maxpdf'] = coeffs
         if (method == 'mh'):
             options['R'] = 30
