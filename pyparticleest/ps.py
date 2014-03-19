@@ -80,6 +80,7 @@ class SmoothTrajectory(object):
             pa = step.pa
             if (method=='rs'):
                 opt['maxpdf'] = options['maxpdf'][cur_ind]
+            self.model.t = step.t
             ind = sampler(pa, self.model, self.traj[cur_ind+1], step.u, opt=opt)
             # Select 'previous' particle
             self.traj[cur_ind] = self.model.sample_smooth(pa.part[ind:(ind+1)], self.traj[cur_ind+1], step.u)
@@ -100,10 +101,11 @@ class SmoothTrajectory(object):
             trajetory """
         (z0, P0) = self.model.get_rb_initial([self.traj[0][0],])
         particles = self.model.create_initial_estimate(1)
-        self.model.set_states(particles, self.traj[0][0], z0, P0)
+        self.model.set_states(particles, (self.traj[0][0],), (z0,), (P0,))
         self.straj = list()
         T = len(self.traj)
         for i in xrange(T-1):
+            self.model.t = 1.0*i
             if (self.y[i] != None):
                 self.model.measure(particles, self.y[i])
             self.model.meas_xi_next(particles, self.traj[i+1][0], self.u[i])
@@ -124,11 +126,12 @@ class SmoothTrajectory(object):
         
         # Backward smoothing
         for i in reversed(xrange(len(self.traj)-1)):
+            self.model.t = 1.0*i
             (xin, zn, Pn) = self.model.get_states(self.straj[i+1])
             (xi, z, P) = self.model.get_states(self.straj[i])
             (Al, fl, Ql) = self.model.calc_cond_dynamics(self.straj[i], self.traj[i+1], self.u[i])
             (zs, Ps, Ms) = self.model.kf.smooth(z[0], P[0], zn[0], Pn[0], Al[0], fl[0], Ql[0])
-            self.model.set_states(self.straj[i], xi, zs, Ps)
+            self.model.set_states(self.straj[i], xi, (zs,), (Ps,))
 
 #
 #

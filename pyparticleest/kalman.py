@@ -64,8 +64,8 @@ class KalmanFilter(object):
         
         self.set_dynamics(A, C, Q, R, f_k, h_k)
         
-        if (f_k == None):
-            self.f_k = np.zeros(self.z.shape)
+#        if (f_k == None):
+#            self.f_k = np.zeros(self.z.shape)
         
     def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
         if (A != None):

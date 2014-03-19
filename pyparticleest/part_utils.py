@@ -323,10 +323,22 @@ class MixedNLGaussian(RBPSBase):
         the system matrices at each time instant  """
     def __init__(self, Az=None, C=None, Qz=None, R=None, fz=None,
                  Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None, t0=0):
-        self.Axi = numpy.copy(Axi)
-        self.fxi = numpy.copy(fxi)
-        self.Qxi = numpy.copy(Qxi)
-        self.Qxiz = numpy.copy(Qxiz)
+        if (Axi != None):
+            self.Axi = numpy.copy(Axi)
+        else:
+            self.Axi = None
+        if (fxi != None):
+            self.fxi = numpy.copy(fxi)
+        else:
+            self.fxi = None
+        if (Qxi != None):
+            self.Qxi = numpy.copy(Qxi)
+        else:
+            self.Qxi = None
+        if (Qxiz != None):
+            self.Qxiz = numpy.copy(Qxiz)
+        else:
+            self.Qxiz = None
         return super(MixedNLGaussian, self).__init__(Az=Az, C=C, 
                                               Qz=Qz, R=R,
                                               hz=h, fz=fz,
@@ -399,30 +411,35 @@ class MixedNLGaussian(RBPSBase):
         self.set_states(particles, xil, zl, Pl)
     
     def get_cross_covariance(self, particles, u):
-        N = len(particles)
-        Qxiz = N*(self.Qxiz,)
-        return Qxiz
+        return None
     
     def calc_cond_dynamics(self, particles, xi_next, u=None):
         #Compensate for noise correlation
         N = len(particles)
         #(xil, zl, Pl) = self.get_states(particles)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles=particles, u=u)
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
-        Qxiz = self.get_cross_covariance(particles=particles, u=u)
         
-        if (Axi == None):
-            Axi = N*(self.Axi,)
-        if (fxi == None):
-            fxi = N*(self.fxi,)
-        if (Qxi == None):
-            Qxi = N*(self.Qxi,)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles=particles, u=u)
         if (Az == None):
             Az = N*(self.kf.A,)
         if (fz == None):
             fz = N*(self.kf.f_k,)
         if (Qz == None):
             Qz = N*(self.kf.Q,)
+        
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        if (Qxiz == None and self.Qxiz == None):
+            return (Az, fz, Qz)
+        if (Qxiz == None):
+            Qxiz = N*(self.Qxiz,)
+        
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles=particles, u=u)
+        if (Axi == None):
+            Axi = N*(self.Axi,)
+        if (fxi == None):
+            fxi = N*(self.fxi,)
+        if (Qxi == None):
+            Qxi = N*(self.Qxi,)
+
         
         Acond = list()
         fcond = list()
@@ -438,6 +455,8 @@ class MixedNLGaussian(RBPSBase):
             Qcond.append(Qz[i])
         
         return (Acond, fcond, Qcond)
+        
+        
     
     def cond_predict(self, particles, xi_next, u=None):
         #Compensate for noise correlation
@@ -491,6 +510,11 @@ class MixedNLGaussian(RBPSBase):
             fz = N*(self.kf.f_k,)
         if (Qz == None):
             Qz = N*(self.kf.Q,)
+        if (Qxiz == None):
+            if (self.Qxiz == None):
+                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
+            else:
+                Qxiz = N*(self.Qxiz,)
         dim=len(xil[0])+len(zl[0])
         zeros = numpy.zeros((dim,1))
         for i in xrange(N):
@@ -522,6 +546,11 @@ class MixedNLGaussian(RBPSBase):
             fz = N*(self.kf.f_k,)
         if (Qz == None):
             Qz = N*(self.kf.Q,)
+        if (Qxiz == None):
+            if (self.Qxiz == None):
+                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
+            else:
+                Qxiz = N*(self.Qxiz,)
         
         lpx = numpy.empty(N)
         x_next = numpy.vstack(next_part)

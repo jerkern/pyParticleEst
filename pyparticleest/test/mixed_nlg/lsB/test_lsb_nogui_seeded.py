@@ -21,7 +21,7 @@ class LSBEst(param_est.ParamEstimation):
 if __name__ == '__main__':
     
     num = 300
-    nums = 10
+    nums = 5
 
     # How many steps forward in time should our simulation run
     steps = 100
@@ -34,8 +34,8 @@ if __name__ == '__main__':
     
     plt.ion()
     
-    sqr_err_eta = numpy.zeros((sims, steps))
-    sqr_err_theta = numpy.zeros((sims, steps))
+    sqr_err_eta = numpy.zeros((sims, steps+1))
+    sqr_err_theta = numpy.zeros((sims, steps+1))
     sqr_err_eta_single = numpy.zeros((sims, nums, steps))
     sqr_err_theta_single = numpy.zeros((sims, nums, steps))
     t = numpy.asarray(range(steps+1))
@@ -45,23 +45,28 @@ if __name__ == '__main__':
         numpy.random.seed(k)
         (y, e, z) = particle_lsb.generate_dataset(steps)
 
+        model = particle_lsb.ParticleLSB()
         # Create an array for our particles 
-        ParamEstimator = LSBEst(u=None, y=y)
-        ParamEstimator.simulate(num, nums, False)
+        ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='normal')
 
         svals = numpy.zeros((2, nums, steps+1))
         
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
-                svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i].kf.z)
+                #(xil, zl, Pl) = model.get_states(ParamEstimator.straj[j].straj[i])
+                #svals[0,j,i]=xil[0]
+                #svals[1,j,i]=25.0+C_theta.dot(zl[0])
+                
+                svals[0,j,i]=ParamEstimator.straj[j].traj[i][0]
+                svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i][1])
 
         # Use average of trajectories
         svals_mean = numpy.mean(svals,1)
 
         theta = 25.0+C_theta.dot(z.reshape((4,-1)))
-        sqr_err_eta[k,:] = (svals_mean[0,:-1] - e[0,:])**2
-        sqr_err_theta[k,:] = (svals_mean[1,:-1] - theta)**2
+        sqr_err_eta[k,:] = (svals_mean[0,:] - e[0,:])**2
+        sqr_err_theta[k,:] = (svals_mean[1,:] - theta)**2
 
 #        for i in range(steps):
 #            theta = 25.0+C_theta.dot(z[:,i].reshape((-1,1)))

@@ -11,15 +11,6 @@ import pyparticleest.test.mixed_nlg.lsB.particle_lsb as particle_lsb
 import pyparticleest.param_est as param_est
 import scipy.io
 
-class LS2Est(param_est.ParamEstimation):
-        
-    def create_initial_estimate(self, params, num):
-        particles = numpy.empty(num, particle_lsb.ParticleLSB)
-        
-        for k in range(len(particles)):
-            particles[k] = particle_lsb.ParticleLSB_JN()
-        return particles
-
 if __name__ == '__main__':
     
     num = 300
@@ -39,17 +30,17 @@ if __name__ == '__main__':
     for k in range(sims):
         print k
         # Create reference
-        numpy.random.seed(1)
-        #numpy.random.seed(10)
+        #numpy.random.seed(1)
+        numpy.random.seed(10)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    
     
         print "estimation start"
         
         x = numpy.asarray(range(steps+1))
-       
+        model = particle_lsb.ParticleLSB()
         # Create an array for our particles 
-        ParamEstimator = LS2Est(u=None, y=y)
+        ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
         ParamEstimator.simulate(num, nums, res=0.67, filter='PF')
 
         
@@ -58,11 +49,15 @@ if __name__ == '__main__':
  
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
-                svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i].kf.z)
-            for j in range(num):
-                vals[0,j,i]=ParamEstimator.pt[i].pa.part[j].get_nonlin_state().ravel()
-                vals[1,j,i]=25.0+C_theta.dot(ParamEstimator.pt[i].pa.part[j].kf.z)
+                (xil, zl, Pl) = model.get_states(ParamEstimator.straj[j].straj[i])
+                svals[0,j,i]=xil[0]
+                svals[1,j,i]=25.0+C_theta.dot(zl[0])
+                #svals[0,j,i]=ParamEstimator.straj[j].traj[i][0]
+                #svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i][1])
+                
+            (xil, zl, Pl) = model.get_states(ParamEstimator.pt.traj[i].pa.part)
+            vals[0,:,i]=numpy.vstack(xil).ravel()
+            vals[1,:,i]=25.0+C_theta.dot(numpy.hstack(zl)).ravel()
                 
         svals_mean = numpy.mean(svals,1)
         plt.figure()

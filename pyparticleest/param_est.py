@@ -66,7 +66,7 @@ def calc_pxnext(ind):
 class ParamEstimation(object):
     __metaclass__ = abc.ABCMeta
     
-    def __init__(self, u, y):
+    def __init__(self, model, u, y):
         
         if (u != None):
             self.u = u
@@ -76,26 +76,18 @@ class ParamEstimation(object):
         self.pt = None
         self.straj = None
         self.params = None
-    
-    @abc.abstractmethod
-    def create_initial_estimate(self, params, num):
-        pass
+        self.model = model
     
     def set_params(self, params):
         self.params = numpy.copy(params)
-        if (self.straj != None):
-            set_traj_params(self.straj, params)
+        self.model.set_params(self.params)
     
-    def simulate(self, num_part, num_traj, filter='PF', res=0.67):
+    def simulate(self, num_part, num_traj, filter='PF', smoother='rs', res=0.67):
         resamplings=0
-        particles = self.create_initial_estimate(params=self.params, num=num_part)
-        
-        # Create a particle approximation object from our particles
-        pa = pf.ParticleApproximation(particles=particles)
     
         # Initialise a particle filter with our particle approximation of the initial state,
         # set the resampling threshold to 0.67 (effective particles / total particles )
-        self.pt = pf.ParticleTrajectory(pa,res,filter=filter)
+        self.pt = pf.ParticleTrajectory(self.model, num_part, res,filter=filter)
         
         # Run particle filter
         for i in range(len(self.y)):
@@ -104,10 +96,9 @@ class ParamEstimation(object):
                 resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates
-        self.straj = ps.do_smoothing(self.pt, num_traj)   # Do sampled smoothing
-        for i in range(len(self.straj)):
-            (z0, P0) = self.straj[i].traj[0].get_z0_initial()
-            self.straj[i].constrained_smoothing(z0, P0)
+        self.straj = self.pt.perform_smoothing(num_traj, method=smoother)
+        for i in xrange(len(self.straj)):
+            self.straj[i].constrained_smoothing()
         return resamplings
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 

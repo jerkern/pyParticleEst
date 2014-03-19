@@ -6,7 +6,17 @@ Fredrik Lindsten, Thomas B. Schon
 
 import numpy
 import math
-import pyparticleest.models.mixed_nl_gaussian as mixed_nl_gaussian
+import pyparticleest.part_utils
+
+C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
+def calc_Ae_fe(eta, t):
+    Ae = eta/(1+eta**2)*C_theta
+    fe = 0.5*eta+25*eta/(1+eta**2)+8*math.cos(1.2*t)
+    return (Ae, fe)
+
+def calc_h(eta):
+    return 0.05*eta**2
+
 
 def generate_dataset(length):
     Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
@@ -50,109 +60,147 @@ def generate_dataset(length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
-def calc_Ae_fe(eta, t):
-    Ae = eta/(1+eta**2)*C_theta
-    fe = 0.5*eta+25*eta/(1+eta**2)+8*math.cos(1.2*t)
-    return (Ae, fe)
-
-def calc_h(eta):
-    return 0.05*eta**2
-
-class ParticleLSB(mixed_nl_gaussian.MixedNLGaussian):
+class ParticleLSB(pyparticleest.part_utils.MixedNLGaussian):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self):
         """ Define all model variables """
         
         # No uncertainty in initial state
-        eta = numpy.array([[0.0],])
-        z0 =  numpy.array([[0.0],
-                           [0.0],
-                           [0.0],
-                           [0.0]])
-        P0 = 0.0*numpy.eye(4)
+        self.xi0 = numpy.array([[0.0],])
+        self.z0 =  numpy.array([[0.0],
+                                [0.0],
+                                [0.0],
+                                [0.0]])
+        self.P0 = 0.0*numpy.eye(4)
         
         Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
                           [2.0, 0.0, 0.0, 0.0],
                           [0.0, 1.0, 0.0, 0.0],
                           [0.0, 0.0, 0.5, 0.0]])
         
-        (Ae, fe) = calc_Ae_fe(eta, 0)
-        h = calc_h(eta)
+        #(Axi, fxi) = calc_Axi_fxi(self.xi0, 0)
+        #h = calc_h(eta)
         C = numpy.array([[0.0, 0.0, 0.0, 0.0]])
-        
-        Qe= numpy.diag([ 0.005])
+        fz = numpy.zeros_like(self.z0)
+        Qxi= numpy.diag([ 0.005])
         Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
         R = numpy.diag([0.1,])
 
-        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)),
-                                         P0=P0, e0 = eta,
-                                         Az=Az, C=C, Ae=Ae,
-                                         R=R, Qe=Qe, Qz=Qz,
-                                         fe=fe, h=h)
+        super(ParticleLSB,self).__init__(Az=Az, fz=fz, C=C, R=R,
+                                         Qxi=Qxi, Qz=Qz,)
+    def create_initial_estimate(self, N):
+        particles = numpy.empty((N,), dtype=numpy.ndarray)
+        lxi = len(self.xi0)
+        lz = len(self.z0)
+        dim = lxi + lz + len(self.P0.ravel())
         
-    def prep_update(self, u):
-        """ Update system dynamics based on current state, called
-            before the predict step """
-        (Ae, fe) = calc_Ae_fe(self.eta, self.t)
-        self.set_dynamics(fe=fe, Ae=Ae)
-        
-    def prep_measure(self, y):
-        """ ppdate system dynamics based on current state, called
-            before the measurement step """
-        h = calc_h(self.eta)
-        self.set_dynamics(h=h)
-        return y
+        for i in xrange(N):
+            particles[i] = numpy.empty(dim)
+            particles[i][0:lxi] = numpy.copy(self.xi0)
+            particles[i][lxi:(lxi+lz)] = numpy.copy(self.z0).ravel()
+            particles[i][(lxi+lz):] = numpy.copy(self.P0).ravel()  
+        return particles
     
-class ParticleLSB_JN(ParticleLSB):
-    """ Model 60 & 61 from Lindsten & Schon (2011) """
-    def __init__(self):
-        """ Define all model variables """
+    def set_states(self, particles, xi_list, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        lxi = len(self.xi0)
+        lz = len(self.z0)
+        N = len(particles)
+        for i in xrange(N):
+            particles[i][0:lxi] = xi_list[i].ravel()
+            particles[i][lxi:(lxi+lz)] = z_list[i].ravel()
+            particles[i][(lxi+lz):] = P_list[i].ravel()
+ 
+    def get_states(self, particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        N = len(particles)
+        xil = list()
+        zl = list()
+        Pl = list()
+        N = len(particles)
+        lxi = len(self.xi0)
+        lz = len(self.z0)
+        for i in xrange(N):
+            xil.append(particles[i][0:lxi].reshape(-1,1))
+            zl.append(particles[i][lxi:(lxi+lz)].reshape(-1,1))
+            Pl.append(particles[i][(lxi+lz):].reshape(self.P0.shape))
         
-        # No uncertainty in initial state
-        eta = numpy.array([[0.0],])
-        z0 =  numpy.array([[0.0],
-                           [0.0],
-                           [0.0],
-                           [0.0]])
-        P0 = 0.0*numpy.eye(4)
+        return (xil, zl, Pl)
+    
+    def get_rb_initial(self, xi0):
+        return (numpy.copy(self.z0),
+                numpy.copy(self.P0))
         
-        Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
-                          [2.0, 0.0, 0.0, 0.0],
-                          [0.0, 1.0, 0.0, 0.0],
-                          [0.0, 0.0, 0.5, 0.0]])
+    def get_nonlin_pred_dynamics(self, particles, u):
+        N = len(particles)
+        C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
+        tmp = numpy.vstack(particles)[:,numpy.newaxis,:]
+        Axi = (tmp[:,:,0]/(1+tmp[:,:,0]**2)).dot(C_theta)
+        Axi = Axi[:,numpy.newaxis,:]
+        fxi = 0.5*tmp[:,:,0]+25*tmp[:,:,0]/(1+tmp[:,:,0]**2)+8*math.cos(1.2*self.t)
+        fxi = fxi[:,numpy.newaxis,:]
+        return (Axi, fxi, None)
         
-        (Ae, fe) = calc_Ae_fe(eta, 0)
-        h = calc_h(eta)
-        C = numpy.array([[0.0, 0.0, 0.0, 0.0]])
+    def get_meas_dynamics(self, y, particles):
+        N = len(particles)
+        tmp = numpy.vstack(particles)
+        h = 0.05*tmp[:,0]**2
+        h = h[:,numpy.newaxis,numpy.newaxis]
         
-        Qe= numpy.diag([ 0.005])
-        Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
-        R = numpy.diag([0.1,])
-
-        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)),
-                                         P0=P0, e0 = eta,
-                                         Az=Az, C=C, Ae=Ae,
-                                         R=R, Qe=Qe, Qz=Qz,
-                                         fe=fe, h=h)
-        
-    def eval_1st_stage_weight(self, u,y):
-#        eta_old = copy.deepcopy(self.get_nonlin_state())
-#        lin_old = copy.deepcopy(self.get_lin_est())
-#        t_old = self.t
-        self.prep_update(u)
-        noise = numpy.zeros_like(self.eta)
-        self.update(u, noise)
-        
-        dh = numpy.asarray(((0.05*2*self.eta,),))
-        
-        yn = self.prep_measure(y)
-        self.kf.R = self.kf.R + dh*self.Qe*dh
-        logpy = self.measure(yn)
-        
-        # Restore state
-#        self.set_lin_est(lin_old)
-#        self.set_nonlin_state(eta_old)
-#        self.t = t_old
-        
-        return logpy
+        return (y, None, h, None)
+    
+#class ParticleLSB_JN(ParticleLSB):
+#    """ Model 60 & 61 from Lindsten & Schon (2011) """
+#    def __init__(self):
+#        """ Define all model variables """
+#        
+#        # No uncertainty in initial state
+#        eta = numpy.array([[0.0],])
+#        z0 =  numpy.array([[0.0],
+#                           [0.0],
+#                           [0.0],
+#                           [0.0]])
+#        P0 = 0.0*numpy.eye(4)
+#        
+#        Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
+#                          [2.0, 0.0, 0.0, 0.0],
+#                          [0.0, 1.0, 0.0, 0.0],
+#                          [0.0, 0.0, 0.5, 0.0]])
+#        
+#        (Ae, fe) = calc_Ae_fe(eta, 0)
+#        h = calc_h(eta)
+#        C = numpy.array([[0.0, 0.0, 0.0, 0.0]])
+#        
+#        Qe= numpy.diag([ 0.005])
+#        Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
+#        R = numpy.diag([0.1,])
+#
+#        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)),
+#                                         P0=P0, e0 = eta,
+#                                         Az=Az, C=C, Ae=Ae,
+#                                         R=R, Qe=Qe, Qz=Qz,
+#                                         fe=fe, h=h)
+#        
+#    def eval_1st_stage_weight(self, u,y):
+##        eta_old = copy.deepcopy(self.get_nonlin_state())
+##        lin_old = copy.deepcopy(self.get_lin_est())
+##        t_old = self.t
+#        self.prep_update(u)
+#        noise = numpy.zeros_like(self.eta)
+#        self.update(u, noise)
+#        
+#        dh = numpy.asarray(((0.05*2*self.eta,),))
+#        
+#        yn = self.prep_measure(y)
+#        self.kf.R = self.kf.R + dh*self.Qe*dh
+#        logpy = self.measure(yn)
+#        
+#        # Restore state
+##        self.set_lin_est(lin_old)
+##        self.set_nonlin_state(eta_old)
+##        self.t = t_old
+#        
+#        return logpy
