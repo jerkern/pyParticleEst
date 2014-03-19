@@ -43,19 +43,19 @@ def rs_sampler(pa, model, next, u, opt):
 
 class SmoothTrajectory(object):
     """ Store smoothed trajectory """
-    def __init__(self, pt, method='normal', options=None):
+    def __init__(self, pt, M=1, method='normal', options=None):
         """ Create smoothed trajectory from filtered trajectory
             pt - particle trajectory to be smoothed
             rej_sampling - Use rejection sampling instead of evaluating all 
                            weights (reduces time complexity to M*N from M*N^2
             """
-        # Initialise from end time estimates
-        part = pt[-1].pa.sample()
-        # Collapse particle which is conditionally linear gaussian
-        # to a single point by sampling the MVN 
-        self.traj = numpy.zeros(len(pt), dtype=list)
+        
+        self.traj = numpy.zeros((len(pt), M), dtype=numpy.ndarray)
         self.model =  pt.pf.model
-        self.traj[-1] = self.model.sample_smooth(numpy.asarray([part,]), None, None)
+        # Initialise from end time estimates
+        for j in xrange(M):
+            part = pt[-1].pa.sample()
+            self.traj[-1,j] = self.model.sample_smooth(numpy.asarray([part,]), None, None)
         
         
         self.u = [pt[-1].u, ]
@@ -74,16 +74,18 @@ class SmoothTrajectory(object):
         else:
             raise ValueError('Unknown sampler: %s' % method)
         
-        for cur_ind in reversed(range(len(pt)-1)):
-
+        for cur_ind in reversed(xrange(len(pt)-1)):
             step = pt[cur_ind]
+            self.model.t = step.t
             pa = step.pa
             if (method=='rs'):
-                opt['maxpdf'] = options['maxpdf'][cur_ind]
-            self.model.t = step.t
-            ind = sampler(pa, self.model, self.traj[cur_ind+1], step.u, opt=opt)
-            # Select 'previous' particle
-            self.traj[cur_ind] = self.model.sample_smooth(pa.part[ind:(ind+1)], self.traj[cur_ind+1], step.u)
+                    opt['maxpdf'] = options['maxpdf'][cur_ind]
+            for j in xrange(M):
+                ind = sampler(pa, self.model, self.traj[cur_ind+1,j], step.u, opt=opt)
+                # Select 'previous' particle
+                self.traj[cur_ind, j] = self.model.sample_smooth(pa.part[ind:(ind+1)],
+                                                                 self.traj[cur_ind+1,j],
+                                                                 step.u)
             self.u.append(step.u)
             self.y.append(step.y)
             self.t.append(step.t)
@@ -99,39 +101,50 @@ class SmoothTrajectory(object):
     def constrained_smoothing(self):
         """ Kalman smoothing of the linear states conditione on the non-linear
             trajetory """
-        (z0, P0) = self.model.get_rb_initial([self.traj[0][0],])
-        particles = self.model.create_initial_estimate(1)
-        self.model.set_states(particles, (self.traj[0][0],), (z0,), (P0,))
-        self.straj = list()
+        M = self.traj.shape[1]
+        particles = self.model.create_initial_estimate(M)
+        for j in xrange(M):
+            (z0, P0) = self.model.get_rb_initial([self.traj[0][j][0],])
+            self.model.set_states(particles[j:j+1], (self.traj[0][j][0],), (z0,), (P0,))
+        
         T = len(self.traj)
+        self.straj = numpy.empty((T, M), dtype=object)
+        
         for i in xrange(T-1):
-            self.model.t = 1.0*i
+            self.model.t = self.t[i]
             if (self.y[i] != None):
                 self.model.measure(particles, self.y[i])
-            self.model.meas_xi_next(particles, self.traj[i+1][0], self.u[i])
-            (_xil, zl, Pl) = self.model.get_states(particles)
-            self.model.set_states(particles, self.traj[i][0], zl, Pl)
-            self.straj.append(particles)
+            for j in xrange(M):
+                self.model.meas_xi_next(particles[j:j+1], self.traj[i+1][j][0], self.u[i])
+            for j in xrange(M):
+                (_xil, zl, Pl) = self.model.get_states(particles[j:j+1])
+                self.model.set_states(particles[j:j+1], self.traj[i][j][0], zl, Pl)
+                self.straj[i,j] = particles[j:j+1]
 
             particles = copy.deepcopy(particles)
-            self.model.cond_predict(particles, self.traj[i+1][0], self.u[i])
-            (_xil, zl, Pl) = self.model.get_states(particles)
-            self.model.set_states(particles, self.traj[i+1][0], zl, Pl)
+            for j in xrange(M):
+                self.model.cond_predict(particles[j:j+1], self.traj[i+1][j][0], self.u[i])
+                (_xil, zl, Pl) = self.model.get_states(particles[j:j+1])
+                self.model.set_states(particles[j:j+1], self.traj[i+1][j][0], zl, Pl)
             
         if (self.y[-1] != None):
             self.model.measure(particles, self.y[-1])
-        (_xil, zl, Pl) = self.model.get_states(particles)
-        self.model.set_states(particles, self.traj[-1][0], zl, Pl)
-        self.straj.append(particles)
+        
+        
+        for j in xrange(M):
+            (_xil, zl, Pl) = self.model.get_states(particles)
+            self.model.set_states(particles[j:j+1], self.traj[-1][j][0], zl, Pl)
+            self.straj[-1,j] = particles[j:j+1]
         
         # Backward smoothing
         for i in reversed(xrange(len(self.traj)-1)):
-            self.model.t = 1.0*i
-            (xin, zn, Pn) = self.model.get_states(self.straj[i+1])
-            (xi, z, P) = self.model.get_states(self.straj[i])
-            (Al, fl, Ql) = self.model.calc_cond_dynamics(self.straj[i], self.traj[i+1], self.u[i])
-            (zs, Ps, Ms) = self.model.kf.smooth(z[0], P[0], zn[0], Pn[0], Al[0], fl[0], Ql[0])
-            self.model.set_states(self.straj[i], xi, (zs,), (Ps,))
+            self.model.t = self.t[i]
+            for j in xrange(M):
+                (xin, zn, Pn) = self.model.get_states(self.straj[i+1,j])
+                (xi, z, P) = self.model.get_states(self.straj[i,j])
+                (Al, fl, Ql) = self.model.calc_cond_dynamics(self.straj[i,j], self.traj[i+1][j], self.u[i])
+                (zs, Ps, Ms) = self.model.kf.smooth(z[0], P[0], zn[0], Pn[0], Al[0], fl[0], Ql[0])
+                self.model.set_states(self.straj[i][j], xi, (zs,), (Ps,))
 
 #
 #

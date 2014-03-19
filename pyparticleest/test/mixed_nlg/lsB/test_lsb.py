@@ -30,8 +30,8 @@ if __name__ == '__main__':
     for k in range(sims):
         print k
         # Create reference
-        #numpy.random.seed(1)
-        numpy.random.seed(10)
+        numpy.random.seed(1)
+        #numpy.random.seed(10)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    
     
@@ -49,7 +49,7 @@ if __name__ == '__main__':
  
         for i in range(steps+1):
             for j in range(nums):
-                (xil, zl, Pl) = model.get_states(ParamEstimator.straj[j].straj[i])
+                (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i][j])
                 svals[0,j,i]=xil[0]
                 svals[1,j,i]=25.0+C_theta.dot(zl[0])
                 #svals[0,j,i]=ParamEstimator.straj[j].traj[i][0]

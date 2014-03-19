@@ -250,11 +250,7 @@ class ParticleTrajectory(object):
         if (method == 'mh'):
             options['R'] = 30
             
-        straj = numpy.empty(M, SmoothTrajectory)
-        #print "smoothing"
-        for i in range(M):
-            #print "%d/%d" % (i,M)
-            straj[i] = SmoothTrajectory(self, method=method, options=options)
+        straj = SmoothTrajectory(self, M=M, method=method, options=options)
             
         return straj
 
