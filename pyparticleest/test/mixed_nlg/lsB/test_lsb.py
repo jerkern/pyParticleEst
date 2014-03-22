@@ -48,13 +48,9 @@ if __name__ == '__main__':
         vals = numpy.zeros((2, num, steps+1))
  
         for i in range(steps+1):
-            for j in range(nums):
-                (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i][j])
-                svals[0,j,i]=xil[0]
-                svals[1,j,i]=25.0+C_theta.dot(zl[0])
-                #svals[0,j,i]=ParamEstimator.straj[j].traj[i][0]
-                #svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i][1])
-                
+            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i])
+            svals[0,:,i] = numpy.vstack(xil).ravel()
+            svals[1,:,i] = 25.0+C_theta.dot(numpy.hstack(zl)).ravel()
             (xil, zl, Pl) = model.get_states(ParamEstimator.pt.traj[i].pa.part)
             vals[0,:,i]=numpy.vstack(xil).ravel()
             vals[1,:,i]=25.0+C_theta.dot(numpy.hstack(zl)).ravel()

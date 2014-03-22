@@ -6,7 +6,7 @@ Created on Nov 11, 2013
 
 import numpy
 import math
-from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
+import pyparticleest.part_utils
 import pyparticleest.kalman as kalman
 
 def sign(x):
@@ -16,7 +16,7 @@ def sign(x):
         return 1.0
 
 def calc_h(eta):
-    return numpy.asarray(((0.1*(eta[0,0]**2)*sign(eta[0,0])),
+    return numpy.asarray(((0.1*eta[0,0]*math.fabs(eta[0,0])),
                           0.0)).reshape((-1,1))
  
 def generate_dataset(params, length):
@@ -45,7 +45,7 @@ def generate_dataset(params, length):
     y[:,0] = (h + C.dot(z)).ravel()
     
     for i in range(1,length):
-        e = params[0]*numpy.arctan(e) + Ae.dot(z) + numpy.random.normal(0.0,0.01)
+        e = params[0]*numpy.arctan(e) + Ae.dot(z) + numpy.random.normal(0.0,math.sqrt(0.01))
         
         wz = numpy.random.multivariate_normal(numpy.zeros((3,)), 0.01*numpy.eye(3, 3)).ravel().reshape((-1,1))
         
@@ -57,11 +57,11 @@ def generate_dataset(params, length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLS2(MixedNLGaussian):
+class ParticleLS2(pyparticleest.part_utils.MixedNLGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
-    def __init__(self, eta0, params):
+    def __init__(self, params):
         """ Define all model variables """
-        Ae = numpy.array([[params[1], 0.0, 0.0]])
+        Axi = numpy.array([[params[1], 0.0, 0.0]])
         Az = numpy.asarray(((1.0, params[2], 0.0), 
                             (0.0,  
                              params[3]*math.cos(params[4]), 
@@ -71,59 +71,86 @@ class ParticleLS2(MixedNLGaussian):
                              params[3]*math.cos(params[4]))))
         
         C = numpy.array([[0.0, 0.0, 0.0], [1.0, -1.0, 1.0]])
-        z0 = numpy.zeros((3,1))
-        P0 = 0.0*numpy.eye(3,3)
-        Qe= numpy.diag([ 0.01,])
+        Qxi= numpy.diag([ 0.01,])
         Qz = numpy.diag([ 0.01, 0.01, 0.01])
         R = numpy.diag([0.1, 0.1])
-        z0 =  numpy.copy(z0).reshape((-1,1))
-        fe = params[0]*numpy.arctan(eta0[0,0])
-        h = calc_h(eta0)
+        fz = numpy.zeros((3,1))
+        self.xi0 = numpy.asarray((0.0,)).reshape((-1,1))
+        self.Pxi0 = numpy.eye(1)
+        self.z0 = numpy.zeros((3,))
+        self.Pz0 = numpy.eye(3)
         # Linear states handled by base-class
-        super(ParticleLS2,self).__init__(z0=numpy.reshape(z0,(-1,1)), P0=P0,
-                                                 e0 = eta0,
-                                                 Az=Az, C=C, Ae=Ae,
-                                                 R=R, Qe=Qe, Qz=Qz,
-                                                 fe=fe, h=h, params=params)
+        super(ParticleLS2,self).__init__(Az=Az, C=C, fz=fz, Axi=Axi,
+                                         R=R, Qxi=Qxi, Qz=Qz,
+                                         params=params)
+
+    def create_initial_estimate(self, N):
+        particles = numpy.empty((N,), dtype=numpy.ndarray)
+               
+        for i in xrange(N):
+            particles[i] = numpy.empty(1+3+3*3)
+            particles[i][0] = numpy.random.multivariate_normal(self.xi0.ravel(), self.Pxi0)
+            particles[i][1:4] = numpy.copy(self.z0).ravel()
+            particles[i][4:] = numpy.copy(self.Pz0).ravel()  
+        return particles        
+
+    def get_rb_initial(self, xi0):
+        return (numpy.copy(self.z0),
+                numpy.copy(self.Pz0))
+
         
-    def prep_update(self, u):
-        """ Perform a time update of all states """
-        fe = self.params[0]*numpy.arctan(self.eta)
-        self.set_dynamics(fe=fe)
+    def get_nonlin_pred_dynamics(self, particles, u):
+        xil = numpy.vstack(particles)[:,0]
+        fxil = self.params[0]*numpy.arctan(xil)
+        return (None, fxil[:,numpy.newaxis,numpy.newaxis], None)
         
-    def prep_measure(self, y):
-        """ Perform a measurement update """
-        h = calc_h(self.eta)
-        self.set_dynamics(h=h)
-        return y
-    
-    def next_pdf(self, next_cpart, u):
-        return super(ParticleLS2,self).next_pdf(next_cpart, None)
-    
+    def get_meas_dynamics(self, y, particles):
+        N = len(particles)
+        xil = numpy.vstack(particles)[:,0]
+        h = numpy.zeros((N,2,1))
+        h[:,0,0] = 0.1*numpy.fabs(xil)*xil
+        return (numpy.asarray(y).reshape((-1,1)), None, h, None)
+
+    def set_states(self, particles, xi_list, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        N = len(particles)
+        for i in xrange(N):
+            particles[i][0:1] = xi_list[i].ravel()
+            particles[i][1:4] = z_list[i].ravel()
+            particles[i][4:] = P_list[i].ravel()
+ 
+    def get_states(self, particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        N = len(particles)
+        xil = list()
+        zl = list()
+        Pl = list()
+        for i in xrange(N):
+            xil.append(particles[i][0].reshape(1,1))
+            zl.append(particles[i][1:4].reshape(3,1))
+            Pl.append(particles[i][4:].reshape(3,3))
+        
+        return (xil, zl, Pl)
+
     # Override this method since there is no uncertainty in z0    
-    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
+    def eval_logp_xi0(self, xil):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""    
             
-        e0 = numpy.asarray((0.0,)).reshape((-1,1))
-        P0 = numpy.asarray((1.0,)).reshape((-1,1))
-        return (kalman.lognormpdf(self.eta, e0, P0),
-                numpy.zeros(self.params.shape))
+        N = len(xil)
+        return kalman.lognormpdf_vec(xil, N*(self.xi0,), N*(self.Pxi0,))
 
     def set_params(self, params):
         """ New set of parameters """
         # Update all needed matrices and derivates with respect
         # to the new parameter set
-        
-        Ae = numpy.array([[params[1], 0.0, 0.0]])
-        Ae_grad = [numpy.array([[0.0, 0.0, 0.0]]), #theta_1
-                   numpy.array([[1.0, 0.0, 0.0]]), #theta_2
-                   numpy.array([[0.0, 0.0, 0.0]]), #theta_3
-                   numpy.array([[0.0, 0.0, 0.0]]), #theta_4
-                   numpy.array([[0.0, 0.0, 0.0]]), #theta_5
-                   ]
+        self.params = numpy.copy(params)
+        Axi = numpy.array([[params[1], 0.0, 0.0]])
         Az = numpy.asarray(((1.0, params[2], 0.0), 
                             (0.0,  
                              params[3]*math.cos(params[4]), 
@@ -131,37 +158,4 @@ class ParticleLS2(MixedNLGaussian):
                              (0.0,  
                              params[3]*math.sin(params[4]), 
                              params[3]*math.cos(params[4]))))
-        Az_grad = [numpy.asarray(((0.0, 0.0, 0.0), 
-                                  (0.0, 0.0, 0.0),
-                                  (0.0, 0.0, 0.0))), #theta_1
-                   numpy.asarray(((0.0, 0.0, 0.0), 
-                                  (0.0, 0.0, 0.0),
-                                  (0.0, 0.0, 0.0))), #theta_2
-                   numpy.asarray(((0.0, 1.0, 0.0), 
-                                  (0.0, 0.0, 0.0),
-                                  (0.0, 0.0, 0.0))), #theta_3
-                   numpy.asarray(((0.0, 0.0, 0.0), 
-                                  (0.0,  
-                                   math.cos(params[4]), 
-                                   -math.sin(params[4])),
-                                  (0.0,  
-                                   math.sin(params[4]), 
-                                   math.cos(params[4])))), #theta_4
-                   numpy.asarray(((0.0, 0.0, 0.0), 
-                                  (0.0,  
-                                   -params[3]*math.sin(params[4]), 
-                                   -params[3]*math.cos(params[4])),
-                                  (0.0,  
-                                   params[3]*math.cos(params[4]), 
-                                   -params[3]*math.sin(params[4])))), #theta_5
-                   ]
-        
-        fe = params[0]*numpy.arctan(self.eta)
-        fe_grad = [ numpy.array([[numpy.arctan(self.eta)]]),
-                   numpy.array([[0.0]]),
-                   numpy.array([[0.0]]),
-                   numpy.array([[0.0]]),
-                   numpy.array([[0.0]])] 
-        self.set_dynamics(Ae=Ae, Az=Az, fe=fe)
-        self.set_dynamics_gradient(grad_Ae=Ae_grad, grad_Az=Az_grad, grad_fe=fe_grad)
-        return super(ParticleLS2, self).set_params(params)
+        self.set_dynamics(Axi=Axi, Az=Az)

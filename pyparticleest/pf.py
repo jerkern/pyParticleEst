@@ -36,18 +36,19 @@ class ParticleFilter(object):
         self.res = res
         self.model = model
     
-    def forward(self, u, y, pa):
+    def forward(self, pa, u, y):
         pa = copy.deepcopy(pa)
         resampled = False
         if (self.res and pa.N_eff < self.res*pa.num):
             pa.resample()
             resampled = True
         
-        pa = self.update(u, pa)
-        pa = self.measure(y, pa)
+        pa = self.update(pa, u)
+        if (y != None):
+            pa = self.measure(pa, y)
         return (pa, resampled)
     
-    def update(self, u, pa, inplace=True):
+    def update(self, pa, u, inplace=True):
         """ Update particle approximation using u as kinematic input.
             
             If inplace=True the particles are update then returned,
@@ -66,13 +67,13 @@ class ParticleFilter(object):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
             
-        v = self.model.sample_process_noise(u=u, particles=pa.part)
-        self.model.update(u=u, noise=v, particles=pa.part)
+        v = self.model.sample_process_noise(particles=pa.part, u=u)
+        self.model.update(particles=pa.part, u=u, noise=v)
         
         return pa 
     
     
-    def measure(self, r, pa, inplace=True):
+    def measure(self, pa, r, inplace=True):
         """ Evaluate and update particle approximation using new measurement r
             
             If inplace=True the particles are update then returned,
@@ -84,7 +85,7 @@ class ParticleFilter(object):
             pa = pa_out
 
         #y = pa.part[k].prep_measure(r)
-        new_weights = self.model.measure(y=r, particles=pa.part)
+        new_weights = self.model.measure(particles=pa.part, y=r)
         
         pa.w = pa.w + new_weights
         # Keep the weights from going to -Inf
@@ -108,7 +109,7 @@ class AuxiliaryParticleFilter(object):
         res - 0 or 1 if resampling on or off """
         self.res = res
     
-    def forward(self, u, y, pa):
+    def forward(self, pa, u, y):
         """ Update particle approximation using u as kinematic input.
             
             If inplace=True the particles are update then returned,
@@ -196,7 +197,7 @@ class ParticleTrajectory(object):
     
     def forward(self, u, y):
         self.traj[-1].u = u
-        (pa_nxt, resampled) = self.pf.forward(u, y, self.traj[-1].pa)
+        (pa_nxt, resampled) = self.pf.forward(self.traj[-1].pa, u, y)
         self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1))
         self.traj[-1].y = y
         self.len = len(self.traj)

@@ -95,12 +95,13 @@ if __name__ == '__main__':
             return
         
         # Create an array for our particles 
-        ParamEstimator = LS2Est(u=None, y=y)
+        model = particle_ls2.ParticleLS2(theta_guess)
+        ParamEstimator = LS2Est(model=model, u=None, y=y)
         ParamEstimator.set_params(theta_guess)
         #ParamEstimator.simulate(num, nums, False)
 
         (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                             update_before_predict=False, callback=callback)
+                                             callback=callback)
         
         svals = numpy.zeros((4, nums, steps+1))
  
@@ -112,8 +113,8 @@ if __name__ == '__main__':
         
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
-                svals[1:,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
+                svals[0,j,i]=ParamEstimator.straj.straj[i][j][0]
+                svals[1:,j,i]=ParamEstimator.straj.straj[i][j][1:4]
                 
         plt.figure(fig3.number)
         plt.clf()

@@ -6,6 +6,7 @@ Created on Nov 11, 2013
 
 import pyparticleest.param_est as param_est
 import numpy
+import math
 import matplotlib.pyplot as plt
 import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
 
@@ -19,9 +20,10 @@ class GradPlot():
         fig = plt.figure(fig_id)
         fig.clf()
         plt.plot(self.params, self.vals)
-        for k in range(len(self.params)):
-            if (k % 10 == 1):
-                self.draw_gradient(self.params[k], self.vals[k], self.params[k]-self.params[k-1], self.diff[k])
+        if (self.diff != None):
+            for k in range(len(self.params)):
+                if (k % 10 == 1):
+                    self.draw_gradient(self.params[k], self.vals[k], self.params[k]-self.params[k-1], self.diff[k])
                 
         plt.show()
         
@@ -31,36 +33,29 @@ class GradPlot():
     
 class GradientTest(param_est.ParamEstimation):
     
-    def create_initial_estimate(self, params, num):
-        particles = numpy.empty(num, particle_ls2.ParticleLS2)
-        
-        for k in range(len(particles)):
-            e = numpy.array([numpy.random.normal(0.0,1.0),]).reshape((-1,1))
-            z0 = numpy.zeros((3,1))
-            P0 = 0.00001*numpy.eye(3,3)
-            particles[k] = particle_ls2.ParticleLS2(eta0=e, z0=z0, P0=P0, params=params)
-        return particles
-    
     def test(self, param_id, param_vals, num=100, nums=1):
         self.simulate(num_part=num, num_traj=nums)
         param_steps = len(param_vals)
         logpy = numpy.zeros((param_steps,))
-        grad_lpy = numpy.zeros((len(self.params), param_steps))
+        #grad_lpy = numpy.zeros((len(self.params), param_steps))
         logpxn = numpy.zeros((param_steps,))
-        grad_lpxn = numpy.zeros((len(self.params), param_steps))
+        #grad_lpxn = numpy.zeros((len(self.params), param_steps))
         logpx0 = numpy.zeros((param_steps,))
-        grad_lpx0 = numpy.zeros((len(self.params), param_steps))
+        #grad_lpx0 = numpy.zeros((len(self.params), param_steps))
         for k in range(param_steps):    
             tmp = numpy.copy(self.params)
             tmp[param_id] = param_vals[k]
             self.set_params(tmp)
-            (logpy[k],grad_lpy[:,k]) = self.eval_logp_y()
-            (logpxn[k], grad_lpxn[:,k])  = self.eval_logp_xnext()
-            (logpx0[k], grad_lpx0[:,k]) = self.eval_logp_x0()
+            logpy[k] = self.eval_logp_y()
+            logpxn[k]  = self.eval_logp_xnext()
+            logpx0[k] = self.eval_logp_x0()
 
-        self.plot_y = GradPlot(param_vals, logpy, grad_lpy[param_id,:])
-        self.plot_xn = GradPlot(param_vals, logpxn, grad_lpxn[param_id,:])
-        self.plot_x0 = GradPlot(param_vals, logpx0, grad_lpx0[param_id,:])
+#        self.plot_y = GradPlot(param_vals, logpy, grad_lpy[param_id,:])
+#        self.plot_xn = GradPlot(param_vals, logpxn, grad_lpxn[param_id,:])
+#        self.plot_x0 = GradPlot(param_vals, logpx0, grad_lpx0[param_id,:])
+        self.plot_y = GradPlot(param_vals, logpy, None)
+        self.plot_xn = GradPlot(param_vals, logpxn, None)
+        self.plot_x0 = GradPlot(param_vals, logpx0, None)
 
     
 if __name__ == '__main__':
@@ -83,13 +78,16 @@ if __name__ == '__main__':
 
     (y, e, z) = particle_ls2.generate_dataset(theta_true, steps)
     
+    model = particle_ls2.ParticleLS2(theta_true)
     # Create an array for our particles 
-    gt = GradientTest(u=None, y=y)
+    gt = GradientTest(model=model, u=None, y=y)
     gt.set_params(theta_true)
     
-    param_steps = 51
-    param_vals = numpy.linspace(0.0, 0.6, param_steps)
-    gt.test(4, param_vals, nums=nums)
+    param_id = 4
+    param_steps = 101
+    tval = theta_true[param_id]
+    param_vals = numpy.linspace(tval-math.fabs(tval), tval+math.fabs(tval), param_steps)
+    gt.test(param_id, param_vals, nums=nums)
 
     gt.plot_y.plot(1)
     gt.plot_xn.plot(2)

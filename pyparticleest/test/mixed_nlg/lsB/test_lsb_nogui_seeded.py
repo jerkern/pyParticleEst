@@ -53,14 +53,10 @@ if __name__ == '__main__':
         svals = numpy.zeros((2, nums, steps+1))
         
         for i in range(steps+1):
-            for j in range(nums):
-                #(xil, zl, Pl) = model.get_states(ParamEstimator.straj[j].straj[i])
-                #svals[0,j,i]=xil[0]
-                #svals[1,j,i]=25.0+C_theta.dot(zl[0])
-                
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i][0]
-                svals[1,j,i]=25.0+C_theta.dot(ParamEstimator.straj[j].traj[i][1])
-
+            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i])
+            svals[0,:,i] = numpy.vstack(xil).ravel()
+            svals[1,:,i] = 25.0+C_theta.dot(numpy.hstack(zl)).ravel()
+        
         # Use average of trajectories
         svals_mean = numpy.mean(svals,1)
 

@@ -51,6 +51,7 @@ class SmoothTrajectory(object):
             """
         
         self.traj = numpy.zeros((len(pt), M), dtype=numpy.ndarray)
+        self.Mz = None
         self.model =  pt.pf.model
         # Initialise from end time estimates
         for j in xrange(M):
@@ -102,6 +103,8 @@ class SmoothTrajectory(object):
         """ Kalman smoothing of the linear states conditione on the non-linear
             trajetory """
         M = self.traj.shape[1]
+        T = len(self.traj)
+        self.Mz = numpy.empty((T-1,M), dtype=numpy.ndarray)
         particles = self.model.create_initial_estimate(M)
         for j in xrange(M):
             (z0, P0) = self.model.get_rb_initial([self.traj[0][j][0],])
@@ -119,7 +122,7 @@ class SmoothTrajectory(object):
             for j in xrange(M):
                 (_xil, zl, Pl) = self.model.get_states(particles[j:j+1])
                 self.model.set_states(particles[j:j+1], self.traj[i][j][0], zl, Pl)
-                self.straj[i,j] = particles[j:j+1]
+            self.straj[i] = particles
 
             particles = copy.deepcopy(particles)
             for j in xrange(M):
@@ -132,19 +135,20 @@ class SmoothTrajectory(object):
         
         
         for j in xrange(M):
-            (_xil, zl, Pl) = self.model.get_states(particles)
+            (_xil, zl, Pl) = self.model.get_states(particles[j:j+1])
             self.model.set_states(particles[j:j+1], self.traj[-1][j][0], zl, Pl)
-            self.straj[-1,j] = particles[j:j+1]
+        self.straj[-1] = particles
         
         # Backward smoothing
-        for i in reversed(xrange(len(self.traj)-1)):
+        for i in reversed(xrange(T-1)):
             self.model.t = self.t[i]
+            (xin, zn, Pn) = self.model.get_states(self.straj[i+1])
+            (xi, z, P) = self.model.get_states(self.straj[i])
             for j in xrange(M):
-                (xin, zn, Pn) = self.model.get_states(self.straj[i+1,j])
-                (xi, z, P) = self.model.get_states(self.straj[i,j])
-                (Al, fl, Ql) = self.model.calc_cond_dynamics(self.straj[i,j], self.traj[i+1][j], self.u[i])
-                (zs, Ps, Ms) = self.model.kf.smooth(z[0], P[0], zn[0], Pn[0], Al[0], fl[0], Ql[0])
-                self.model.set_states(self.straj[i][j], xi, (zs,), (Ps,))
+                (Al, fl, Ql) = self.model.calc_cond_dynamics(self.straj[i,j:j+1], self.traj[i+1][j], self.u[i])
+                (zs, Ps, Ms) = self.model.kf.smooth(z[j], P[j], zn[j], Pn[j], Al[0], fl[0], Ql[0])
+                self.model.set_states(self.straj[i][j:j+1], xi[j], (zs,), (Ps,))
+                self.Mz[i,j] = Ms
 
 #
 #

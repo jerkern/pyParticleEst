@@ -50,12 +50,13 @@ if __name__ == '__main__':
         (y, e, z) = particle_ls2.generate_dataset(theta_true, steps)
    
         # Create an array for our particles 
-        ParamEstimator = LS2Est(u=None, y=y)
+        model = particle_ls2.ParticleLS2(theta_guess)
+        ParamEstimator = LS2Est(model=model, u=None, y=y)
         ParamEstimator.set_params(theta_guess)
         #ParamEstimator.simulate(num, nums, False)
 
         (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                             update_before_predict=False, callback=None)
+                                             callback=None)
         
         print "%.4f %.4f %.4f %.4f %.4f" % tuple(param)
         
