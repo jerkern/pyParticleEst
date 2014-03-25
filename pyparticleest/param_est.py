@@ -25,7 +25,7 @@ class ParamEstInterface(object):
         pass
     
     @abc.abstractmethod
-    def eval_logp_xnext(self, particles, particles_next, u):
+    def eval_logp_xnext(self, particles, particles_next, u, t, Mz=None):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -93,7 +93,7 @@ class ParamEstimation(object):
         self.params = numpy.copy(params)
         self.model.set_params(self.params)
     
-    def simulate(self, num_part, num_traj, filter='PF', smoother='rs', res=0.67):
+    def simulate(self, num_part, num_traj, filter='PF', smoother='rs', res=0.67, meas_first=False):
         resamplings=0
     
         # Initialise a particle filter with our particle approximation of the initial state,
@@ -101,18 +101,27 @@ class ParamEstimation(object):
         self.pt = pf.ParticleTrajectory(self.model, num_part, res,filter=filter)
         
         # Run particle filter
-        for i in range(len(self.y)):
+        if (meas_first):
+            self.pt.measure(self.y[0])
+        else:
+            if (self.pt.forward(self.u[0], self.y[0])):
+                resamplings = resamplings + 1
+        for i in range(1,len(self.y)):
             # Run PF using noise corrupted input signal
             if (self.pt.forward(self.u[i], self.y[i])):
                 resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates
         self.straj = self.pt.perform_smoothing(num_traj, method=smoother)
-        self.straj.constrained_smoothing()
+        if hasattr(self.model, 'get_rb_initial'): 
+            self.straj.constrained_smoothing()
+        else:
+            self.straj.straj = self.straj.traj
         return resamplings
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
-                 callback=None, callback_sim=None, bounds=None):
+                 callback=None, callback_sim=None, bounds=None, meas_first=False,
+                 smoother='normal'):
         
         def fval(params_val):
             self.model.set_params(params_val)
@@ -147,7 +156,7 @@ class ParamEstimation(object):
                 else:
                     numt = num_traj[-1]
             
-            self.simulate(nump, numt, smoother='normal')
+            self.simulate(nump, numt, smoother=smoother, meas_first=meas_first)
             if (callback_sim != None):
                 callback_sim(self)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
@@ -194,8 +203,14 @@ class ParamEstimation(object):
         M = self.straj.straj.shape[1]
         T = len(self.straj)
         for t in xrange(T-1):
-            val = self.model.eval_logp_xnext(numpy.vstack(self.straj.straj[t]),
-                                             numpy.vstack(self.straj.straj[t+1]),
-                                             self.straj.u[t], self.straj.Mz[t])
+            if (self.straj.Mz != None):
+                val = self.model.eval_logp_xnext(numpy.vstack(self.straj.straj[t]),
+                                                 numpy.vstack(self.straj.straj[t+1]),
+                                                 self.straj.u[t], self.straj.t[t],
+                                                 self.straj.Mz[t])
+            else:
+                val = self.model.eval_logp_xnext(numpy.vstack(self.straj.straj[t]),
+                                 numpy.vstack(self.straj.straj[t+1]),
+                                 self.straj.u[t], self.straj.t[t])
             logp_xnext += numpy.sum(val)
         return logp_xnext/M

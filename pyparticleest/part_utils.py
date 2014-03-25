@@ -41,7 +41,7 @@ class FFBSiInterface(ParticleFilteringInterface):
         pass
     
     @abc.abstractmethod
-    def sample_smooth(self, particles, next_part):
+    def sample_smooth(self, particles, next_part, u=None):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         pass
 
@@ -663,7 +663,7 @@ class MixedNLGaussian(RBPSBase):
         return (l2, predict_err)
     
        
-    def eval_logp_xnext(self, particles, x_next, u, Mzl):
+    def eval_logp_xnext(self, particles, x_next, u, t, Mzl):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 

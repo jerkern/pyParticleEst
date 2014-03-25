@@ -70,7 +70,7 @@ class SmoothTrajectory(object):
             pass
         elif (method=='rs'):
             N = len(pt[-1].pa.part)
-            opt['max_iter'] = int(0.67*N)
+            opt['max_iter'] = int(0.2*N)
             sampler = rs_sampler
         else:
             raise ValueError('Unknown sampler: %s' % method)

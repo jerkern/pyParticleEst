@@ -202,6 +202,9 @@ class ParticleTrajectory(object):
         self.traj[-1].y = y
         self.len = len(self.traj)
         return resampled
+    
+    def measure(self, y):
+        self.pf.measure(self.traj[-1].pa, y, inplace=True)
         
     def prep_rejection_sampling(self):
         """ Find the maximum over all inputs of the pdf for the next timestep,
