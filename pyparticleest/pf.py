@@ -29,9 +29,7 @@ class ParticleFilter(object):
     
     def __init__(self, model, res = 0):
         """ Create particle filter.
-        res - 0 or 1 if resampling on or off
-        lp_hack - switches to a (mathematically incorrect) mode of lowpass
-                filtering weights instead of multiplying them """
+        res - 0 or 1 if resampling on or off """
         
         self.res = res
         self.model = model
@@ -40,13 +38,15 @@ class ParticleFilter(object):
         pa = copy.deepcopy(pa)
         resampled = False
         if (self.res and pa.N_eff < self.res*pa.num):
-            pa.resample()
+            ancestors = pa.resample()
             resampled = True
+        else:
+            ancestors = numpy.arange(pa.num,dtype=int)
         
         pa = self.update(pa, u)
         if (y != None):
             pa = self.measure(pa, y)
-        return (pa, resampled)
+        return (pa, resampled, ancestors)
     
     def update(self, pa, u, inplace=True):
         """ Update particle approximation using u as kinematic input.
@@ -159,14 +159,14 @@ class AuxiliaryParticleFilter(object):
             
         pa.w = pa.w + l2w - l1w
         pa.w -= numpy.max(pa.w)
-        return (pa, resampled)
+        return (pa, resampled, new_ind)
     
         
 
 class TrajectoryStep(object):
     """ Store particle approximation, input, output and timestamp for
         a single time index in a trajectory """
-    def __init__(self, pa, u = None, y = None, t = None):
+    def __init__(self, pa, u = None, y = None, t = None, ancestors = None):
         """ u[t] contains the input for takin x[t] to x[t+1]
             y[t] is the measurment of x[t] """
         self.pa = pa
@@ -174,6 +174,7 @@ class TrajectoryStep(object):
         self.y = y
         # t is time
         self.t = t
+        self.ancestors = ancestors
 
 class ParticleTrajectory(object):
     """ Store particle trajectories, each time instance is saved
@@ -183,7 +184,7 @@ class ParticleTrajectory(object):
         """ Initialize the trajectory with a ParticleApproximation """
         particles = model.create_initial_estimate(N)
         pa = ParticleApproximation(particles=particles)
-        self.traj = [TrajectoryStep(pa, t=t0),]
+        self.traj = [TrajectoryStep(pa, t=t0, ancestors=numpy.arange(N)),]
         
         self.pf = ParticleFilter(model=model, res=resample)
 #        if (filter == 'PF'):
@@ -197,9 +198,9 @@ class ParticleTrajectory(object):
     
     def forward(self, u, y):
         self.traj[-1].u = u
-        (pa_nxt, resampled) = self.pf.forward(self.traj[-1].pa, u, y)
-        self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1))
-        self.traj[-1].y = y
+        (pa_nxt, resampled, ancestors) = self.pf.forward(self.traj[-1].pa, u, y)
+        self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1, y=y, ancestors=ancestors))
+        #self.traj[-1].y = y
         self.len = len(self.traj)
         return resampled
     
@@ -251,7 +252,7 @@ class ParticleTrajectory(object):
                 coeffs[k] = math.exp(self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,
                                                                 u=self.traj[k].u)) 
             options['maxpdf'] = coeffs
-        if (method == 'mh'):
+        if (method == 'mcmc'):
             options['R'] = 30
             
         straj = SmoothTrajectory(self, M=M, method=method, options=options)

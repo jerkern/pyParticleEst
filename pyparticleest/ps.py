@@ -5,40 +5,61 @@ import math
 import copy
 import pyparticleest.pf as pf
 
-def bsi_full(pa, model, next, u, opt):
-    p_next = model.next_pdf(pa.part, next, u)
+def bsi_full(pa, model, next, u):
+    M = len(next)
+    res = numpy.empty(M, dtype=int)
+    for j in xrange(M):
+        p_next = model.next_pdf(pa.part, next[j:j+1], u)
             
-    w = pa.w + p_next
-    w = w - numpy.max(w)
-    w_norm = numpy.exp(w)
-    w_norm /= numpy.sum(w_norm)
-    return pf.sample(w_norm, 1)
+        w = pa.w + p_next
+        w = w - numpy.max(w)
+        w_norm = numpy.exp(w)
+        w_norm /= numpy.sum(w_norm)
+        res[j] = pf.sample(w_norm, 1)
+    return res
 
 
-def rs_sampler(pa, model, next, u, opt):
-    maxpdf = opt['maxpdf']
-    max_iter = opt['max_iter']
-    ind = pf.sample(pa.w, max_iter)
-    test = numpy.log(numpy.random.uniform(size=max_iter))
-    N = len(pa.part)
-    p_next = numpy.empty(N, dtype=float)
-    not_tested = numpy.ones(N, dtype=bool)
-    for i in xrange(len(ind)):
-        if (not_tested[ind[i]]):
-            not_tested[ind[i]] = False
-            p_next[ind[i]] = model.next_pdf(pa.part[ind[i]:ind[i]+1], next, u)
-        if test[i] < p_next[ind[i]]/maxpdf:
-            # Accept sample
-            return ind[i]
-    if (not_tested.any()):
-        p_next[not_tested] = model.next_pdf(pa.part[not_tested], next, u)
-   
-    w = pa.w + p_next
-    w = w - numpy.max(w)
-    w_norm = numpy.exp(w)
-    w_norm /= numpy.sum(w_norm)
-    return pf.sample(w_norm, 1)
-        
+def bsi_rs(pa, model, next, u, maxpdf, max_iter):
+    M = len(next)
+    todo = numpy.asarray(range(M))
+    res = numpy.empty(M, dtype=int)
+    weights = numpy.copy(pa.w)
+    weights -= numpy.max(weights)
+    weights = numpy.exp(weights)
+    weights /= numpy.sum(weights)
+    for i in xrange(max_iter):
+
+        ind = numpy.random.permutation(pf.sample(weights, len(todo)))
+        pn = model.next_pdf(pa.part[ind], next[todo], u)
+        test = numpy.log(numpy.random.uniform(size=len(todo)))
+        accept = test < pn - maxpdf
+        res[todo[accept]] = ind[accept]
+        todo = todo[~accept]
+        if (len(todo) == 0):
+            return res
+    
+    res[todo] = bsi_full(pa, model, next[todo], u)        
+    return res
+
+def bsi_mcmc(pa, model, next, u, R, ancestors):
+    M = len(next)
+    ind = ancestors
+    weights = numpy.copy(pa.w)
+    weights -= numpy.max(weights)
+    weights = numpy.exp(weights)
+    weights /= numpy.sum(weights)
+    pind = model.next_pdf(pa.part[ind], next, u)                     
+    for j in xrange(R):
+        propind = numpy.random.permutation(pf.sample(weights, M))
+        pprop = model.next_pdf(pa.part[propind], next, u)
+        diff = pprop - pind
+        diff[diff > 0.0] = 0.0
+        test = numpy.log(numpy.random.uniform(size=M))
+        accept = test < diff
+        ind[accept] = propind[accept]
+        pind[accept] = pprop[accept] 
+    
+    return ind
         
 
 class SmoothTrajectory(object):
@@ -50,13 +71,17 @@ class SmoothTrajectory(object):
                            weights (reduces time complexity to M*N from M*N^2
             """
         
-        self.traj = numpy.zeros((len(pt), M), dtype=numpy.ndarray)
+        self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
         self.Mz = None
         self.model =  pt.pf.model
         # Initialise from end time estimates
-        for j in xrange(M):
-            part = pt[-1].pa.sample()
-            self.traj[-1,j] = self.model.sample_smooth(numpy.asarray([part,]), None, None)
+
+        tmp = numpy.copy(pt[-1].pa.w)
+        tmp -= numpy.max(tmp)
+        tmp = numpy.exp(tmp)
+        tmp = tmp / numpy.sum(tmp)
+        ind = pf.sample(tmp, M)
+        self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind], None, None)[numpy.newaxis,]
         
         
         self.u = [pt[-1].u, ]
@@ -64,33 +89,39 @@ class SmoothTrajectory(object):
         self.t = [pt[-1].t, ]
         opt = dict()
         if (method=='normal'):
-            sampler = bsi_full
-        elif (method=='mh'):
-            R = options['R']
             pass
+        elif (method=='mcmc'):
+            ancestors = pt[-1].ancestors[ind]
         elif (method=='rs'):
             N = len(pt[-1].pa.part)
-            opt['max_iter'] = int(0.2*N)
-            sampler = rs_sampler
+            max_iter = int(0.1*N)
         else:
             raise ValueError('Unknown sampler: %s' % method)
+        
         
         for cur_ind in reversed(xrange(len(pt)-1)):
             step = pt[cur_ind]
             self.model.t = step.t
             pa = step.pa
             if (method=='rs'):
-                    opt['maxpdf'] = options['maxpdf'][cur_ind]
-            for j in xrange(M):
-                ind = sampler(pa, self.model, self.traj[cur_ind+1,j], step.u, opt=opt)
-                # Select 'previous' particle
-                self.traj[cur_ind, j] = self.model.sample_smooth(pa.part[ind:(ind+1)],
-                                                                 self.traj[cur_ind+1,j],
-                                                                 step.u)
+                opt['maxpdf'] = options['maxpdf'][cur_ind]
+                ind = bsi_rs(pa, self.model, self.traj[cur_ind+1][0], step.u,
+                             options['maxpdf'][cur_ind],max_iter)
+            elif (method=='mcmc'):
+                ind = bsi_mcmc(pa, self.model, self.traj[cur_ind+1][0], step.u, 
+                               options['R'], ancestors)
+                ancestors = step.ancestors[ind]
+            elif (method=='normal'):
+                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u)
+            # Select 'previous' particle
+            self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
+                                                                     self.traj[cur_ind+1][0],
+                                                                     step.u))[numpy.newaxis,]
             self.u.append(step.u)
             self.y.append(step.y)
             self.t.append(step.t)
-            
+        
+        self.traj = numpy.vstack(self.traj)
         # Reorder so the list are ordered with increasing time
         self.u.reverse()
         self.y.reverse()
@@ -100,10 +131,11 @@ class SmoothTrajectory(object):
         return len(self.traj)
     
     def constrained_smoothing(self):
-        """ Kalman smoothing of the linear states conditione on the non-linear
+        """ Kalman smoothing of the linear states conditioned on the non-linear
             trajetory """
+        
+        T = self.traj.shape[0]
         M = self.traj.shape[1]
-        T = len(self.traj)
         self.Mz = numpy.empty((T-1,M), dtype=numpy.ndarray)
         particles = self.model.create_initial_estimate(M)
         for j in xrange(M):

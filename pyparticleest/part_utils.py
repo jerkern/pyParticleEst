@@ -509,6 +509,9 @@ class MixedNLGaussian(RBPSBase):
         """ Implements the next_pdf function for MixedNLGaussian models """
         
         N = len(particles)
+        Nn = len(next_part)
+        if (N > 1 and Nn == 1):
+            next_part = numpy.repeat(next_part, N, 0)
         (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
         (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         Qxiz = self.get_cross_covariance(particles=particles, u=u)
@@ -520,11 +523,12 @@ class MixedNLGaussian(RBPSBase):
                 Qxiz = N*(self.Qxiz,)
         
         lpx = numpy.empty(N)
-        x_next = numpy.vstack(next_part)
+        
 #        #z_diff= next_part.sampled_z - self.kf.predict()[0]
 #        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
         
         for i in xrange(N):
+            x_next = numpy.vstack(next_part[i])
             A = numpy.vstack((Axi[i], Az[i]))
             f = numpy.vstack((fxi[i], fz[i]))
             Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
@@ -537,19 +541,22 @@ class MixedNLGaussian(RBPSBase):
     
     def sample_smooth(self, particles, next_part, u=None):
         """ Implements the sample_smooth function for MixedNLGaussian models """
-        part = numpy.copy(particles[0])
-        (xil, zl, Pl) = self.get_states([part,])
-        if (next_part != None):
-            self.meas_xi_next([part,], next_part[0])
-            (Acond, fcond, Qcond) = self.calc_cond_dynamics([part,], next_part[0], u)
+        M = len(particles)
+        res = numpy.empty((M,2,1,1))
+        for j in range(M):
+            part = numpy.copy(particles[j])
             (xil, zl, Pl) = self.get_states([part,])
-            self.kf.measure_full(next_part[1], zl[0], Pl[0],
-                                 C=Acond[0], h_k=fcond[0], R=Qcond[0])
+            if (next_part != None):
+                self.meas_xi_next([part,], next_part[j][0])
+                (Acond, fcond, Qcond) = self.calc_cond_dynamics([part,], next_part[j][0], u)
+                (xil, zl, Pl) = self.get_states([part,])
+                self.kf.measure_full(next_part[j][1], zl[0], Pl[0],
+                                     C=Acond[0], h_k=fcond[0], R=Qcond[0])
 
-        xi = copy.copy(xil[0]).reshape((-1,1))
-        z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((-1,1))
-            
-        return (xi, z)
+            xi = copy.copy(xil[0]).reshape((1,-1,1))
+            z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((1,-1,1))
+            res[j] = numpy.vstack((xi, z))
+        return res
     
 #    def eval_1st_stage_weight(self, u,y):
 ##        eta_old = copy.deepcopy(self.get_nonlin_state())
