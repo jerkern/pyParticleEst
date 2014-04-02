@@ -237,7 +237,7 @@ class ParticleTrajectory(object):
             
         return signals
     
-    def perform_smoothing(self, M, method="normal"):
+    def perform_smoothing(self, M, method="full"):
         """ return an array of smoothed trajectories 
             M - number of smoothed trajectories """
         from pyparticleest.ps import SmoothTrajectory
@@ -246,7 +246,7 @@ class ParticleTrajectory(object):
 #        if (rej_sampling):
 #            self.prep_rejection_sampling()
         options={}
-        if (method == 'rs'):
+        if (method == 'rs' or method == 'rsas'):
             coeffs = numpy.empty(self.len, dtype=float)
             for k in range(self.len):
                 coeffs[k] = math.exp(self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,

@@ -196,8 +196,9 @@ class HierarchicalBase(RBPFBase):
     """ Base class for Rao-Blackwellization of hierarchical models """
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, **kwargs):
-        
+    def __init__(self, len_xi, len_z, **kwargs):
+        self.len_xi = len_xi
+        self.len_z = len_z
         super(HierarchicalBase, self).__init__(**kwargs)
         # Sore z0, P0 needed for default implementation of 
         # get_z0_initial and get_grad_z0_initial
@@ -221,7 +222,7 @@ class HierarchicalBase(RBPFBase):
         """ Return the log-pdf value of the measurement """
         
         lyxi = self.measure_nonlin(y, particles)
-        (_xil, zl, Pl) = self.get_states(particles)
+        (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
         (y, Cz, hz, Rz) = self.get_lin_meas_dynamics(y, particles)
         if (Cz == None):
@@ -239,39 +240,55 @@ class HierarchicalBase(RBPFBase):
             # Predict z_{t+1}
             lyz[i] = self.kf.measure_full(y, zl[i], Pl[i], Cz[i], hz[i], Rz[i])
         
+        self.set_states(particles, xil, zl, Pl)
         return lyxi + lyz
     
     def next_pdf(self, particles, next_cpart, u=None):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         N = len(particles)
-        lpxi = self.next_pdf_xi(particles, next_cpart[0], u).ravel()
+        Nn = len(next_cpart)
+        if (N > 1 and Nn == 1):
+            next_cpart = numpy.repeat(next_cpart, N, 0)
+        
+        #lpxi = numpy.empty(N)
+        lpz = numpy.empty(N)
+
         (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
-        lpz = numpy.empty_like(lpxi)
         (xil, zl, Pl) = self.get_states(particles)
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
-
-        for i in xrange(len(zl)):
+        
+        lpxi = self.next_pdf_xi(particles, next_cpart[:,:self.len_xi], u).ravel()
+        
+        for i in xrange(N):
+            
             # Predict z_{t+1}
             (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
-            #lpz[i] = kalman.lognormpdf(next_cpart[1].reshape((-1,1)), zl[i], Pl[i])
+            
+            lpz[i] = kalman.lognormpdf(next_cpart[i][self.len_xi:].reshape((-1,1)), zln[i], Pln[i])
+            
         #mul = numpy.repeat(next_cpart[1].reshape((-1,1)),N,axis=0)
-        mul = N*(next_cpart[1].reshape((-1,1)),)
-        lpz = kalman.lognormpdf_vec(zln, mul, Pln)
+        #mul = N*(next_cpart[:self.len_xi].reshape((-1,1)),)
+        #lpz = kalman.lognormpdf_vec(zln, mul, Pln)
         #lpz = kalman.lognormpdf_jit(zl, mul, Pl)
         return lpxi + lpz
     
-    def sample_smooth(self, particle, next_part, u):
+    def sample_smooth(self, particles, next_part, u):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        (xil, zl, Pl) = self.get_states(particle)
-        if (next_part != None):
-            (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particle, u)
-            self.kf.measure_full(next_part[1].reshape((-1,1)), zl[0], Pl[0], C=Az[0], h_k=fz[0], R=Qz[0])
-        
-        xi = copy.copy(xil[0])
-        z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0])
-            
-        return (xi, z)
+        M = len(particles)
+        res = numpy.empty((M,self.len_xi+self.len_z,1))
+        for j in range(M):
+            part = numpy.copy(particles[j])
+            (xil, zl, Pl) = self.get_states([part,])
+            if (next_part != None):
+                (A, f, Q) = self.get_lin_pred_dynamics_int([part,], u)
+                self.kf.measure_full(next_part[j][self.len_xi:], zl[0], Pl[0],
+                                     C=A[0], h_k=f[0], R=Q[0])
+
+            xi = copy.copy(xil[0]).reshape((1,-1,1))
+            z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((1,-1,1))
+            res[j] = numpy.hstack((xi, z))
+        return res
 
     @abc.abstractmethod
     def next_pdf_xi(self, particles, next_xi, u):
@@ -833,26 +850,31 @@ class MixedNLGaussian(RBPSBase):
 #        return (val, grad)
 
 #class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
-class LTV(RBPSBase):
+class LTV(FFBSiInterface):
     """ Base class for particles of the type linear time varying with additive gaussian noise.
 
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
-    def __init__(self, z0, P0, A=None, C=None, Q=None,
+    def __init__(self, z0, P0, A=None, C=None, Q=None, 
              R=None, f=None, h=None, params=None, t0=0):
-        super(LTV, self).__init__(z0=z0, P0=P0,
-                                  Az=A, C=C, 
-                                  Qz=Q, R=R,
-                                  h_k=h, f_k=f, t0=t0)
-        
-        self.z0 = numpy.copy(z0)
+        self.z0 = numpy.copy(z0).reshape((-1,1))
         self.P0 = numpy.copy(P0)
-        self.t0 = t0
+        if (f == None):
+            f = numpy.zeros_like(self.z0)
+        if (h == None):
+            h = numpy.zeros_like(self.z0)
+        self.kf = kalman.KalmanSmoother(A=A, C=C, 
+                                        Q=Q, R=R,
+                                        f_k=f, h_k=h)
+        
+        self.t = t0
 
     def create_initial_estimate(self, N):
+        if (N > 1):
+            print("N > 1 redundamt for LTV system (N={0})".format(N), )
         particles = numpy.empty((N,), dtype=numpy.ndarray)
         lz = len(self.z0)
-        dim = lz + len(self.P0.ravel())
+        dim = lz + lz*lz
         
         for i in xrange(N):
             particles[i] = numpy.empty(dim)
@@ -860,7 +882,7 @@ class LTV(RBPSBase):
             particles[i][lz:] = numpy.copy(self.P0).ravel()  
         return particles
     
-    def set_states(self, particles, _xi_list, z_list, P_list):
+    def set_states(self, particles, z_list, P_list):
         """ Set the estimate of the Rao-Blackwellized states """
         lz = len(self.z0)
         N = len(particles)
@@ -869,58 +891,53 @@ class LTV(RBPSBase):
             particles[i][lz:] = P_list[i].ravel()
  
     def get_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
+        """ Returns two variables, the first a list containing all the
             expected values, the second a list of the corresponding covariance
             matrices"""
         N = len(particles)
-        xil = list()
         zl = list()
         Pl = list()
-        N = len(particles)
         lz = len(self.z0)
         for i in xrange(N):
-            xil.append(None)
             zl.append(particles[i][:lz].reshape(-1,1))
             Pl.append(particles[i][lz:].reshape(self.P0.shape))
         
-        return (xil, zl, Pl)
+        return (zl, Pl)
+
+    def get_pred_dynamics(self, t, u):
+        return (None, None, None)
 
     def update(self, particles, u, noise):
         """ Update estimate using noise as input """
         # Update linear estimate with data from measurement of next non-linear
         # state 
-        (_xil, zl, Pl) = self.get_states(particles)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        (zl, Pl) = self.get_states(particles)
+        (A, f, Q) = self.get_pred_dynamics(self.t, u)
+        self.kf.set_dynamics(A=A, Q=Q, f_k=f)
         for i in xrange(len(zl)):
             # Predict z_{t+1}
-            (zl[i], Pl[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
+            (zl[i], Pl[i]) = self.kf.predict(zl[i], Pl[i])
         
         # Predict next states conditioned on eta_next
-        self.set_states(particles, None, zl, Pl)
+        self.set_states(particles, zl, Pl)
         self.t = self.t + 1.0
+    
+    def get_meas_dynamics(self, t, y):
+        return (y, None, None, None)
     
     def measure(self, y, particles):
         """ Return the log-pdf value of the measurement """
-        
-        (_xil, zl, Pl) = self.get_states(particles)
-        N = len(particles)
-        (y, Cz, hz, Rz) = self.get_lin_meas_dynamics(y, particles)
-        if (Cz == None):
-            Cz=numpy.repeat(self.kf.C[numpy.newaxis,:,:], N, axis=0)
-            #Cz=N*(self.kf.C,)
-        if (hz == None):
-            hz=numpy.repeat(self.kf.h_k[numpy.newaxis,:,:], N, axis=0)
-            #hz=N*(self.kf.h_k,)
-        if (Rz == None):
-            Rz=numpy.repeat(self.kf.R[numpy.newaxis,:,:], N, axis=0)
-            #Rz=N*(self.kf.R,)
-            
+
+       
+        (zl, Pl) = self.get_states(particles)
+        (y, C, h, R) = self.get_meas_dynamics(self.t, y)
+        self.kf.set_dynamics(C=C, R=R, h_k=h)  
         lyz = numpy.empty((len(particles)))
         for i in xrange(len(zl)):
             # Predict z_{t+1}
-            lyz[i] = self.kf.measure_full(y, zl[i], Pl[i], Cz[i], hz[i], Rz[i])
+            lyz[i] = self.kf.measure(y, zl[i], Pl[i])
         
+        self.set_states(particles, zl, Pl)
         return lyz
     
     def next_pdf(self, particles, next_cpart, u=None):
@@ -928,17 +945,22 @@ class LTV(RBPSBase):
         N = len(particles)
         return numpy.zeros((N,))
     
+    def sample_process_noise(self, particles, u=None): 
+        return None
+    
     def sample_smooth(self, particle, next_part, u):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        (xil, zl, Pl) = self.get_states(particle)
+        (zl, Pl) = self.get_states(particle)
         if (next_part != None):
-            (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particle, u)
-            self.kf.measure_full(next_part[1].reshape((-1,1)), zl[0], Pl[0], C=Az[0], h_k=fz[0], R=Qz[0])
+            lz = len(self.z0)
+            zn = next_part[:lz].reshape((lz,1))
+            Pn = next_part[lz:].reshape((lz,lz))
+            (A, f, Q) = self.get_pred_dynamics(particle, u)
+            self.kf.set_dynamics(A=A, Q=Q, f_k=f)
+            self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
         
-        xi = copy.copy(xil[0])
-        z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0])
-            
-        return (None, z)
+        
+        return numpy.hstack((zl[0].ravel(), Pl[0].ravel()))
 
     def fwd_peak_density(self, u=None):
         return 0.0

@@ -27,7 +27,7 @@ def bsi_rs(pa, model, next, u, maxpdf, max_iter):
     weights -= numpy.max(weights)
     weights = numpy.exp(weights)
     weights /= numpy.sum(weights)
-    for i in xrange(max_iter):
+    for _i in xrange(max_iter):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
         pn = model.next_pdf(pa.part[ind], next[todo], u)
@@ -49,7 +49,7 @@ def bsi_mcmc(pa, model, next, u, R, ancestors):
     weights = numpy.exp(weights)
     weights /= numpy.sum(weights)
     pind = model.next_pdf(pa.part[ind], next, u)                     
-    for j in xrange(R):
+    for _j in xrange(R):
         propind = numpy.random.permutation(pf.sample(weights, M))
         pprop = model.next_pdf(pa.part[propind], next, u)
         diff = pprop - pind
@@ -61,6 +61,42 @@ def bsi_mcmc(pa, model, next, u, R, ancestors):
     
     return ind
         
+def bsi_rsas(pa, model, next, u, maxpdf, x1, P1, sv, sw, ratio):
+    M = len(next)
+    todo = numpy.asarray(range(M))
+    res = numpy.empty(M, dtype=int)
+    weights = numpy.copy(pa.w)
+    weights -= numpy.max(weights)
+    weights = numpy.exp(weights)
+    weights /= numpy.sum(weights)
+    pk = x1
+    Pk = P1
+    stop_criteria = ratio / len(pa)
+    while (True):
+
+        ind = numpy.random.permutation(pf.sample(weights, len(todo)))
+        pn = model.next_pdf(pa.part[ind], next[todo], u)
+        test = numpy.log(numpy.random.uniform(size=len(todo)))
+        accept = test < pn - maxpdf
+        ak = numpy.sum(accept)
+        mk = len(todo)
+        res[todo[accept]] = ind[accept]
+        todo = todo[~accept]
+        if (len(todo) == 0):
+            return res
+        # meas update for adaptive stop
+        mk2 = mk*mk
+        sw2 = sw*sw
+        pk = pk + (mk*Pk)/(mk2*Pk+sw2)*(ak-mk*pk)
+        Pk = (1-(mk2*Pk)/(mk2*Pk+sw2))*Pk
+        # predict
+        pk = (1 - ak/mk)*pk
+        Pk = (1 - ak/mk)**2*Pk+sv*sv
+        if (pk < stop_criteria):
+            break
+    
+    res[todo] = bsi_full(pa, model, next[todo], u)        
+    return res
 
 class SmoothTrajectory(object):
     """ Store smoothed trajectory """
@@ -88,13 +124,19 @@ class SmoothTrajectory(object):
         self.y = [pt[-1].y, ]
         self.t = [pt[-1].t, ]
         opt = dict()
-        if (method=='normal'):
+        if (method=='full'):
             pass
         elif (method=='mcmc'):
             ancestors = pt[-1].ancestors[ind]
         elif (method=='rs'):
             N = len(pt[-1].pa.part)
             max_iter = int(0.1*N)
+        elif (method=='rsas'):
+            x1 = 1.0
+            P1 = 1.0
+            sv = 1.0
+            sw = 1.0
+            ratio = 1.0
         else:
             raise ValueError('Unknown sampler: %s' % method)
         
@@ -104,9 +146,11 @@ class SmoothTrajectory(object):
             self.model.t = step.t
             pa = step.pa
             if (method=='rs'):
-                opt['maxpdf'] = options['maxpdf'][cur_ind]
                 ind = bsi_rs(pa, self.model, self.traj[cur_ind+1][0], step.u,
                              options['maxpdf'][cur_ind],max_iter)
+            elif (method=='rsas'):
+                ind = bsi_rsas(pa, self.model, self.traj[cur_ind+1][0], step.u,
+                               options['maxpdf'][cur_ind],x1,P1,sv,sw,ratio)                
             elif (method=='mcmc'):
                 ind = bsi_mcmc(pa, self.model, self.traj[cur_ind+1][0], step.u, 
                                options['R'], ancestors)

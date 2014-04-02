@@ -87,8 +87,8 @@ class KalmanFilter(object):
         # Calculate next state
         (self.z, self.P) = self.predict_full(A=self.A, f_k=self.f_k, Q=self.Q)  
         
-    def predict(self):
-        return self.predict_full(A=self.A, f_k=self.f_k, Q=self.Q)
+    def predict(self, z, P):
+        return self.predict_full(z, P, A=self.A, f_k=self.f_k, Q=self.Q)
     
     def predict_full_inplace(self, z, P, A, f_k, Q):
         """ Calculate next state estimate without actually updating
@@ -110,11 +110,11 @@ class KalmanFilter(object):
             yhat += h_k
         return (y-yhat)
     
-    def measure(self, y):
+    def measure(self, y, z, P):
         """ Do a measurement update, i.e correct the current estimate 
             with information from a new measurement """
 
-        return self.measure_full(y, h_k=self.h_k, C=self.C, R=self.R)
+        return self.measure_full(y, z, P, C=self.C, h_k=self.h_k, R=self.R)
 
     def measure_full(self, y, z, P, C, h_k, R):
         S = C.dot(P).dot(C.T)+R
