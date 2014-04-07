@@ -1,234 +1,262 @@
-""" Class for mixed linear/non-linear models with additive gaussian noise """
-
+""" Collection of functions and classes used for Particle Filtering/Smoothing """
+import pyparticleest.kalman as kalman
+from pyparticleest.part_utils import RBPSBase
 import numpy
 import copy
-import pyparticleest.kalman as kalman
-import pyparticleest.part_utils as part_utils
-import pyparticleest.param_est as param_est
 
-
-class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
+class MixedNLGaussian(RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
-    def __init__(self, z0, P0, e0, Az=None, C=None, Qz=None, R=None, fz=None,
-                 Ae=None, Qe=None, Qez=None, fe=None, h=None, params=None, t0=0):
-        super(MixedNLGaussian, self).__init__(z0=z0, P0=P0,
-                                              Az=Az, C=C, 
+    def __init__(self, Az=None, C=None, Qz=None, R=None, fz=None,
+                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None, t0=0):
+        if (Axi != None):
+            self.Axi = numpy.copy(Axi)
+        else:
+            self.Axi = None
+        if (fxi != None):
+            self.fxi = numpy.copy(fxi)
+        else:
+            self.fxi = None
+        if (Qxi != None):
+            self.Qxi = numpy.copy(Qxi)
+        else:
+            self.Qxi = None
+        if (Qxiz != None):
+            self.Qxiz = numpy.copy(Qxiz)
+        else:
+            self.Qxiz = None
+        return super(MixedNLGaussian, self).__init__(Az=Az, C=C, 
                                               Qz=Qz, R=R,
-                                              h_k=h, f_k=fz,
+                                              hz=h, fz=fz,
                                               t0=t0)
-        self.Ae = numpy.copy(Ae)
-        self.Az = numpy.copy(Az)
-        self.A = numpy.vstack((self.Ae, self.Az))
-        self.Qe = Qe
-        # Store a copy of these variables, needed in clin_dynamics
-        self.Qz = numpy.copy(self.kf.Q)
-        self.fz = numpy.copy(self.kf.f_k)
-        
-        self.eta = numpy.copy(e0.reshape((-1,1)))
 
-        self.x_zeros = numpy.zeros((len(self.eta)+len(self.kf.z), 1))
-
-        if (Qez != None):
-            self.Qez = numpy.copy(Qez)
-        else:
-            self.Qez = numpy.zeros((len(e0),len(z0)))
-
-        self.Q = numpy.vstack((numpy.hstack((self.Qe, self.Qez)),
-                               numpy.hstack((self.Qez.T, self.Qz))))
-        
-        if (fe != None):
-            self.fe = fe
-        else:
-            self.fe = numpy.zeros((len(self.eta), 1))
-
-        self.Sigma = None
-        
-        self.sampled_z = None
-        self.z_tN = None
-        self.P_tN = None
-        self.M_tN = None
-        if (params != None):
-            self.params = numpy.copy(params)
-        else:
-            self.params = None
-        # Lists of element-wise derivatives, e.g self.grad_Az[0] is the 
-        # element-wise derivative of Az with respect to the first parameter
-        self.grad_Az = None
-        self.grad_fz = None
-        self.grad_Ae = None
-        self.grad_fe = None
-        self.grad_Qe = None
-        self.grad_Qez = None 
-        self.grad_Qz = None
-        self.grad_C = None
-        self.grad_h = None
-        self.grad_R = None
-        
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
-                     Ae=None, fe=None, Qe=None, Qez=None, 
+                     Axi=None, fxi=None, Qxi=None, Qxiz=None, 
                      C=None, h=None):
-        super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, f_k=fz,h_k=h)
+        super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, fz=fz,hz=h)
 
-        if (Ae != None):
-            self.Ae = numpy.copy(Ae)
+        if (Axi != None):
+            self.Axi = numpy.copy(Axi)
         if (Az != None):
             self.Az = numpy.copy(Az)
-        if (Ae != None or Az != None):
-            if (Ae == None):
-                Ae = self.Ae
-            if (Az == None):
-                Az = self.Az
-            self.A = numpy.vstack((Ae, Az))
-        if (Qe != None):
-            self.Qe = numpy.copy(Qe)
-        if (Qez != None):
-            self.Qez = numpy.copy(Qez)
+        if (Qxi != None):
+            self.Qxi = numpy.copy(Qxi)
+        if (Qxiz != None):
+            self.Qxiz = numpy.copy(Qxiz)
         if (Qz != None):
             self.Qz = numpy.copy(self.kf.Q)
-        if (Qe != None or Qez != None or Qz != None):
-            if (Qe == None):
-                Qe = self.Qe
-            if (Qez == None):
-                Qez = self.Qez
-            if (Qz == None):
-                Qz = self.Qz
-            self.Q = numpy.vstack((numpy.hstack((Qe, Qez)),
-                               numpy.hstack((Qez.T, Qz))))
         if (fz != None):
             self.fz = numpy.copy(self.kf.f_k)
-        if (fe != None):
-            self.fe = numpy.copy(fe)
-            
-    def calc_next_eta(self, u, noise):
+        if (fxi != None):
+            self.fxi = numpy.copy(fxi)
+
+    def sample_process_noise(self, particles, u=None): 
+        """ Return sampled process noise for the non-linear states """
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles, u)
+        (_xil, zl, Pl) = self.get_states(particles)
+        N = len(particles)
+        # This is probably not so nice performance-wise, but will
+        # work initially to profile where the bottlenecks are.
+                    
+        dim=len(_xil[0])
+        noise = numpy.empty((N,dim))
+        zeros = numpy.zeros(dim)
+        for i in xrange(N):
+            Sigma = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
+            noise[i] =  numpy.random.multivariate_normal(zeros, Sigma).ravel()    
+        return noise
+
+    def calc_xi_next(self, particles, noise, u=None):
         """ Update non-linear state using sampled noise,
         # the noise term here includes the uncertainty from z """
-        noise = numpy.reshape(noise, (-1,1))
-        eta = self.pred_eta() + noise
-        return eta
+        xi_pred = self.pred_xi(particles=particles, u=u)
+        xi_next = xi_pred + noise
+   
+        return xi_next
 
-    def pred_eta(self):
-        return self.fe + self.Ae.dot(self.kf.z)
+    def pred_xi(self, particles, u=None):
+        N = len(particles)
+        (Axi, fxi, _Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (xil, zl, _Pl) = self.get_states(particles)
+        dim=len(xil[0])
+        xi_next = numpy.empty((N,dim))
+        # This is probably not so nice performance-wise, but will
+        # work initially to profile where the bottlenecks are.
+        for i in xrange(N):
+            xi_next[i] =  Axi[i].dot(zl[i]) + fxi[i]
+        return xi_next
     
-    def meas_eta_next(self, eta_next):
+    def meas_xi_next(self, particles, xi_next, u=None):
         """ Update estimate using observation of next state """
         # This is what is sometimes called "the second measurement update"
         # for Rao-Blackwellized particle filters
-        return self.kf.measure_full(y=eta_next, h_k=self.fe,
-                                    C=self.Ae, R=self.Qe)
-    
-    def calc_cond_dynamics(self, eta_next):
-        #Compensate for noise correlation
-        tmp = self.Qez.T.dot(numpy.linalg.inv(self.Qe))
-        A_cond = self.kf.A - tmp.dot(self.Ae)
-        offset = tmp.dot(eta_next - self.fe)
-        return (A_cond, self.fz + offset)
-    
-    def cond_dynamics(self, eta_next):
-        """ Condition dynamics on future state 'eta_next'. """
-        (Az, fz) = self.calc_cond_dynamics(eta_next)
-        self.kf.set_dynamics(f_k=fz, A=Az)
-
-    def cond_predict(self, eta_next=None):
-        #Compensate for noise correlation
-        (Az, fz) = self.calc_cond_dynamics(eta_next)
-        return self.kf.predict_full(f_k=fz, A=Az, Q=self.Qz)
-
-
-
-    def sample_process_noise(self, u=None): 
-        """ Return sampled process noise for the non-linear states """
-        Sigma_a = self.Qe + self.Ae.dot(self.kf.P).dot(self.Ae.T)
         
-        return numpy.random.multivariate_normal(numpy.zeros(len(self.eta)), Sigma_a).reshape((-1,1))
+        N = len(particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        for i in xrange(len(zl)):
+            self.kf.measure_full(y=xi_next[i], z=zl[i], P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
+        
+        # Predict next states conditioned on eta_next
+        self.set_states(particles, xil, zl, Pl)
+    
+    def get_cross_covariance(self, particles, u):
+        return None
+    
+    def calc_cond_dynamics(self, particles, xi_next, u=None):
+        #Compensate for noise correlation
+        N = len(particles)
+        #(xil, zl, Pl) = self.get_states(particles)
+        
+        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
 
-    def fwd_peak_density(self, u):
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        if (Qxiz == None and self.Qxiz == None):
+            return (Az, fz, Qz)
+        if (Qxiz == None):
+            Qxiz = N*(self.Qxiz,)
+        
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        
+        Acond = list()
+        fcond = list()
+        Qcond = list()
+        
+        for i in xrange(N):
+            #TODO linalg.solve instead?
+            tmp = Qxiz[i].T.dot(numpy.linalg.inv(Qxi[i]))
+            Acond.append(Az[i] - tmp.dot(Axi[i]))
+            #Acond.append(Az[i])
+            fcond.append(fz[i] +  tmp.dot(xi_next[i] - fxi[i]))
+            # TODO, shouldn't Qz be affected? Why wasn't it before?
+            Qcond.append(Qz[i])
+        
+        return (Acond, fcond, Qcond)
+        
+        
+    
+    def cond_predict(self, particles, xi_next, u=None):
+        #Compensate for noise correlation
+        (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u)
+        N = len(particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        for i in xrange(len(zl)):
+            (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
+        
+        # Predict next states conditioned on eta_next
+        self.set_states(particles, xil, zl, Pl)
+        
+    def measure(self, particles, y):
+        """ Return the log-pdf value of the measurement """
+        
+        (xil, zl, Pl) = self.get_states(particles)
+        N = len(particles)
+        (y, Cz, hz, Rz) = self.get_meas_dynamics_int(particles=particles, y=y)
+            
+        lyz = numpy.empty(N)
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
+            
+        self.set_states(particles, xil, zl, Pl)
+        return lyz
+
+    def next_pdf_max(self, particles, u=None):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
-        A = self.A
-        self.Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
-        return kalman.lognormpdf(self.x_zeros, self.x_zeros, self.Sigma)
+        N = len(particles)
+        pmax = numpy.empty(N)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        (xil, zl, Pl) = self.get_states(particles)
+        if (Qxiz == None):
+            if (self.Qxiz == None):
+                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
+            else:
+                Qxiz = N*(self.Qxiz,)
+        dim=len(xil[0])+len(zl[0])
+        zeros = numpy.zeros((dim,1))
+        for i in xrange(N):
+            A = numpy.vstack((Axi[i], Az[i]))
+            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
+                              numpy.hstack((Qxiz[i].T, Qz[i]))))
+            self.Sigma = Q + A.dot(Pl[i]).dot(A.T)
+            pmax[i] = kalman.lognormpdf(zeros, zeros, self.Sigma)
         
-    def next_pdf(self, next_part, u):
+        return numpy.max(pmax)
+        
+    def next_pdf(self, particles, next_part, u=None):
         """ Implements the next_pdf function for MixedNLGaussian models """
         
-        #nonlin_est = numpy.reshape(self.get_nonlin_state(),(-1,1))
-        eta_est = self.pred_eta()
+        N = len(particles)
+        Nn = len(next_part)
+        if (N > 1 and Nn == 1):
+            next_part = numpy.repeat(next_part, N, 0)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        (xil, zl, Pl) = self.get_states(particles)
+        if (Qxiz == None):
+            if (self.Qxiz == None):
+                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
+            else:
+                Qxiz = N*(self.Qxiz,)
         
-        eta_diff = next_part.eta - eta_est
-        #z_diff= next_part.sampled_z - self.kf.predict()[0]
-        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
+        lpx = numpy.empty(N)
         
-        if (self.Sigma == None):
-            self.fwd_peak_density(u) 
+#        #z_diff= next_part.sampled_z - self.kf.predict()[0]
+#        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
         
-        diff = numpy.vstack((eta_diff, z_diff)).reshape((-1,1))
-        # We can used cached self.Sigma since 'fwd_peak_density' will always be called first
-        #Sigma = self.Q + A.dot(self.kf.P).dot(A.T)
-        return kalman.lognormpdf(diff,mu=self.x_zeros,S=self.Sigma)
+        for i in xrange(N):
+            x_next = numpy.vstack(next_part[i])
+            A = numpy.vstack((Axi[i], Az[i]))
+            f = numpy.vstack((fxi[i], fz[i]))
+            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
+                              numpy.hstack((Qxiz[i].T, Qz[i]))))
+            xp = f + A.dot(zl[i])
+            Sigma = A.dot(Pl[i]).dot(A.T) + Q
+            lpx[i] = kalman.lognormpdf(x_next,mu=xp,S=Sigma)
+        
+        return lpx
     
-    def sample_smooth(self, next_part):
+    def sample_smooth(self, particles, next_part, u=None):
         """ Implements the sample_smooth function for MixedNLGaussian models """
-        if (next_part != None):
-            self.meas_eta_next(next_part.eta)
-            self.cond_dynamics(next_part.eta)
-            self.kf.measure_full(next_part.sampled_z, self.kf.f_k, self.kf.A, self.kf.Q)
+        M = len(particles)
+        res = numpy.empty((M,2,1,1))
+        for j in range(M):
+            part = numpy.copy(particles[j])
+            (xil, zl, Pl) = self.get_states([part,])
+            if (next_part != None):
+                self.meas_xi_next([part,], next_part[j][0])
+                (Acond, fcond, Qcond) = self.calc_cond_dynamics([part,], next_part[j][0], u)
+                (xil, zl, Pl) = self.get_states([part,])
+                self.kf.measure_full(next_part[j][1], zl[0], Pl[0],
+                                     C=Acond[0], h_k=fcond[0], R=Qcond[0])
 
-        self.sampled_z = numpy.random.multivariate_normal(self.kf.z.ravel(),self.kf.P).ravel().reshape((-1,1))
+            xi = copy.copy(xil[0]).reshape((1,-1,1))
+            z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((1,-1,1))
+            res[j] = numpy.vstack((xi, z))
+        return res
     
-    def measure(self, y):
-        y=numpy.reshape(y, (-1,1))
-        return super(MixedNLGaussian, self).measure(y)
-    
-    def eval_1st_stage_weight(self, u,y):
-#        eta_old = copy.deepcopy(self.get_nonlin_state())
-#        lin_old = copy.deepcopy(self.get_lin_est())
-#        t_old = self.t
-        self.prep_update(u)
-        noise = numpy.zeros_like(self.eta)
-        self.update(u, noise)
-        
-        yn = self.prep_measure(y)
-        logpy = self.measure(yn)
-        
-        # Restore state
-#        self.set_lin_est(lin_old)
-#        self.set_nonlin_state(eta_old)
-#        self.t = t_old
-        
-        return logpy
-        
-    def get_nonlin_state(self):
-        return self.eta
-
-    def set_nonlin_state(self,inp):
-        self.eta = numpy.copy(inp)
-
-    def set_dynamics_gradient(self, grad_Az=None, grad_fz=None, grad_Qz=None, grad_R=None,
-                     grad_Ae=None, grad_fe=None, grad_Qe=None, grad_Qez=None, 
-                     grad_C=None, grad_h=None):
-        """ Lists of element-wise derivatives """
-        if (grad_Az != None):
-            self.grad_Az = grad_Az
-        if (grad_fz !=None):
-            self.grad_fz = grad_fz
-        if (grad_Ae != None):
-            self.grad_Ae = grad_Ae
-        if (grad_fe != None):
-            self.grad_fe = grad_fe
-        if (grad_Qe != None):
-            self.grad_Qe = grad_Qe
-        if (grad_Qez != None):
-            self.grad_Qez = grad_Qez 
-        if (grad_Qz != None):
-            self.grad_Qz = grad_Qz
-        if (grad_C != None):
-            self.grad_C = grad_C
-        if (grad_h != None):
-            self.grad_h = grad_h
-        if (grad_R != None):
-            self.grad_R = grad_R
+#    def eval_1st_stage_weight(self, u,y):
+##        eta_old = copy.deepcopy(self.get_nonlin_state())
+##        lin_old = copy.deepcopy(self.get_lin_est())
+##        t_old = self.t
+#        self.prep_update(u)
+#        noise = numpy.zeros_like(self.eta)
+#        self.update(u, noise)
+#        
+#        yn = self.prep_measure(y)
+#        logpy = self.measure(yn)
+#        
+#        # Restore state
+##        self.set_lin_est(lin_old)
+##        self.set_nonlin_state(eta_old)
+##        self.t = t_old
+#        
+#        return logpy
     
     def set_params(self, params):
         self.params = numpy.copy(params).reshape((-1,1))
@@ -241,89 +269,121 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
         tmp2 = dA + dB - dA.dot(tmp)
         return numpy.trace(numpy.linalg.solve(A,tmp2))
 
-    def calc_l1(self, z0, P0):
-        z0_diff = self.kf.z - z0
-        l1 = z0_diff.dot(z0_diff.T) + self.kf.P
+
+
+    def eval_logp_xi0(self, xil):
+        """ Evaluate logprob of the initial non-linear state eta,
+            default implementation assumes all are equal, override this
+            if another behavior is desired """
+        return numpy.zeros((len(xil)))
+    
+#    def eval_grad_eta0_logpdf(self, eta):
+#        """ Evaluate logprob of the initial non-linear state eta,
+#            default implementation assumes all are equal, override this
+#            if another behavior is desired """
+#        return numpy.zeros(self.params.shape)
+
+
+    def calc_l1(self, z, P, z0, P0):
+        z0_diff = z - z0
+        l1 = z0_diff.dot(z0_diff.T) + P
         return l1
-
-    def eval_eta0_logpdf(self, eta):
-        """ Evaluate logprob of the initial non-linear state eta,
-            default implementation assumes all are equal, override this
-            if another behavior is desired """
-        return 0.0
-    
-    def eval_grad_eta0_logpdf(self, eta):
-        """ Evaluate logprob of the initial non-linear state eta,
-            default implementation assumes all are equal, override this
-            if another behavior is desired """
-        return numpy.zeros(self.params.shape)
-    
-    # Default implementation, for when initial state is independent 
-    # of parameters
-    def get_z0_initial(self):
-        return (self.z0, self.P0)
-
-    # Default implementation, for when initial state is independent 
-    # of parameters    
-    def get_grad_z0_initial(self):
-        grad_z0 = []
-        grad_P0 = []
-        for _i in range(len(self.params)):
-            grad_z0.append(numpy.zeros(self.z0.shape))
-            grad_P0.append(numpy.zeros(self.P0.shape))
-            
-        return (grad_z0, grad_P0)
         
-    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
+    def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""    
             
         # Calculate l1 according to (19a)
-        l1 = self.calc_l1(z0, P0)
-        
-        (_tmp, ld) = numpy.linalg.slogdet(self.Q)
-        tmp = numpy.linalg.solve(P0, l1)
-        val = -0.5*(ld + numpy.trace(tmp)) 
-       
-        grad = numpy.zeros(self.params.shape)
-        # Calculate gradient
-        for i in range(len(self.params)):
-
-            if (diff_z0 != None):
-                dl1 = -diff_z0[i].dot((self.kf.z-z0).T) - (self.kf.z-z0).dot(diff_z0[i].T)
-            else:
-                dl1 = numpy.zeros(l1.shape)
-        
-            if (diff_P0 != None): 
-                dP0 = diff_P0[i]
-            else:
-                dP0 = numpy.zeros(P0.shape)
-
-            grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
-        return (val + self.eval_eta0_logpdf(self.eta),
-                grad + self.eval_grad_eta0_logpdf(self.eta))
+        N = len(particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        lpxi0 = self.eval_logp_xi0(xil)
+        lpz0 = numpy.empty(N)
+        for i in xrange(N):
+            (z0, P0) = self.get_rb_initial([xil[i],])
+            l1 = self.calc_l1(zl[i], Pl[i], z0, P0)
+            (_tmp, ld) = numpy.linalg.slogdet(P0)
+            tmp = numpy.linalg.solve(P0, l1)
+            lpz0[i] = -0.5*(ld + numpy.trace(tmp))
+        return lpxi0 + lpz0
+    
+#    def eval_logp_x0_grad(self, z0, P0, diff_z0, diff_P0):
+#        # Calculate l1 according to (19a)
+#        l1 = self.calc_l1(z0, P0)
+#        
+#        (_tmp, ld) = numpy.linalg.slogdet(self.Q)
+#        tmp = numpy.linalg.solve(P0, l1)
+#        val = -0.5*(ld + numpy.trace(tmp))
+#        
+#        grad = numpy.zeros(self.params.shape)
+#        # Calculate gradient
+#        for i in range(len(self.params)):
+#
+#            if (diff_z0 != None):
+#                dl1 = -diff_z0[i].dot((self.kf.z-z0).T) - (self.kf.z-z0).dot(diff_z0[i].T)
+#            else:
+#                dl1 = numpy.zeros(l1.shape)
+#        
+#            if (diff_P0 != None): 
+#                dP0 = diff_P0[i]
+#            else:
+#                dP0 = numpy.zeros(P0.shape)
+#
+#            grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
+#        return (val + self.eval_eta0_logpdf(self.eta),
+#                grad + self.eval_grad_eta0_logpdf(self.eta))
     
     
-    def calc_l2(self, x_next):
-        x_kplus = numpy.vstack((x_next.eta, x_next.kf.z))
-        f = numpy.vstack((self.fe, self.fz))
+    def calc_l2(self, xin, zn, Pn, z, P, Axi, Az, f, M):
+        xn = numpy.vstack((xin, zn))
+        A = numpy.vstack((Axi, Az))
+        predict_err = xn - f - A.dot(z)
+        
+        l2 = predict_err.dot(predict_err.T) +A.dot(P).dot(A.T)
+        
+        tmp = -Axi.dot(M)
+        l2[len(xin):,:len(xin)] += tmp.T
+        l2[:len(xin),len(xin):] += tmp
+        
+        tmp2 = Pn - M.T.dot(P) - Az.dot(M)        
 
-        A = self.A
-        predict_err = x_kplus - f - A.dot(self.kf.z)
-        
-        l2 = predict_err.dot(predict_err.T) +A.dot(self.kf.P).dot(A.T)
-        
-        tmp = -self.Ae.dot(self.kf.M)
-        l2[len(self.eta):,:len(self.eta)] += tmp.T
-        l2[:len(self.eta),len(self.eta):] += tmp
-        
-        tmp2 = x_next.kf.P - self.kf.M.T.dot(self.kf.P) - self.kf.A.dot(self.kf.M)        
-
-        l2[len(self.eta):,len(self.eta):] += tmp2
+        l2[len(xin):,len(xin):] += tmp2
         return (l2, predict_err)
     
+       
+    def eval_logp_xnext(self, particles, x_next, u, t, Mzl):
+        """ Calculate gradient of a term of the I2 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""
+        # Calculate l2 according to (16)
+        N = len(particles)
+        lpxn = numpy.empty(N)
+        
+        (_xi, z, P) = self.get_states(particles)
+        (xin, zn, Pn) = self.get_states(x_next)
+        
+        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        Qxiz = self.get_cross_covariance(particles=particles, u=u)
+        if (Qxiz == None):
+            if (self.Qxiz == None):
+                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
+            else:
+                Qxiz = N*(self.Qxiz,)
+        
+        for i in xrange(N):
+            f = numpy.vstack((fxi[i], fz[i]))
+            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
+                              numpy.hstack((Qxiz[i].T, Qz[i]))))
+            (l2, _pe) = self.calc_l2(xin[i], zn[i], Pn[i], z[i], P[i], Axi[i], Az[i], f, Mzl[i])
+            (_tmp, ld) = numpy.linalg.slogdet(Q)
+            tmp = numpy.linalg.solve(Q, l2)
+            lpxn[i] = -0.5*(ld + numpy.trace(tmp))
+      
+        return lpxn
+
     def calc_diff_l2(self, x_next):
         
         (l2, predict_err) = self.calc_l2(x_next)
@@ -356,81 +416,100 @@ class MixedNLGaussian(part_utils.RBPSBase, param_est.ParamEstInterface):
             diff_l2.append(diff_l2_i)
             
         return (l2,diff_l2)
-        
-    def eval_logp_xnext(self, x_next):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        # Calculate l2 according to (16)
-        (l2, diff_l2) = self.calc_diff_l2(x_next)
-      
-        (_tmp, ld) = numpy.linalg.slogdet(self.Q)
-        tmp = numpy.linalg.solve(self.Q, l2)
-        val = -0.5*(ld + numpy.trace(tmp))
-      
-        # Calculate gradient
-        grad = numpy.zeros(self.params.shape)
-        for i in range(len(self.params)):
-            
-            grad_Q = numpy.zeros(self.Q.shape)
-            
-            if (self.grad_Qe != None or 
-                self.grad_Qez != None or 
-                self.grad_Qz != None): 
-            
-                if (self.grad_Qe != None):
-                    grad_Q[:len(self.eta),:len(self.eta)] = self.grad_Qe[i]
-                if (self.grad_Qez != None):
-                    grad_Q[:len(self.eta),len(self.eta):] = self.grad_Qez[i]
-                    grad_Q[len(self.eta):,:len(self.eta)] = self.grad_Qez[i].T
-                if (self.grad_Qz != None):
-                    grad_Q[len(self.eta):, len(self.eta):] = self.grad_Qz[i]
 
-            
-                            
-            grad[i] = -0.5*self.calc_logprod_derivative(self.Q, grad_Q, l2, diff_l2[i])
-                
-        return (val, grad)
+#    def eval_logp_xnext_grad(self, x_next):
+#        """ Calculate gradient of a term of the I2 integral approximation
+#            as specified in [1].
+#            The gradient is an array where each element is the derivative with 
+#            respect to the corresponding parameter"""
+#        # Calculate l2 according to (16)
+#        (l2, diff_l2) = self.calc_diff_l2(x_next)
+#      
+#        (_tmp, ld) = numpy.linalg.slogdet(self.Q)
+#        tmp = numpy.linalg.solve(self.Q, l2)
+#        val = -0.5*(ld + numpy.trace(tmp))
+#      
+#        # Calculate gradient
+#        grad = numpy.zeros(self.params.shape)
+#        for i in range(len(self.params)):
+#            
+#            grad_Q = numpy.zeros(self.Q.shape)
+#            
+#            if (self.grad_Qe != None or 
+#                self.grad_Qez != None or 
+#                self.grad_Qz != None): 
+#            
+#                if (self.grad_Qe != None):
+#                    grad_Q[:len(self.eta),:len(self.eta)] = self.grad_Qe[i]
+#                if (self.grad_Qez != None):
+#                    grad_Q[:len(self.eta),len(self.eta):] = self.grad_Qez[i]
+#                    grad_Q[len(self.eta):,:len(self.eta)] = self.grad_Qez[i].T
+#                if (self.grad_Qz != None):
+#                    grad_Q[len(self.eta):, len(self.eta):] = self.grad_Qz[i]
+#
+#            
+#                            
+#            grad[i] = -0.5*self.calc_logprod_derivative(self.Q, grad_Q, l2, diff_l2[i])
+#                
+#        return (val, grad)
     
+    def eval_logp_y(self, particles, y, t):
+        """ Calculate a term of the I3 integral approximation
+        and its gradient as specified in [1]"""
+        N = len(particles)
+        (y, Cz, hz, Rz) = self.get_meas_dynamics_int(particles, y)
+        (xil, zl, Pl) = self.get_states(particles)
+        logpy = numpy.empty(N)
+        for i in xrange(N):
+        # Calculate l3 according to (19b)
+            meas_diff = self.kf.measurement_diff(y,z=zl[i], C=Cz[i], h_k=hz[i]) 
+            l3 = meas_diff.dot(meas_diff.T)
+            l3 += Cz[i].dot(Pl[i]).dot(Cz[i].T)
+        
+            (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
+            tmp = numpy.linalg.solve(Rz[i], l3)
+            logpy[i] = -0.5*(ld + numpy.trace(tmp))
+
+        return logpy
+
     def calc_l3(self, y):
         meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
         l3 = meas_diff.dot(meas_diff.T)
         l3 += self.kf.C.dot(self.kf.P).dot(self.kf.C.T)
         return l3
-    
-    def eval_logp_y(self, y):
-        """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
         
-        # For later use
-        R = self.kf.R
-        grad_R = self.grad_R
-        # Calculate l3 according to (19b)
-        l3 = self.calc_l3(y)
-        
-        (_tmp, ld) = numpy.linalg.slogdet(R)
-        tmp = numpy.linalg.solve(R, l3)
-        val = -0.5*(ld + numpy.trace(tmp))
-
-        # Calculate gradient
-        grad = numpy.zeros(self.params.shape)
-        for i in range(len(self.params)):
-            
-            dl3 = numpy.zeros(l3.shape)
-            if (self.grad_C != None):
-                meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
-                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
-                tmp = self.grad_C[i].dot(self.kf.z).dot(meas_diff.T)
-                if (self.grad_h != None):
-                    tmp += self.grad_h[i].dot(meas_diff.T)
-                dl3 += -tmp -tmp.T + tmp2 + tmp2.T
-
-            if (grad_R != None): 
-                dR = grad_R[i]
-            else:
-                dR = numpy.zeros(R.shape)
-
-            grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
-
-        return (val, grad)
+#    def eval_logp_y_grad(self, y):
+#        """ Calculate a term of the I3 integral approximation
+#        and its gradient as specified in [1]"""
+#        
+#        # For later use
+#        R = self.kf.R
+#        grad_R = self.grad_R
+#        # Calculate l3 according to (19b)
+#        l3 = self.calc_l3(y)
+#        
+#        (_tmp, ld) = numpy.linalg.slogdet(R)
+#        tmp = numpy.linalg.solve(R, l3)
+#        val = -0.5*(ld + numpy.trace(tmp))
+#
+#        # Calculate gradient
+#        grad = numpy.zeros(self.params.shape)
+#        for i in range(len(self.params)):
+#            
+#            dl3 = numpy.zeros(l3.shape)
+#            if (self.grad_C != None):
+#                meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
+#                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
+#                tmp = self.grad_C[i].dot(self.kf.z).dot(meas_diff.T)
+#                if (self.grad_h != None):
+#                    tmp += self.grad_h[i].dot(meas_diff.T)
+#                dl3 += -tmp -tmp.T + tmp2 + tmp2.T
+#
+#            if (grad_R != None): 
+#                dR = grad_R[i]
+#            else:
+#                dR = numpy.zeros(R.shape)
+#
+#            grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
+#
+#        return (val, grad)

@@ -1,101 +1,152 @@
-""" Class for hierarchial models"""
-
+""" Collection of functions and classes used for Particle Filtering/Smoothing """
 import abc
-import numpy
 import pyparticleest.kalman as kalman
-import pyparticleest.part_utils as part_utils
+from pyparticleest.part_utils import RBPFBase, FFBSiRSInterface
+import numpy
+import copy
+import math
 
-class Hierarchial(part_utils.RBPSBase):
-    """ Base class for particles of the type hierarchial which have a linear/guassian system conditioned on the
-        non-linear states, with no effect from the linear states on the non-linear """
+class HierarchicalBase(RBPFBase):
+    """ Base class for Rao-Blackwellization of hierarchical models """
+    __metaclass__ = abc.ABCMeta
 
-    def __init__(self, z0, P0, e0, Az=None, C=None, Qz=None, 
-                 R=None, fz=None, h=None, params=None):
-        super(Hierarchial, self).__init__(z0=z0, P0=P0,
-                                              Az=Az, C=C, 
-                                              Qz=Qz, R=R,
-                                              h_k=h, f_k=fz)
-       
+    def __init__(self, len_xi, len_z, **kwargs):
+        self.len_xi = len_xi
+        self.len_z = len_z
+        super(HierarchicalBase, self).__init__(**kwargs)
         # Sore z0, P0 needed for default implementation of 
         # get_z0_initial and get_grad_z0_initial
-        self.z0 = numpy.copy(z0)
-        self.P0 = numpy.copy(P0)
-        
-        self.eta = numpy.copy(numpy.asarray(e0).reshape((-1,1)))
 
-        self.sampled_z = None
+    def update(self, particles, u, noise):
+        """ Update estimate using noise as input """
+        xin = self.calc_xi_next(particles, u, noise)
+        # Update linear estimate with data from measurement of next non-linear
+        # state 
+        (_xil, zl, Pl) = self.get_states(particles)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            (zl[i], Pl[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
         
-    def meas_eta_next(self, eta_next):
-        """ Update estimate using observation of next state """
-        return
+        # Predict next states conditioned on eta_next
+        self.set_states(particles, xin, zl, Pl)
+        self.t = self.t + 1.0
     
-    def calc_cond_dynamics(self, eta_next):
-        return
+    def measure(self, y, particles):
+        """ Return the log-pdf value of the measurement """
+        
+        lyxi = self.measure_nonlin(y, particles)
+        (xil, zl, Pl) = self.get_states(particles)
+        N = len(particles)
+        (y, Cz, hz, Rz) = self.get_lin_meas_dynamics(y, particles)
+        if (Cz == None):
+            Cz=numpy.repeat(self.kf.C[numpy.newaxis,:,:], N, axis=0)
+            #Cz=N*(self.kf.C,)
+        if (hz == None):
+            hz=numpy.repeat(self.kf.h_k[numpy.newaxis,:,:], N, axis=0)
+            #hz=N*(self.kf.h_k,)
+        if (Rz == None):
+            Rz=numpy.repeat(self.kf.R[numpy.newaxis,:,:], N, axis=0)
+            #Rz=N*(self.kf.R,)
+            
+        lyz = numpy.empty_like(lyxi)
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            lyz[i] = self.kf.measure_full(y, zl[i], Pl[i], Cz[i], hz[i], Rz[i])
+        
+        self.set_states(particles, xil, zl, Pl)
+        return lyxi + lyz
     
-    def cond_dynamics(self, eta_next):
-        """ Condition dynamics on future state 'eta_next'. """
-        return
+    def next_pdf(self, particles, next_cpart, u=None):
+        """ Return the log-pdf value for the possible future state 'next' given input u """
+        N = len(particles)
+        Nn = len(next_cpart)
+        if (N > 1 and Nn == 1):
+            next_cpart = numpy.repeat(next_cpart, N, 0)
+        
+        #lpxi = numpy.empty(N)
+        lpz = numpy.empty(N)
 
-    def cond_predict(self, eta_next=None):
-        return self.kf.predict()
+        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        (xil, zl, Pl) = self.get_states(particles)
+        zln = numpy.empty_like(zl)
+        Pln = numpy.empty_like(Pl)
+        
+        lpxi = self.next_pdf_xi(particles, next_cpart[:,:self.len_xi], u).ravel()
+        
+        for i in xrange(N):
+            
+            # Predict z_{t+1}
+            (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
+            
+            lpz[i] = kalman.lognormpdf(next_cpart[i][self.len_xi:].reshape((-1,1)), zln[i], Pln[i])
+            
+        #mul = numpy.repeat(next_cpart[1].reshape((-1,1)),N,axis=0)
+        #mul = N*(next_cpart[:self.len_xi].reshape((-1,1)),)
+        #lpz = kalman.lognormpdf_vec(zln, mul, Pln)
+        #lpz = kalman.lognormpdf_jit(zl, mul, Pl)
+        return lpxi + lpz
+    
+    def sample_smooth(self, particles, next_part, u):
+        """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
+        M = len(particles)
+        res = numpy.empty((M,self.len_xi+self.len_z,1))
+        for j in range(M):
+            part = numpy.copy(particles[j])
+            (xil, zl, Pl) = self.get_states([part,])
+            if (next_part != None):
+                (A, f, Q) = self.get_lin_pred_dynamics_int([part,], u)
+                self.kf.measure_full(next_part[j][self.len_xi:], zl[0], Pl[0],
+                                     C=A[0], h_k=f[0], R=Q[0])
+
+            xi = copy.copy(xil[0]).reshape((1,-1,1))
+            z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((1,-1,1))
+            res[j] = numpy.hstack((xi, z))
+        return res
 
     @abc.abstractmethod
-    def next_eta_pdf(self, next_part, u):
+    def next_pdf_xi(self, particles, next_xi, u):
         pass
-
-    def next_pdf(self, next_part, u):
-        """ Implements the next_pdf function for Hierarchial models """
+    
+    @abc.abstractmethod
+    def calc_xi_next(self, particles, u, noise):
+        pass
+    
+    @abc.abstractmethod
+    def measure_nonlin(self, y, particles):
+        pass
+    
+    @abc.abstractmethod
+    def set_states(self, particles, xi_list, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        pass
+ 
+    @abc.abstractmethod
+    def get_states(self, particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return thrre variables, the first a list containing all the xi,
+            the second a list of all the expected values, 
+            the third a list of the corresponding covariance matrices"""
+        pass
+    
+class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
+    def __init__(self, **kwargs):
+        super(HierarchicalRSBase, self).__init__(**kwargs)
         
-        log_etapdf = self.next_eta_pdf(next_part, u)
-        (zn, Pn) = self.kf.predict()
-        return log_etapdf + kalman.lognormpdf(next_part.sampled_z,mu=zn,S=Pn)
-    
-
-    def sample_smooth(self, next_part):
-        """ Implements the sample_smooth function for MixedNLGaussian models """
-        if (next_part != None):
-            self.kf.smooth(next_part.kf.z, next_part.kf.P)
-
-        self.sampled_z = numpy.random.multivariate_normal(self.kf.z.ravel(),self.kf.P).ravel().reshape((-1,1))
-    
-    @abc.abstractmethod
-    def split_measure(self, y):
-        """ Split measurement into linear/non-liner part """
-        pass
+    def next_pdf_max(self, particles, u=None):
+        N = len(particles)
+        lpxi = self.next_pdf_xi_max(particles, u)
+        (Az, _fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        lpz = numpy.empty_like(lpxi)
+        (_xil, _zl, Pl) = self.get_states(particles)
+        nx = len(Qz[0])
+        for i in xrange(N):
+            # Predict z_{t+1}
+            Pn=Az[i].dot(Pl[i]).dot(Az[i].T) + Qz[i]
+            lpz[i] = -0.5*nx*math.log(2*math.pi)+numpy.linalg.slogdet(Pn)[1]
+        lpmax = numpy.max(lpxi+lpz)
+        return lpmax
     
     @abc.abstractmethod
-    def measure_nl(self, y_nl):
+    def next_pdf_xi_max(self, particles, u=None):
         pass
-
-    def clin_measure(self, y, next_part=None):
-        (_y_nl, y_l) = self.split_measure(y)
-        self.kf.measure(y_l)
-
-    def measure(self, y):
-        # Split measurement into linear/non-liner part
-        (y_nl, y_l) = self.split_measure(y)
-        logp_nl = 0.0
-        logp_l = 0.0
-        
-        # Non-linear measure
-        if (y_nl != None):
-            logp_nl = self.measure_nl(y_nl)
-        # Linear measure
-        if (y_l != None):
-            logp_l = super(Hierarchial, self).measure(y_l)
-        return logp_nl +logp_l 
-    
-    @abc.abstractmethod
-    def fwd_peak_density_eta(self, u):
-        pass
-    
-    def fwd_peak_density(self, u):
-        """ Implements the fwd_peak_density function for MixedNLGaussian models """
-        (zn, Pn) = self.kf.predict()
-        return kalman.lognormpdf(zn, zn, Pn) + self.fwd_peak_density_eta(u)
-    
-    def get_nonlin_state(self):
-        return self.eta
-
-    def set_nonlin_state(self,inp):
-        self.eta = numpy.copy(inp)

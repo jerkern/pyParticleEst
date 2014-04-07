@@ -1,264 +1,210 @@
-""" Class for mixed linear/non-linear models with additive gaussian noise """
-
+""" Collection of functions and classes used for Particle Filtering/Smoothing """
+import pyparticleest.kalman as kalman
+from pyparticleest.part_utils import FFBSiInterface
 import numpy
-import pyparticleest.part_utils as part_utils
-import pyparticleest.param_est as param_est
 
-
-#class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
-class LTV(part_utils.RBPSBase, param_est.ParamEstInterface):
+class LTV(FFBSiInterface):
     """ Base class for particles of the type linear time varying with additive gaussian noise.
 
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
-    def __init__(self, z0, P0, A=None, C=None, Q=None,
+    def __init__(self, z0, P0, A=None, C=None, Q=None, 
              R=None, f=None, h=None, params=None, t0=0):
-        super(LTV, self).__init__(z0=z0, P0=P0,
-                                  Az=A, C=C, 
-                                  Qz=Q, R=R,
-                                  h_k=h, f_k=f, t0=t0)
-        
-        self.z0 = numpy.copy(z0)
+        self.z0 = numpy.copy(z0).reshape((-1,1))
         self.P0 = numpy.copy(P0)
-        self.t0 = t0
+        if (f == None):
+            f = numpy.zeros_like(self.z0)
+        if (h == None and C != None):
+            h = numpy.zeros((C.shape[0],1))
+        self.kf = kalman.KalmanSmoother(A=A, C=C, 
+                                        Q=Q, R=R,
+                                        f_k=f, h_k=h)
         
-        self.params = None
-        self.grad_A = None
-        self.grad_f = None
-        self.grad_Q = None
-        self.grad_C = None
-        self.grad_h = None
-        self.grad_R = None
-        
-        self.z_tN = None
-        self.P_tN = None
-        self.M_tN = None
+        self.t = t0
 
-    def calc_next_eta(self, u, noise):
-        """ Update non-linear state using sampled noise,
-        # the noise term here includes the uncertainty from z """
-        return None
+    def create_initial_estimate(self, N):
+        if (N > 1):
+            print("N > 1 redundamt for LTV system (N={0})".format(N), )
+        particles = numpy.empty((N,), dtype=numpy.ndarray)
+        lz = len(self.z0)
+        dim = lz + lz*lz
+        
+        for i in xrange(N):
+            particles[i] = numpy.empty(dim)
+            particles[i][:lz] = numpy.copy(self.z0).ravel()
+            particles[i][lz:] = numpy.copy(self.P0).ravel()  
+        return particles
     
-    def get_nonlin_state(self):
-        return None
+    def set_states(self, particles, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        lz = len(self.z0)
+        N = len(particles)
+        for i in xrange(N):
+            particles[i][:lz] = z_list[i].ravel()
+            lzP = lz + lz*lz
+            particles[i][lz:lzP] = P_list[i].ravel()
+ 
+    def get_states(self, particles):
+        """ Returns two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        N = len(particles)
+        zl = list()
+        Pl = list()
+        lz = len(self.z0)
+        for i in xrange(N):
+            zl.append(particles[i][:lz].reshape(-1,1))
+            lzP = lz + lz*lz
+            Pl.append(particles[i][lz:lzP].reshape(self.P0.shape))
+        
+        return (zl, Pl)
 
-    def set_nonlin_state(self,inp):
-        pass
+    def get_pred_dynamics(self, t, u):
+        # Return (A, f, Q) 
+        return (None, None, None)
+
+    def update(self, particles, u, noise):
+        """ Update estimate using noise as input """
+        # Update linear estimate with data from measurement of next non-linear
+        # state 
+        (zl, Pl) = self.get_states(particles)
+        (A, f, Q) = self.get_pred_dynamics(self.t, u)
+        self.kf.set_dynamics(A=A, Q=Q, f_k=f)
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            (zl[i], Pl[i]) = self.kf.predict(zl[i], Pl[i])
         
-    def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
-        super(LTV, self).set_dynamics(Az=A, C=C, Qz=Q, R=R, f_k=f_k, h_k=h_k)
-        
-    def set_dynamics_gradient(self, grad_A=None, grad_f=None, grad_Q=None, grad_R=None,
-                              grad_Qez=None, grad_C=None, grad_h=None):
-        """ Lists of element-wise derivatives """
-        if (grad_A != None):
-            self.grad_A = grad_A
-        if (grad_f !=None):
-            self.grad_f = grad_f
-        if (grad_Q != None):
-            self.grad_Q = grad_Q
-        if (grad_C != None):
-            self.grad_C = grad_C
-        if (grad_h != None):
-            self.grad_h = grad_h
-        if (grad_R != None):
-            self.grad_R = grad_R
-            
-    def meas_eta_next(self, eta_next):
-        return 0
+        # Predict next states conditioned on eta_next
+        self.set_states(particles, zl, Pl)
+        self.t = self.t + 1.0
     
-    def cond_dynamics(self, eta_next):
-        return
+    def get_meas_dynamics(self, t, y):
+        return (y, None, None, None)
+    
+    def measure(self, y, particles):
+        """ Return the log-pdf value of the measurement """
 
-    def sample_process_noise(self, u):
-        """ Return process noise for input u """
-        return None
-
-    def next_pdf(self, next_cpart, u):
+       
+        (zl, Pl) = self.get_states(particles)
+        (y, C, h, R) = self.get_meas_dynamics(self.t, y)
+        self.kf.set_dynamics(C=C, R=R, h_k=h)  
+        lyz = numpy.empty((len(particles)))
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            lyz[i] = self.kf.measure(y, zl[i], Pl[i])
+        
+        self.set_states(particles, zl, Pl)
+        return lyz
+    
+    def next_pdf(self, particles, next_cpart, u=None):
         """ Return the log-pdf value for the possible future state 'next' given input u """
-        return (next_cpart.t == self.t+1)
-
-    def sample_smooth(self, next_part):
+        N = len(particles)
+        return numpy.zeros((N,))
+    
+    def sample_process_noise(self, particles, u=None): 
+        return None
+    
+    def sample_smooth(self, particle, next_part, u):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        return
-    
-    def fwd_peak_density(self, u=None):
-        return 1.0
-    
-    def get_z0_initial(self):
-        return (self.z0, self.P0)
-    
-    def set_params(self, params):
-        self.params = numpy.copy(params).reshape((-1,1))
-    
-    def calc_logprod_derivative(self, A, dA, B, dB):
-        """ I = logdet(A)+Tr(inv(A)*B)
-            dI/dx = Tr(inv(A)*(dA - dA*inv(A)*B + dB) """
-            
-        tmp = numpy.linalg.solve(A, B)
-        tmp2 = dA + dB - dA.dot(tmp)
-        return numpy.trace(numpy.linalg.solve(A,tmp2))
-
-    def calc_l1(self, z0, P0):
-        z = self.kf.z
-        P = self.kf.P
-        #z = self.z_tN
-        #P = self.P_tN
         
+        (zl, Pl) = self.get_states(particle)
+        M = len(particle)
+        lz = len(self.z0)
+        lzP = lz + lz*lz
+        res = numpy.empty((M,lz+2*lz*lz))
+        for j in xrange(M):
+            if (next_part != None):
+                zn = next_part[j, :lz].reshape((lz,1))
+                Pn = next_part[j, lz:lzP].reshape((lz,lz))
+                (A, f, Q) = self.get_pred_dynamics(particle, u)
+                self.kf.set_dynamics(A=A, Q=Q, f_k=f)
+                (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
+            else:
+                zs = zl[j]
+                Ps = Pl[j]
+                Ms = numpy.zeros_like(Ps)
+            res[j] = numpy.hstack((zs.ravel(), Ps.ravel(), Ms.ravel()))
+        
+        return res
+
+
+    def fwd_peak_density(self, u=None):
+        return 0.0
+
+    def calc_l1(self, z, P, z0, P0):
         z0_diff = z - z0
         l1 = z0_diff.dot(z0_diff.T) + P
         return l1
 
-    # Default implementation, for when initial state is independent 
-    # of parameters    
-    def get_grad_z0_initial(self):
-        grad_z0 = []
-        grad_P0 = []
-        for _i in range(len(self.params)):
-            grad_z0.append(numpy.zeros(self.z0.shape))
-            grad_P0.append(numpy.zeros(self.P0.shape))
-            
-        return (grad_z0, grad_P0)
-        
-    def eval_logp_x0(self, z0, P0, diff_z0, diff_P0):
+    def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""    
-            
         # Calculate l1 according to (19a)
-        l1 = self.calc_l1(z0, P0)
-        
-        Q = self.kf.Q
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
-        tmp = numpy.linalg.solve(P0, l1)
-        val = -0.5*(ld + numpy.trace(tmp)) 
-       
-        grad = numpy.zeros(self.params.shape)
-        
-        z = self.kf.z
-        #z = self.z_tN
-        
-        # Calculate gradient
-        for i in range(len(self.params)):
-
-            if (diff_z0 != None):
-                dl1 = -diff_z0[i].dot((z-z0).T) - (z-z0).dot(diff_z0[i].T)
-            else:
-                dl1 = numpy.zeros(l1.shape)
-        
-            if (diff_P0 != None): 
-                dP0 = diff_P0[i]
-            else:
-                dP0 = numpy.zeros(P0.shape)
-
-            grad[i] = -0.5*self.calc_logprod_derivative(P0, dP0, l1, dl1)
-        return (val, grad)
+        N = len(particles)
+        (zl, Pl) = self.get_states(particles)
+        lpz0 = numpy.empty(N)
+        for i in xrange(N):
+            l1 = self.calc_l1(zl[i], Pl[i], self.z0, self.P0)
+            (_tmp, ld) = numpy.linalg.slogdet(self.P0)
+            tmp = numpy.linalg.solve(self.P0, l1)
+            lpz0[i] = -0.5*(ld + numpy.trace(tmp))
+        return lpz0
     
-    
-    def calc_l2(self, x_next):
-        z = self.kf.z
-        zn = x_next.kf.z
-        P = self.kf.P
-        Pn = x_next.kf.P
-        #z = self.z_tN
-        #zn = x_next.z_tN
-        #P = self.P_tN
-        #Pn = x_next.P_tN
-        
-        f = self.kf.f_k
-        # TODO this A could have been changed!
-        A = self.kf.A
+    def calc_l2(self, zn, Pn, z, P, A, f, M):
         predict_err = zn - f - A.dot(z)
-        M = self.kf.M
         AM = A.dot(M)
         l2 = predict_err.dot(predict_err.T)
         l2 += Pn + A.dot(P).dot(A.T) - AM.T - AM
         return (l2, A, M, predict_err)    
         
-    def eval_logp_xnext(self, x_next):
+    def eval_logp_xnext(self, particles, x_next, u, t, Mzl):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-        # Calculate l2 according to (16)    
-        (l2, A, M_ext, predict_err) = self.calc_l2(x_next)
-      
-        Q = self.kf.Q
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
-        tmp = numpy.linalg.solve(Q, l2)
-        val = -0.5*(ld + numpy.trace(tmp))
+        # Calculate l2 according to (16)
+        N = len(particles)    
+        (zl, Pl) = self.get_states(particles)
+        (zn, Pn) = self.get_states(x_next)
+        (A, f, Q) = self.get_pred_dynamics(t, u)
+        self.kf.set_dynamics(A=A, Q=Q, f_k=f)
+        self.t = t
+        lpxn = numpy.empty(N)
         
-        z = self.kf.z
-        P = self.kf.P
+        for k in xrange(N):
+            lz = len(self.z0)
+            lzP = lz + lz*lz
+            Mz = particles[k][lzP:].reshape((lz,lz))
+            (l2, _A, _M_ext, _predict_err) = self.calc_l2(zn[k], Pn[k], zl[k], Pl[k], self.kf.A, self.kf.f_k, Mz)
+            (_tmp, ld) = numpy.linalg.slogdet(self.kf.Q)
+            tmp = numpy.linalg.solve(self.kf.Q, l2)
+            lpxn[k] = -0.5*(ld + numpy.trace(tmp))
         
-        # Calculate gradient
-        grad = numpy.zeros(self.params.shape)
-        for i in range(len(self.params)):
-            tmp = numpy.zeros((len(l2), 1))
-            
-            grad_Q = numpy.zeros(Q.shape)
-            
-            if (self.grad_Q != None):
-                grad_Q = self.grad_Q[i]
-
-            diff_l2 = numpy.zeros(l2.shape)
-            grad_f = numpy.zeros((len(z),1))
-            if (self.grad_f != None):
-                grad_f = self.grad_f[i]
-                    
-            grad_A = numpy.zeros(A.shape)
-            if (self.grad_A != None):
-                grad_A = self.grad_A[i]
-                    
-            tmp = (grad_f + grad_A.dot(z)).dot(predict_err.T)
-            tmp2 = grad_A.dot(M_ext)
-            tmp3 = grad_A.dot(P).dot(A.T)
-            diff_l2 = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T
-                
-            grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
-                
-        return (val, grad)
+        return lpxn
     
-    def calc_l3(self, y):
-        P = self.kf.P
-        # P = self.P_tN
-        meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
+    def calc_l3(self, y, z, P):
+        meas_diff = self.kf.measurement_diff(y,z,C=self.kf.C, h_k=self.kf.h_k) 
         l3 = meas_diff.dot(meas_diff.T)
         l3 += self.kf.C.dot(P).dot(self.kf.C.T)
         return l3
     
-    def eval_logp_y(self, y):
+    def eval_logp_y(self, particles, y, t):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
-
-        # For later use
-        R = self.kf.R
-        grad_R = self.grad_R
+        N = len(particles)
+        self.t = t
+        (y, C, h, R) = self.get_meas_dynamics(particles, y)
+        self.kf.set_dynamics(C=C, R=R, h_k=h) 
+        (zl, Pl) = self.get_states(particles)
+        logpy = numpy.empty(N)
+        for i in xrange(N):
         # Calculate l3 according to (19b)
-        l3 = self.calc_l3(y)
-        (_tmp, ld) = numpy.linalg.slogdet(R)
-        tmp = numpy.linalg.solve(R, l3)
-        val = -0.5*(ld + numpy.trace(tmp))
-                    
-        # Calculate gradient
-        grad = numpy.zeros(self.params.shape)
-        for i in range(len(self.params)):
-            
-            dl3 = numpy.zeros(l3.shape)
-            if (self.grad_C != None):
-                meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
-                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
-                tmp = self.grad_C[i].dot(self.kf.z).dot(meas_diff)
-                if (self.grad_h != None):
-                    tmp += self.grad_h[i]
-                dl3 += -tmp -tmp.T + tmp2 + tmp2.T
-        
-            if (grad_R != None): 
-                dR = grad_R[i]
-            else:
-                dR = numpy.zeros(R.shape)
+            # Calculate l3 according to (19b)
+            l3 = self.calc_l3(y, zl[i], Pl[i])
+            (_tmp, ld) = numpy.linalg.slogdet(self.kf.R)
+            tmp = numpy.linalg.solve(self.kf.R, l3)
+            logpy[i] = -0.5*(ld + numpy.trace(tmp))
 
-            grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
-                
-        return (val, grad)
+        return logpy

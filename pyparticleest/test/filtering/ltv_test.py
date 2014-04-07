@@ -1,12 +1,9 @@
 import numpy
 import math
-import pyparticleest.kalman as kalman
 import pyparticleest.part_utils
 import pyparticleest.pf as pf
-import pyparticleest.param_est as param_est
 import matplotlib.pyplot as plt
-import scipy.stats
-
+from pyparticleest.models.ltv import LTV
 
 def generate_dataset(steps, z0, P0, Q, R):
     x = numpy.zeros((steps+1,2,1))
@@ -30,7 +27,7 @@ def generate_dataset(steps, z0, P0, Q, R):
 #        out[k] = kalman.lognormpdf(particles[k].reshape(-1,1), y, R)
 #    return out
 
-class Model(pyparticleest.part_utils.LTV):
+class Model(LTV):
     
     def __init__(self, z0, P0, Q, R):
         A = numpy.asarray(((1.0, 1.0), (0.0, 1.0)))
@@ -91,8 +88,8 @@ if __name__ == '__main__':
     plt.plot(range(steps+1),x[:,1,0],'g-')
     plt.plot(range(steps+1),y[:,0,0],'bx')
     plt.plot(range(steps+1),y[:,1,0],'bo')
-    plt.plot(range(steps+1),straj.traj[:,0],'r--')
-    plt.plot(range(steps+1),straj.traj[:,1],'g--')
+    plt.plot(range(steps+1),straj.traj[:,0,0],'r--')
+    plt.plot(range(steps+1),straj.traj[:,0,1],'g--')
     plt.show()
     
     
