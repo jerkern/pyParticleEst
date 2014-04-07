@@ -624,7 +624,7 @@ class MixedNLGaussian(RBPSBase):
         l1 = z0_diff.dot(z0_diff.T) + P
         return l1
         
-    def eval_logp_x0(self, particles):
+    def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -788,7 +788,7 @@ class MixedNLGaussian(RBPSBase):
 #                
 #        return (val, grad)
     
-    def eval_logp_y(self, particles, y):
+    def eval_logp_y(self, particles, y, t):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
         N = len(particles)
@@ -861,8 +861,8 @@ class LTV(FFBSiInterface):
         self.P0 = numpy.copy(P0)
         if (f == None):
             f = numpy.zeros_like(self.z0)
-        if (h == None):
-            h = numpy.zeros_like(self.z0)
+        if (h == None and C != None):
+            h = numpy.zeros((C.shape[0],1))
         self.kf = kalman.KalmanSmoother(A=A, C=C, 
                                         Q=Q, R=R,
                                         f_k=f, h_k=h)
@@ -888,7 +888,8 @@ class LTV(FFBSiInterface):
         N = len(particles)
         for i in xrange(N):
             particles[i][:lz] = z_list[i].ravel()
-            particles[i][lz:] = P_list[i].ravel()
+            lzP = lz + lz*lz
+            particles[i][lz:lzP] = P_list[i].ravel()
  
     def get_states(self, particles):
         """ Returns two variables, the first a list containing all the
@@ -900,11 +901,13 @@ class LTV(FFBSiInterface):
         lz = len(self.z0)
         for i in xrange(N):
             zl.append(particles[i][:lz].reshape(-1,1))
-            Pl.append(particles[i][lz:].reshape(self.P0.shape))
+            lzP = lz + lz*lz
+            Pl.append(particles[i][lz:lzP].reshape(self.P0.shape))
         
         return (zl, Pl)
 
     def get_pred_dynamics(self, t, u):
+        # Return (A, f, Q) 
         return (None, None, None)
 
     def update(self, particles, u, noise):
@@ -950,17 +953,27 @@ class LTV(FFBSiInterface):
     
     def sample_smooth(self, particle, next_part, u):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
+        
         (zl, Pl) = self.get_states(particle)
-        if (next_part != None):
-            lz = len(self.z0)
-            zn = next_part[:lz].reshape((lz,1))
-            Pn = next_part[lz:].reshape((lz,lz))
-            (A, f, Q) = self.get_pred_dynamics(particle, u)
-            self.kf.set_dynamics(A=A, Q=Q, f_k=f)
-            self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
+        M = len(particle)
+        lz = len(self.z0)
+        lzP = lz + lz*lz
+        res = numpy.empty((M,lz+2*lz*lz))
+        for j in xrange(M):
+            if (next_part != None):
+                zn = next_part[j, :lz].reshape((lz,1))
+                Pn = next_part[j, lz:lzP].reshape((lz,lz))
+                (A, f, Q) = self.get_pred_dynamics(particle, u)
+                self.kf.set_dynamics(A=A, Q=Q, f_k=f)
+                (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
+            else:
+                zs = zl[j]
+                Ps = Pl[j]
+                Ms = numpy.zeros_like(Ps)
+            res[j] = numpy.hstack((zs.ravel(), Ps.ravel(), Ms.ravel()))
         
-        
-        return numpy.hstack((zl[0].ravel(), Pl[0].ravel()))
+        return res
+
 
     def fwd_peak_density(self, u=None):
         return 0.0
@@ -970,20 +983,19 @@ class LTV(FFBSiInterface):
         l1 = z0_diff.dot(z0_diff.T) + P
         return l1
 
-    def eval_logp_x0(self, particles):
+    def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""    
         # Calculate l1 according to (19a)
         N = len(particles)
-        (xil, zl, Pl) = self.get_states(particles)
+        (zl, Pl) = self.get_states(particles)
         lpz0 = numpy.empty(N)
         for i in xrange(N):
-            (z0, P0) = self.get_rb_initial([xil[i],])
-            l1 = self.calc_l1(zl[i], Pl[i], z0, P0)
-            (_tmp, ld) = numpy.linalg.slogdet(P0)
-            tmp = numpy.linalg.solve(P0, l1)
+            l1 = self.calc_l1(zl[i], Pl[i], self.z0, self.P0)
+            (_tmp, ld) = numpy.linalg.slogdet(self.P0)
+            tmp = numpy.linalg.solve(self.P0, l1)
             lpz0[i] = -0.5*(ld + numpy.trace(tmp))
         return lpz0
     
@@ -994,91 +1006,52 @@ class LTV(FFBSiInterface):
         l2 += Pn + A.dot(P).dot(A.T) - AM.T - AM
         return (l2, A, M, predict_err)    
         
-    def eval_logp_xnext(self, x_next):
+    def eval_logp_xnext(self, particles, x_next, u, t, Mzl):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-        # Calculate l2 according to (16)    
-        (xil, zl, Pl) = self.get_states(particles)
+        # Calculate l2 according to (16)
+        N = len(particles)    
+        (zl, Pl) = self.get_states(particles)
+        (zn, Pn) = self.get_states(x_next)
+        (A, f, Q) = self.get_pred_dynamics(t, u)
+        self.kf.set_dynamics(A=A, Q=Q, f_k=f)
+        self.t = t
+        lpxn = numpy.empty(N)
         
-        (l2, A, M_ext, predict_err) = self.calc_l2(x_next)
-      
-        Q = self.kf.Q
-        (_tmp, ld) = numpy.linalg.slogdet(Q)
-        tmp = numpy.linalg.solve(Q, l2)
-        val = -0.5*(ld + numpy.trace(tmp))
+        for k in xrange(N):
+            lz = len(self.z0)
+            lzP = lz + lz*lz
+            Mz = particles[k][lzP:].reshape((lz,lz))
+            (l2, _A, _M_ext, _predict_err) = self.calc_l2(zn[k], Pn[k], zl[k], Pl[k], self.kf.A, self.kf.f_k, Mz)
+            (_tmp, ld) = numpy.linalg.slogdet(self.kf.Q)
+            tmp = numpy.linalg.solve(self.kf.Q, l2)
+            lpxn[k] = -0.5*(ld + numpy.trace(tmp))
         
-        z = self.kf.z
-        P = self.kf.P
-        
-        # Calculate gradient
-        grad = numpy.zeros(self.params.shape)
-        for i in range(len(self.params)):
-            tmp = numpy.zeros((len(l2), 1))
-            
-            grad_Q = numpy.zeros(Q.shape)
-            
-            if (self.grad_Q != None):
-                grad_Q = self.grad_Q[i]
-
-            diff_l2 = numpy.zeros(l2.shape)
-            grad_f = numpy.zeros((len(z),1))
-            if (self.grad_f != None):
-                grad_f = self.grad_f[i]
-                    
-            grad_A = numpy.zeros(A.shape)
-            if (self.grad_A != None):
-                grad_A = self.grad_A[i]
-                    
-            tmp = (grad_f + grad_A.dot(z)).dot(predict_err.T)
-            tmp2 = grad_A.dot(M_ext)
-            tmp3 = grad_A.dot(P).dot(A.T)
-            diff_l2 = -tmp - tmp.T -tmp2 - tmp2.T + tmp3 + tmp3.T
-                
-            grad[i] = -0.5*self.calc_logprod_derivative(Q, grad_Q, l2, diff_l2)
-                
-        return (val, grad)
+        return lpxn
     
-    def calc_l3(self, y):
-        P = self.kf.P
-        # P = self.P_tN
-        meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
+    def calc_l3(self, y, z, P):
+        meas_diff = self.kf.measurement_diff(y,z,C=self.kf.C, h_k=self.kf.h_k) 
         l3 = meas_diff.dot(meas_diff.T)
         l3 += self.kf.C.dot(P).dot(self.kf.C.T)
         return l3
     
-    def eval_logp_y(self, y):
+    def eval_logp_y(self, particles, y, t):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
-
-        # For later use
-        R = self.kf.R
-        grad_R = self.grad_R
+        N = len(particles)
+        self.t = t
+        (y, C, h, R) = self.get_meas_dynamics(particles, y)
+        self.kf.set_dynamics(C=C, R=R, h_k=h) 
+        (zl, Pl) = self.get_states(particles)
+        logpy = numpy.empty(N)
+        for i in xrange(N):
         # Calculate l3 according to (19b)
-        l3 = self.calc_l3(y)
-        (_tmp, ld) = numpy.linalg.slogdet(R)
-        tmp = numpy.linalg.solve(R, l3)
-        val = -0.5*(ld + numpy.trace(tmp))
-                    
-        # Calculate gradient
-        grad = numpy.zeros(self.params.shape)
-        for i in range(len(self.params)):
-            
-            dl3 = numpy.zeros(l3.shape)
-            if (self.grad_C != None):
-                meas_diff = self.kf.measurement_diff(y,C=self.kf.C, h_k=self.kf.h_k) 
-                tmp2 = self.grad_C[i].dot(self.kf.P).dot(self.kf.C.T)
-                tmp = self.grad_C[i].dot(self.kf.z).dot(meas_diff)
-                if (self.grad_h != None):
-                    tmp += self.grad_h[i]
-                dl3 += -tmp -tmp.T + tmp2 + tmp2.T
-        
-            if (grad_R != None): 
-                dR = grad_R[i]
-            else:
-                dR = numpy.zeros(R.shape)
+            # Calculate l3 according to (19b)
+            l3 = self.calc_l3(y, zl[i], Pl[i])
+            (_tmp, ld) = numpy.linalg.slogdet(self.kf.R)
+            tmp = numpy.linalg.solve(self.kf.R, l3)
+            logpy[i] = -0.5*(ld + numpy.trace(tmp))
 
-            grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
-                
-        return (val, grad)
+        return logpy

@@ -17,7 +17,7 @@ class ParamEstInterface(object):
         pass
 
     @abc.abstractmethod
-    def eval_logp_x0(self, particles):
+    def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -33,7 +33,7 @@ class ParamEstInterface(object):
         pass
     
     @abc.abstractmethod    
-    def eval_logp_y(self, particles, y):
+    def eval_logp_y(self, particles, y, t):
         """ Calculate gradient of a term of the I3 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -93,7 +93,7 @@ class ParamEstimation(object):
         self.params = numpy.copy(params)
         self.model.set_params(self.params)
     
-    def simulate(self, num_part, num_traj, filter='PF', smoother='rs', res=0.67, meas_first=False):
+    def simulate(self, num_part, num_traj, filter='PF', smoother='full', res=0.67, meas_first=False):
         resamplings=0
     
         # Initialise a particle filter with our particle approximation of the initial state,
@@ -108,7 +108,7 @@ class ParamEstimation(object):
                 resamplings = resamplings + 1
         for i in range(1,len(self.y)):
             # Run PF using noise corrupted input signal
-            if (self.pt.forward(self.u[i], self.y[i])):
+            if (self.pt.forward(self.u[i-1], self.y[i])):
                 resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates
@@ -121,7 +121,7 @@ class ParamEstimation(object):
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
                  callback=None, callback_sim=None, bounds=None, meas_first=False,
-                 smoother='normal'):
+                 smoother='full'):
         
         def fval(params_val):
             self.model.set_params(params_val)
@@ -184,7 +184,8 @@ class ParamEstimation(object):
        
     def eval_logp_x0(self):
         M = self.straj.straj.shape[1]
-        logp_x0 = self.model.eval_logp_x0(numpy.vstack(self.straj.straj[0]))
+        logp_x0 = self.model.eval_logp_x0(numpy.vstack(self.straj.straj[0]),
+                                          self.straj.t[0])
         return numpy.sum(logp_x0)/M
     
     def eval_logp_y(self, ind=None, traj_ind=None):
@@ -193,7 +194,9 @@ class ParamEstimation(object):
         T = len(self.straj)
         for t in xrange(T):
             if (self.straj.y[t] != None):
-                val = self.model.eval_logp_y(numpy.vstack(self.straj.straj[t]), self.straj.y[t])
+                val = self.model.eval_logp_y(numpy.vstack(self.straj.straj[t]),
+                                             self.straj.y[t],
+                                             self.straj.t[t])
                 logp_y += numpy.sum(val)
         
         return logp_y/M
@@ -211,6 +214,6 @@ class ParamEstimation(object):
             else:
                 val = self.model.eval_logp_xnext(numpy.vstack(self.straj.straj[t]),
                                  numpy.vstack(self.straj.straj[t+1]),
-                                 self.straj.u[t], self.straj.t[t])
+                                 self.straj.u[t], self.straj.t[t], Mzl=None)
             logp_xnext += numpy.sum(val)
         return logp_xnext/M
