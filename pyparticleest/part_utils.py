@@ -172,5 +172,59 @@ class RBPSBase(RBPFBase, FFBSiInterface):
     
     @abc.abstractmethod
     def get_rb_initial(self, xi_initial):
-        pass    
+        pass
+    
+    def post_smoothing(self, st):
+        """ Kalman smoothing of the linear states conditioned on the non-linear
+            trajetory """
+        
+        T = st.traj.shape[0]
+        M = st.traj.shape[1]
+        st.Mz = numpy.empty((T-1,M), dtype=numpy.ndarray)
+        particles = self.create_initial_estimate(M)
+        for j in xrange(M):
+            (z0, P0) = self.get_rb_initial([st.traj[0][j][0],])
+            self.set_states(particles[j:j+1], (st.traj[0][j][0],), (z0,), (P0,))
+        
+        T = len(st.traj)
+        straj = numpy.empty((T, M), dtype=object)
+        
+        for i in xrange(T-1):
+            self.t = st.t[i]
+            if (st.y[i] != None):
+                self.measure(particles, st.y[i])
+            for j in xrange(M):
+                self.meas_xi_next(particles[j:j+1], st.traj[i+1][j][0], st.u[i])
+            for j in xrange(M):
+                (_xil, zl, Pl) = self.get_states(particles[j:j+1])
+                self.set_states(particles[j:j+1], st.traj[i][j][0], zl, Pl)
+            straj[i] = particles
+
+            particles = copy.deepcopy(particles)
+            for j in xrange(M):
+                self.cond_predict(particles[j:j+1], st.traj[i+1][j][0], st.u[i])
+                (_xil, zl, Pl) = self.get_states(particles[j:j+1])
+                self.set_states(particles[j:j+1], st.traj[i+1][j][0], zl, Pl)
+            
+        if (st.y[-1] != None):
+            self.measure(particles, st.y[-1])
+        
+        
+        for j in xrange(M):
+            (_xil, zl, Pl) = self.get_states(particles[j:j+1])
+            self.set_states(particles[j:j+1], st.traj[-1][j][0], zl, Pl)
+        straj[-1] = particles
+        
+        # Backward smoothing
+        for i in reversed(xrange(T-1)):
+            self.t = st.t[i]
+            (xin, zn, Pn) = self.get_states(straj[i+1])
+            (xi, z, P) = self.get_states(straj[i])
+            for j in xrange(M):
+                (Al, fl, Ql) = self.calc_cond_dynamics(straj[i,j:j+1], st.traj[i+1][j], st.u[i])
+                (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j], Al[0], fl[0], Ql[0])
+                self.set_states(straj[i][j:j+1], xi[j], (zs,), (Ps,))
+                st.Mz[i,j] = Ms
+                
+        return straj
 

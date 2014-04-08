@@ -59,6 +59,10 @@ class Model(HierarchicalRSBase):
             particles[i][1:3] = numpy.zeros((1, 2))
             particles[i][3:] = numpy.copy(self.P0_z).ravel()  
         return particles
+    
+    def get_rb_initial(self, xi0):
+        return (numpy.zeros((self.len_z,1)),
+                numpy.copy(self.P0_z))
         
     def sample_process_noise(self, particles, u=None):
         """ Return process noise for input u """
@@ -87,7 +91,7 @@ class Model(HierarchicalRSBase):
     def next_pdf_xi_max(self, particles, u):
         return numpy.asarray((scipy.stats.norm.logpdf(0.0, 0.0, math.sqrt(self.Q_xi)),)*len(particles))
     
-    def measure_nonlin(self, y, particles):
+    def measure_nonlin(self, particles, y):
         N = len(particles)
         lpy = numpy.empty((N,))
         m = numpy.zeros((1,1))

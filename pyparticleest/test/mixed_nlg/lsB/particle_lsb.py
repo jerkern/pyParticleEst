@@ -6,7 +6,7 @@ Fredrik Lindsten, Thomas B. Schon
 
 import numpy
 import math
-import pyparticleest.part_utils
+from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
 
 C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
 def calc_Ae_fe(eta, t):
@@ -60,7 +60,7 @@ def generate_dataset(length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLSB(pyparticleest.part_utils.MixedNLGaussian):
+class ParticleLSB(MixedNLGaussian):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self):
         """ Define all model variables """

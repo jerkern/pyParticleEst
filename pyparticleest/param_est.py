@@ -113,10 +113,6 @@ class ParamEstimation(object):
             
         # Use the filtered estimates above to created smoothed estimates
         self.straj = self.pt.perform_smoothing(num_traj, method=smoother)
-        if hasattr(self.model, 'get_rb_initial'): 
-            self.straj.constrained_smoothing()
-        else:
-            self.straj.straj = self.straj.traj
         return resamplings
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 

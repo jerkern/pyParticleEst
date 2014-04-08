@@ -1,12 +1,12 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
 import abc
 import pyparticleest.kalman as kalman
-from pyparticleest.part_utils import RBPFBase, FFBSiRSInterface
+from pyparticleest.part_utils import RBPSBase, FFBSiRSInterface
 import numpy
 import copy
 import math
 
-class HierarchicalBase(RBPFBase):
+class HierarchicalBase(RBPSBase):
     """ Base class for Rao-Blackwellization of hierarchical models """
     __metaclass__ = abc.ABCMeta
 
@@ -32,10 +32,10 @@ class HierarchicalBase(RBPFBase):
         self.set_states(particles, xin, zl, Pl)
         self.t = self.t + 1.0
     
-    def measure(self, y, particles):
+    def measure(self, particles, y):
         """ Return the log-pdf value of the measurement """
         
-        lyxi = self.measure_nonlin(y, particles)
+        lyxi = self.measure_nonlin(particles, y)
         (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
         (y, Cz, hz, Rz) = self.get_lin_meas_dynamics(y, particles)
@@ -128,6 +128,59 @@ class HierarchicalBase(RBPFBase):
             the second a list of all the expected values, 
             the third a list of the corresponding covariance matrices"""
         pass
+    
+    def post_smoothing(self, st):
+        """ Kalman smoothing of the linear states conditioned on the non-linear
+            trajetory """
+        
+        T = st.traj.shape[0]
+        M = st.traj.shape[1]
+        st.Mz = numpy.empty((T-1,M), dtype=numpy.ndarray)
+        particles = self.create_initial_estimate(M)
+        for j in xrange(M):
+            (z0, P0) = self.get_rb_initial([st.traj[0][j][0],])
+            self.set_states(particles[j:j+1], (st.traj[0][j][0],), (z0,), (P0,))
+        
+        T = len(st.traj)
+        straj = numpy.empty((T, M), dtype=object)
+        
+        for i in xrange(T-1):
+            self.t = st.t[i]
+            if (st.y[i] != None):
+                self.measure(particles, st.y[i])
+            for j in xrange(M):
+                (_xil, zl, Pl) = self.get_states(particles[j:j+1])
+                self.set_states(particles[j:j+1], st.traj[i][j][0], zl, Pl)
+            straj[i] = particles
+
+            particles = copy.deepcopy(particles)
+            (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, st.u[i])
+            (_xil, zl, Pl) = self.get_states(particles)
+            for j in xrange(M):
+                self.kf.predict_full(zl[j], Pl[j], Az[j], fz[j], Qz[j])
+                self.set_states(particles[j:j+1], st.traj[i+1][j:j+1][0], zl[j:j+1], Pl[j:j+1])
+            
+        if (st.y[-1] != None):
+            self.measure(particles, st.y[-1])
+        
+        
+        for j in xrange(M):
+            (_xil, zl, Pl) = self.get_states(particles[j:j+1])
+            self.set_states(particles[j:j+1], st.traj[-1][j][0], zl, Pl)
+        straj[-1] = particles
+        
+        # Backward smoothing
+        for i in reversed(xrange(T-1)):
+            self.t = st.t[i]
+            (xin, zn, Pn) = self.get_states(straj[i+1])
+            (xi, z, P) = self.get_states(straj[i])
+            (Az, fz, Qz) = self.get_lin_pred_dynamics_int(straj[i], st.u[i])
+            for j in xrange(M):
+                (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j], Az[j], fz[j], Qz[j])
+                self.set_states(straj[i][j:j+1], xi[j], (zs,), (Ps,))
+                st.Mz[i,j] = Ms
+                
+        return straj
     
 class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
     def __init__(self, **kwargs):

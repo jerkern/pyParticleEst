@@ -117,7 +117,6 @@ if __name__ == '__main__':
     for k in range(len(y)):
         traj.forward(u=None, y=y[k])
     straj = traj.perform_smoothing(M=nums, method='rsas')
-    straj.constrained_smoothing()
         
 #    print("pn_count = %d", traj.pf.model.pn_count)
     if (True):
