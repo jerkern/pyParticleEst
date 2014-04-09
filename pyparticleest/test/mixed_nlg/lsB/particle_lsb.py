@@ -86,7 +86,8 @@ class ParticleLSB(MixedNLGaussian):
         Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
         R = numpy.diag([0.1,])
 
-        super(ParticleLSB,self).__init__(Az=Az, fz=fz, C=C, R=R,
+        super(ParticleLSB,self).__init__(lxi=1, lz=4,
+                                         Az=Az, fz=fz, C=C, R=R,
                                          Qxi=Qxi, Qz=Qz,)
     def create_initial_estimate(self, N):
         particles = numpy.empty((N,), dtype=numpy.ndarray)
@@ -99,40 +100,17 @@ class ParticleLSB(MixedNLGaussian):
             particles[i][0:lxi] = numpy.copy(self.xi0)
             particles[i][lxi:(lxi+lz)] = numpy.copy(self.z0).ravel()
             particles[i][(lxi+lz):] = numpy.copy(self.P0).ravel()  
-        return particles
-    
-    def set_states(self, particles, xi_list, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
-        lxi = len(self.xi0)
-        lz = len(self.z0)
-        N = len(particles)
-        for i in xrange(N):
-            particles[i][0:lxi] = xi_list[i].ravel()
-            particles[i][lxi:(lxi+lz)] = z_list[i].ravel()
-            particles[i][(lxi+lz):] = P_list[i].ravel()
- 
-    def get_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
-        N = len(particles)
-        xil = list()
-        zl = list()
-        Pl = list()
-        N = len(particles)
-        lxi = len(self.xi0)
-        lz = len(self.z0)
-        for i in xrange(N):
-            xil.append(particles[i][0:lxi].reshape(-1,1))
-            zl.append(particles[i][lxi:(lxi+lz)].reshape(-1,1))
-            Pl.append(particles[i][(lxi+lz):].reshape(self.P0.shape))
-        
-        return (xil, zl, Pl)
+        return numpy.vstack(particles)
     
     def get_rb_initial(self, xi0):
-        return (numpy.copy(self.z0),
-                numpy.copy(self.P0))
+        N = len(xi0)
+        z_list = list()
+        P_list = list()
+        for i in xrange(N):
+            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
+            P_list.append(numpy.copy(self.P0))
+        
+        return (z_list, P_list)
         
     def get_nonlin_pred_dynamics(self, particles, u):
         N = len(particles)
@@ -150,7 +128,7 @@ class ParticleLSB(MixedNLGaussian):
         h = 0.05*tmp[:,0]**2
         h = h[:,numpy.newaxis,numpy.newaxis]
         
-        return (y, None, h, None)
+        return (numpy.asarray(y).reshape((-1,1)), None, h, None)
     
 #class ParticleLSB_JN(ParticleLSB):
 #    """ Model 60 & 61 from Lindsten & Schon (2011) """

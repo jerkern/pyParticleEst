@@ -49,7 +49,7 @@ class KalmanFilter(object):
         e_k ~ N(0,R)
         """
         
-    def __init__(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
+    def __init__(self, lz, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
         """ z_{k+1} = A*z_{k}+f_k + v_k
         y_k = C*z_k + h_k + e_k 
         v_k ~ N(0,Q)
@@ -59,13 +59,12 @@ class KalmanFilter(object):
         self.C = None
         self.R = None      # Measurement noise covariance
         self.Q = None      # Process noise covariance
-        self.f_k = None
+        if (f_k == None):
+            self.f_k = np.zeros((lz,1))
         self.h_k = None
-        
+        self.lz = lz       
         self.set_dynamics(A, C, Q, R, f_k, h_k)
         
-#        if (f_k == None):
-#            self.f_k = np.zeros(self.z.shape)
         
     def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
         if (A != None):
@@ -105,7 +104,9 @@ class KalmanFilter(object):
         return (z, P)
     
     def measurement_diff(self, y, z, C, h_k=None):
-        yhat = C.dot(z)
+        yhat = np.zeros_like(y)
+        if (C != None):
+            yhat += C.dot(z)
         if (h_k != None):
             yhat += h_k
         return (y-yhat)
@@ -117,19 +118,30 @@ class KalmanFilter(object):
         return self.measure_full(y, z, P, C=self.C, h_k=self.h_k, R=self.R)
 
     def measure_full(self, y, z, P, C, h_k, R):
-        S = C.dot(P).dot(C.T)+R
+        if (C != None):
+            S = C.dot(P).dot(C.T)+R
+  
 
-        if (sp.issparse(S)):
-            Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
-            Sinv = np.linalg.inv(Sd)
-            K = P.dot(C.T).dot(sp.csr_matrix(Sinv))
+            if (sp.issparse(S)):
+                Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
+                Sinv = np.linalg.inv(Sd)
+                K = P.dot(C.T).dot(sp.csr_matrix(Sinv))
+            else:
+                Sinv = np.linalg.inv(S)
+                K = P.dot(C.T).dot(Sinv)
+             
+            err = self.measurement_diff(y, z, C, h_k)
+            z[:] = z + K.dot(err)  
+            P[:,:] = P - K.dot(C).dot(P)
         else:
-            Sinv = np.linalg.inv(S)
-            K = P.dot(C.T).dot(Sinv)
+            if (h_k != None):
+                err = y - h_k
+            else:
+                err = y
+            S = R
         
-        err = self.measurement_diff(y, z, C, h_k)
-        z[:] = z + K.dot(err)  
-        P[:,:] = P - K.dot(C).dot(P)
+        
+        
         # Return the probability of the received measurement
         return lognormpdf(0, err, S)
 

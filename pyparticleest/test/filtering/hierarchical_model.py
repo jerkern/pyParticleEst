@@ -61,7 +61,7 @@ class Model(HierarchicalRSBase):
         return particles
     
     def get_rb_initial(self, xi0):
-        return (numpy.zeros((self.len_z,1)),
+        return (numpy.zeros((self.kf.lz,1)),
                 numpy.copy(self.P0_z))
         
     def sample_process_noise(self, particles, u=None):

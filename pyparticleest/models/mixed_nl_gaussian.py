@@ -9,7 +9,7 @@ class MixedNLGaussian(RBPSBase):
     
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
-    def __init__(self, Az=None, C=None, Qz=None, R=None, fz=None,
+    def __init__(self, lxi, lz, Az=None, C=None, Qz=None, R=None, fz=None,
                  Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None, t0=0):
         if (Axi != None):
             self.Axi = numpy.copy(Axi)
@@ -18,7 +18,7 @@ class MixedNLGaussian(RBPSBase):
         if (fxi != None):
             self.fxi = numpy.copy(fxi)
         else:
-            self.fxi = None
+            self.fxi = numpy.zeros((lxi,1))
         if (Qxi != None):
             self.Qxi = numpy.copy(Qxi)
         else:
@@ -27,10 +27,14 @@ class MixedNLGaussian(RBPSBase):
             self.Qxiz = numpy.copy(Qxiz)
         else:
             self.Qxiz = None
-        return super(MixedNLGaussian, self).__init__(Az=Az, C=C, 
-                                              Qz=Qz, R=R,
-                                              hz=h, fz=fz,
-                                              t0=t0)
+            
+        self.lxi = lxi
+        
+        return super(MixedNLGaussian, self).__init__(lz=lz,
+                                                     Az=Az, C=C, 
+                                                     Qz=Qz, R=R,
+                                                     hz=h, fz=fz,
+                                                     t0=t0)
 
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Axi=None, fxi=None, Qxi=None, Qxiz=None, 
@@ -96,8 +100,8 @@ class MixedNLGaussian(RBPSBase):
         N = len(particles)
         (xil, zl, Pl) = self.get_states(particles)
         (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
-        for i in xrange(len(zl)):
-            self.kf.measure_full(y=xi_next[i], z=zl[i], P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
+        for i in xrange(N):
+            self.kf.measure_full(y=xi_next[i].reshape((self.lxi,1)), z=zl[i], P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
         
         # Predict next states conditioned on eta_next
         self.set_states(particles, xil, zl, Pl)
@@ -210,7 +214,7 @@ class MixedNLGaussian(RBPSBase):
 #        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
         
         for i in xrange(N):
-            x_next = numpy.vstack(next_part[i])
+            x_next = next_part[i,:self.lxi+self.kf.lz].reshape((-1,1))
             A = numpy.vstack((Axi[i], Az[i]))
             f = numpy.vstack((fxi[i], fz[i]))
             Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
@@ -224,21 +228,80 @@ class MixedNLGaussian(RBPSBase):
     def sample_smooth(self, particles, next_part, u=None):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         M = len(particles)
-        res = numpy.empty((M,2,1,1))
-        for j in range(M):
-            part = numpy.copy(particles[j])
-            (xil, zl, Pl) = self.get_states([part,])
-            if (next_part != None):
-                self.meas_xi_next([part,], next_part[j][0])
-                (Acond, fcond, Qcond) = self.calc_cond_dynamics([part,], next_part[j][0], u)
-                (xil, zl, Pl) = self.get_states([part,])
-                self.kf.measure_full(next_part[j][1], zl[0], Pl[0],
-                                     C=Acond[0], h_k=fcond[0], R=Qcond[0])
+        res = numpy.zeros((M,self.lxi+self.kf.lz + 2*self.kf.lz**2))
+        part = numpy.copy(particles)
+        (xil, zl, Pl) = self.get_states(part)
+        
+        if (next_part != None):
+            (xinl, znl, _unused) = self.get_states(next_part)
+            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u)
+        
+            self.meas_xi_next(part, xinl)
+            
+            (xil, zl, Pl) = self.get_states(part)
+                                            
+            for j in range(M):
+                self.kf.measure_full(znl[j], zl[j], Pl[j],
+                                     C=Acond[j], h_k=fcond[j], R=Qcond[j])
+            self.set_states(particles, xil, zl, Pl)
 
-            xi = copy.copy(xil[0]).reshape((1,-1,1))
-            z = numpy.random.multivariate_normal(zl[0].ravel(), Pl[0]).reshape((1,-1,1))
-            res[j] = numpy.vstack((xi, z))
+        for j in range(M):
+            xi = copy.copy(xil[j]).ravel()
+            z = numpy.random.multivariate_normal(zl[j].ravel(), 
+                                                 Pl[j]).ravel()
+            res[j,:self.lxi+self.kf.lz] = numpy.hstack((xi, z))
         return res
+    
+    def set_states(self, particles, xi_list, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        N = len(particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+        for i in xrange(N):
+            particles[i][:self.lxi] = xi_list[i].ravel()
+            particles[i][self.lxi:zend] = z_list[i].ravel()
+            particles[i][zend:Pend] = P_list[i].ravel()
+ 
+    def get_states(self, particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        N = len(particles)
+        xil = list()
+        zl = list()
+        Pl = list()
+        N = len(particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+        for part in particles:
+            xil.append(part[:self.lxi].reshape(self.lxi,1))
+            zl.append(part[self.lxi:zend].reshape(self.kf.lz,1))
+            Pl.append(part[zend:Pend].reshape(self.kf.lz,self.kf.lz))
+        
+        return (xil, zl, Pl)
+    
+    def get_Mz(self, smooth_particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        Mz = list()
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+        Mend = Pend + self.kf.lz**2
+        for part in smooth_particles:
+            Mz.append(part[Pend:Mend].reshape(self.kf.lz, self.kf.lz))
+        
+        return Mz
+    
+    def set_Mz(self, smooth_particles, Mz):
+        N = len(smooth_particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+        Mend = Pend + self.kf.lz**2
+        for i in xrange(N):
+            smooth_particles[i,Pend:Mend] = Mz[i].ravel()
     
 #    def eval_1st_stage_weight(self, u,y):
 ##        eta_old = copy.deepcopy(self.get_nonlin_state())

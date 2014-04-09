@@ -12,8 +12,7 @@ class HierarchicalBase(RBPSBase):
 
     def __init__(self, len_xi, len_z, **kwargs):
         self.len_xi = len_xi
-        self.len_z = len_z
-        super(HierarchicalBase, self).__init__(**kwargs)
+        super(HierarchicalBase, self).__init__(lz=len_z, **kwargs)
         # Sore z0, P0 needed for default implementation of 
         # get_z0_initial and get_grad_z0_initial
 
@@ -52,7 +51,8 @@ class HierarchicalBase(RBPSBase):
         lyz = numpy.empty_like(lyxi)
         for i in xrange(len(zl)):
             # Predict z_{t+1}
-            lyz[i] = self.kf.measure_full(y, zl[i], Pl[i], Cz[i], hz[i], Rz[i])
+            lyz[i] = self.kf.measure_full(numpy.asarray(y).reshape((-1,1)),
+                                          zl[i], Pl[i], Cz[i], hz[i], Rz[i])
         
         self.set_states(particles, xil, zl, Pl)
         return lyxi + lyz
@@ -90,7 +90,7 @@ class HierarchicalBase(RBPSBase):
     def sample_smooth(self, particles, next_part, u):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         M = len(particles)
-        res = numpy.empty((M,self.len_xi+self.len_z,1))
+        res = numpy.empty((M,self.len_xi+self.kf.lz,1))
         for j in range(M):
             part = numpy.copy(particles[j])
             (xil, zl, Pl) = self.get_states([part,])

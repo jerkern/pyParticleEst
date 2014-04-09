@@ -30,8 +30,8 @@ if __name__ == '__main__':
     for k in range(sims):
         print k
         # Create reference
-        numpy.random.seed(1)
-        #numpy.random.seed(10)
+        #numpy.random.seed(1)
+        numpy.random.seed(10)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    
     
@@ -41,14 +41,14 @@ if __name__ == '__main__':
         model = particle_lsb.ParticleLSB()
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='PF')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
 
         
         svals = numpy.zeros((2, nums, steps+1))
         vals = numpy.zeros((2, num, steps+1))
  
         for i in range(steps+1):
-            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i])
+            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.traj[i])
             svals[0,:,i] = numpy.vstack(xil).ravel()
             svals[1,:,i] = 25.0+C_theta.dot(numpy.hstack(zl)).ravel()
             (xil, zl, Pl) = model.get_states(ParamEstimator.pt.traj[i].pa.part)

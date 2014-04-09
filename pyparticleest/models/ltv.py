@@ -14,9 +14,8 @@ class LTV(FFBSiInterface):
         self.P0 = numpy.copy(P0)
         if (f == None):
             f = numpy.zeros_like(self.z0)
-        if (h == None and C != None):
-            h = numpy.zeros((C.shape[0],1))
-        self.kf = kalman.KalmanSmoother(A=A, C=C, 
+        self.kf = kalman.KalmanSmoother(lz=len(self.z0),
+                                        A=A, C=C, 
                                         Q=Q, R=R,
                                         f_k=f, h_k=h)
         
