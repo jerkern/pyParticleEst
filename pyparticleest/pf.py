@@ -303,7 +303,7 @@ class ParticleApproximation(object):
             N = self.num
         
         new_ind = sample(numpy.exp(self.w), N)
-        new_part = model.copy(self.part, new_ind)
+        new_part = model.copy_ind(self.part, new_ind)
         
         self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
         self.part = new_part

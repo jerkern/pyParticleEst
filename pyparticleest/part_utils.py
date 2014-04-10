@@ -31,7 +31,7 @@ class ParticleFilteringInterface(object):
         """ Return the log-pdf value of the measurement """
         return
     
-    def copy(self, particles, new_ind):
+    def copy_ind(self, particles, new_ind):
         N = len(new_ind)
         new_part = numpy.empty(N, type(particles[0]))
         for k in range(numpy.shape(new_ind)[0]):

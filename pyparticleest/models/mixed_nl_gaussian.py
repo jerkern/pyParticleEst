@@ -252,7 +252,7 @@ class MixedNLGaussian(RBPSBase):
             res[j,:self.lxi+self.kf.lz] = numpy.hstack((xi, z))
         return res
 
-    def copy(self, particles, new_ind):
+    def copy_ind(self, particles, new_ind):
         new_part = particles[new_ind]
         return new_part
     
