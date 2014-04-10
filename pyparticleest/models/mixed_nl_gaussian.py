@@ -251,6 +251,10 @@ class MixedNLGaussian(RBPSBase):
                                                  Pl[j]).ravel()
             res[j,:self.lxi+self.kf.lz] = numpy.hstack((xi, z))
         return res
+
+    def copy(self, particles, new_ind):
+        new_part = particles[new_ind]
+        return new_part
     
     def set_states(self, particles, xi_list, z_list, P_list):
         """ Set the estimate of the Rao-Blackwellized states """
@@ -258,9 +262,9 @@ class MixedNLGaussian(RBPSBase):
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
         for i in xrange(N):
-            particles[i][:self.lxi] = xi_list[i].ravel()
-            particles[i][self.lxi:zend] = z_list[i].ravel()
-            particles[i][zend:Pend] = P_list[i].ravel()
+            particles[i,:self.lxi] = xi_list[i].ravel()
+            particles[i,self.lxi:zend] = z_list[i].ravel()
+            particles[i,zend:Pend] = P_list[i].ravel()
  
     def get_states(self, particles):
         """ Return the estimate of the Rao-Blackwellized states.

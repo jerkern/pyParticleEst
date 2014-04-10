@@ -92,12 +92,17 @@ class ParticleLS2(pyparticleest.part_utils.MixedNLGaussian):
             particles[i][0] = numpy.random.multivariate_normal(self.xi0.ravel(), self.Pxi0)
             particles[i][1:4] = numpy.copy(self.z0).ravel()
             particles[i][4:] = numpy.copy(self.Pz0).ravel()  
-        return particles        
+        return numpy.vstack(particles)        
 
     def get_rb_initial(self, xi0):
-        return (numpy.copy(self.z0),
-                numpy.copy(self.Pz0))
-
+        N = len(xi0)
+        z_list = list()
+        P_list = list()
+        for i in xrange(N):
+            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
+            P_list.append(numpy.copy(self.P0))
+        
+        return (z_list, P_list)
         
     def get_nonlin_pred_dynamics(self, particles, u):
         xil = numpy.vstack(particles)[:,0]
@@ -110,30 +115,6 @@ class ParticleLS2(pyparticleest.part_utils.MixedNLGaussian):
         h = numpy.zeros((N,2,1))
         h[:,0,0] = 0.1*numpy.fabs(xil)*xil
         return (numpy.asarray(y).reshape((-1,1)), None, h, None)
-
-    def set_states(self, particles, xi_list, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
-        N = len(particles)
-        for i in xrange(N):
-            particles[i][0:1] = xi_list[i].ravel()
-            particles[i][1:4] = z_list[i].ravel()
-            particles[i][4:] = P_list[i].ravel()
- 
-    def get_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
-        N = len(particles)
-        xil = list()
-        zl = list()
-        Pl = list()
-        for i in xrange(N):
-            xil.append(particles[i][0].reshape(1,1))
-            zl.append(particles[i][1:4].reshape(3,1))
-            Pl.append(particles[i][4:].reshape(3,3))
-        
-        return (xil, zl, Pl)
 
     # Override this method since there is no uncertainty in z0    
     def eval_logp_xi0(self, xil):

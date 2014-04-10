@@ -38,7 +38,7 @@ class ParticleFilter(object):
         pa = copy.deepcopy(pa)
         resampled = False
         if (self.res and pa.N_eff < self.res*pa.num):
-            ancestors = pa.resample()
+            ancestors = pa.resample(self.model, pa.num)
             resampled = True
         else:
             ancestors = numpy.arange(pa.num,dtype=int)
@@ -292,7 +292,7 @@ class ParticleApproximation(object):
     def __len__(self):
         return len(self.part)
     
-    def resample(self, N=None):
+    def resample(self, model, N=None):
         """ Resample approximation so all particles have the same weight,
             new number of particles is N. If left out the number of particles
             remains the same """
@@ -303,9 +303,7 @@ class ParticleApproximation(object):
             N = self.num
         
         new_ind = sample(numpy.exp(self.w), N)
-        new_part = numpy.empty(N, type(self.part[0]))
-        for k in range(numpy.shape(new_ind)[0]):
-            new_part[k] = copy.copy(self.part[new_ind[k]])
+        new_part = model.copy(self.part, new_ind)
         
         self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
         self.part = new_part
