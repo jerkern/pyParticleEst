@@ -22,7 +22,7 @@ class HierarchicalBase(RBPSBase):
         # Update linear estimate with data from measurement of next non-linear
         # state 
         (_xil, zl, Pl) = self.get_states(particles)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles, u)
         for i in xrange(len(zl)):
             # Predict z_{t+1}
             (zl[i], Pl[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
@@ -67,7 +67,7 @@ class HierarchicalBase(RBPSBase):
         #lpxi = numpy.empty(N)
         lpz = numpy.empty(N)
 
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles, u)
         (xil, zl, Pl) = self.get_states(particles)
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
@@ -95,7 +95,7 @@ class HierarchicalBase(RBPSBase):
             part = numpy.copy(particles[j])
             (xil, zl, Pl) = self.get_states([part,])
             if (next_part != None):
-                (A, f, Q) = self.get_lin_pred_dynamics_int([part,], u)
+                (A, f, Q, _, _, _) = self.get_lin_pred_dynamics_int([part,], u)
                 self.kf.measure_full(next_part[j][self.len_xi:], zl[0], Pl[0],
                                      C=A[0], h_k=f[0], R=Q[0])
 
@@ -154,7 +154,7 @@ class HierarchicalBase(RBPSBase):
             straj[i] = particles
 
             particles = copy.deepcopy(particles)
-            (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles, st.u[i])
+            (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles, st.u[i])
             (_xil, zl, Pl) = self.get_states(particles)
             for j in xrange(M):
                 self.kf.predict_full(zl[j], Pl[j], Az[j], fz[j], Qz[j])
@@ -174,7 +174,7 @@ class HierarchicalBase(RBPSBase):
             self.t = st.t[i]
             (xin, zn, Pn) = self.get_states(straj[i+1])
             (xi, z, P) = self.get_states(straj[i])
-            (Az, fz, Qz) = self.get_lin_pred_dynamics_int(straj[i], st.u[i])
+            (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(straj[i], st.u[i])
             for j in xrange(M):
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j], Az[j], fz[j], Qz[j])
                 self.set_states(straj[i][j:j+1], xi[j], (zs,), (Ps,))
@@ -189,7 +189,7 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
     def next_pdf_max(self, particles, u=None):
         N = len(particles)
         lpxi = self.next_pdf_xi_max(particles, u)
-        (Az, _fz, Qz) = self.get_lin_pred_dynamics_int(particles, u)
+        (Az, _fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles, u)
         lpz = numpy.empty_like(lpxi)
         (_xil, _zl, Pl) = self.get_states(particles)
         nx = len(Qz[0])

@@ -91,15 +91,21 @@ class RBPFBase(ParticleFilteringInterface):
     def get_nonlin_pred_dynamics_int(self, particles, u):
         (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles, u)
         N = len(particles)
+        Axi_identical = False
+        fxi_identical = False
+        Qxi_identical = False
         # This is probably not so nice performance-wise, but will
         # work initially to profile where the bottlenecks are.
         if (Axi == None):
             Axi=N*(self.Axi,)
+            Axi_identical = True
         if (fxi == None):
             fxi=N*(self.fxi,)
+            fxi_identical = True
         if (Qxi == None):
             Qxi= N*(self.Qxi,)
-        return (Axi, fxi, Qxi)
+            Qxi_identical = True
+        return (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical)
     
     def get_condlin_pred_dynamics(self, u, xi_next, particles):
         """ Return matrices describing affine relation of next
@@ -130,16 +136,23 @@ class RBPFBase(ParticleFilteringInterface):
     def get_lin_pred_dynamics_int(self, particles, u):
         N = len(particles)
         (Az, fz, Qz) = self.get_lin_pred_dynamics(particles, u)
+        Az_identical = False
+        fz_identical = False
+        Qz_identical = False
         if (Az == None):
             #Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
             Az=N*(self.kf.A,)
+            Az_identical = True
         if (fz == None):
             #fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
             fz=N*(self.kf.f_k,)
+            fz_identical = True
         if (Qz == None):
-            Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
-            #Qz=N*(self.kf.Q,)
-        return (Az, fz, Qz)
+            #Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
+            Qz=N*(self.kf.Q,)
+            Qz_identical = True
+            
+        return (Az, fz, Qz, Az_identical, fz_identical, Qz_identical)
     
     def get_meas_dynamics(self, particles, y):
         return (y, None, None, None)
@@ -147,17 +160,23 @@ class RBPFBase(ParticleFilteringInterface):
     def get_meas_dynamics_int(self, particles, y):
         N=len(particles)
         (y, Cz, hz, Rz) = self.get_meas_dynamics(particles=particles, y=y)
+        Cz_identical = False
+        hz_identical = False
+        Rz_identical = False
         if (Cz == None):
 #            if (self.kf.C == None):
 #                Cz=N*(numpy.zeros((len(y), self.kf.lz)))
 #            else:
 #                Cz=N*(self.kf.C,)
             Cz=N*(self.kf.C,)
+            Cz_identical = True
         if (hz == None):
             hz=N*(self.kf.h_k,)
+            hz_identical = True
         if (Rz == None):
             Rz=N*(self.kf.R,)
-        return (y, Cz, hz, Rz)
+            Rz_identical = True
+        return (y, Cz, hz, Rz, Cz_identical, hz_identical, Rz_identical)
     
 # This is not implemented  
 #    def get_condlin_meas_dynamics(self, y, xi_next, particles):

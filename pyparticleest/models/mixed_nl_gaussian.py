@@ -58,7 +58,7 @@ class MixedNLGaussian(RBPSBase):
 
     def sample_process_noise(self, particles, u=None): 
         """ Return sampled process noise for the non-linear states """
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles, u)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles, u)
         (_xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
         # This is probably not so nice performance-wise, but will
@@ -82,7 +82,7 @@ class MixedNLGaussian(RBPSBase):
 
     def pred_xi(self, particles, u=None):
         N = len(particles)
-        (Axi, fxi, _Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, _, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         (xil, zl, _Pl) = self.get_states(particles)
         dim=len(xil[0])
         xi_next = numpy.empty((N,dim))
@@ -99,7 +99,7 @@ class MixedNLGaussian(RBPSBase):
         
         N = len(particles)
         (xil, zl, Pl) = self.get_states(particles)
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         for i in xrange(N):
             self.kf.measure_full(y=xi_next[i].reshape((self.lxi,1)), z=zl[i], P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
         
@@ -114,7 +114,7 @@ class MixedNLGaussian(RBPSBase):
         N = len(particles)
         #(xil, zl, Pl) = self.get_states(particles)
         
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
 
         Qxiz = self.get_cross_covariance(particles=particles, u=u)
         if (Qxiz == None and self.Qxiz == None):
@@ -122,7 +122,7 @@ class MixedNLGaussian(RBPSBase):
         if (Qxiz == None):
             Qxiz = N*(self.Qxiz,)
         
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         
         Acond = list()
         fcond = list()
@@ -157,7 +157,7 @@ class MixedNLGaussian(RBPSBase):
         
         (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
-        (y, Cz, hz, Rz) = self.get_meas_dynamics_int(particles=particles, y=y)
+        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=y)
             
         lyz = numpy.empty(N)
         for i in xrange(len(zl)):
@@ -171,8 +171,8 @@ class MixedNLGaussian(RBPSBase):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
         N = len(particles)
         pmax = numpy.empty(N)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         Qxiz = self.get_cross_covariance(particles=particles, u=u)
         (xil, zl, Pl) = self.get_states(particles)
         if (Qxiz == None):
@@ -198,8 +198,8 @@ class MixedNLGaussian(RBPSBase):
         Nn = len(next_part)
         if (N > 1 and Nn == 1):
             next_part = numpy.repeat(next_part, N, 0)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         Qxiz = self.get_cross_covariance(particles=particles, u=u)
         (xil, zl, Pl) = self.get_states(particles)
         if (Qxiz == None):
@@ -431,8 +431,8 @@ class MixedNLGaussian(RBPSBase):
         (_xi, z, P) = self.get_states(particles)
         (xin, zn, Pn) = self.get_states(x_next)
         
-        (Az, fz, Qz) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         Qxiz = self.get_cross_covariance(particles=particles, u=u)
         if (Qxiz == None):
             if (self.Qxiz == None):
@@ -524,7 +524,7 @@ class MixedNLGaussian(RBPSBase):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
         N = len(particles)
-        (y, Cz, hz, Rz) = self.get_meas_dynamics_int(particles, y)
+        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles, y)
         (xil, zl, Pl) = self.get_states(particles)
         logpy = numpy.empty(N)
         for i in xrange(N):
