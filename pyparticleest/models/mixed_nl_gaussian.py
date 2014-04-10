@@ -167,26 +167,55 @@ class MixedNLGaussian(RBPSBase):
         self.set_states(particles, xil, zl, Pl)
         return lyz
 
-    def next_pdf_max(self, particles, u=None):
-        """ Implements the fwd_peak_density function for MixedNLGaussian models """
+    def calc_A_f_Q(self, particles, u):
         N = len(particles)
-        pmax = numpy.empty(N)
-        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
-        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
+        (Az, fz, Qz, Az_identical, fz_identical, Qz_identical) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
+        (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
         Qxiz = self.get_cross_covariance(particles=particles, u=u)
-        (xil, zl, Pl) = self.get_states(particles)
+        Qxiz_identical = False
+
         if (Qxiz == None):
+            Qxiz_identical = True
             if (self.Qxiz == None):
                 Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
             else:
                 Qxiz = N*(self.Qxiz,)
-        dim=len(xil[0])+len(zl[0])
+        
+        if (Az_identical and Axi_identical):
+            A = N*(numpy.vstack((Axi[0], Az[0])),)
+        else:
+            A = list()
+            for i in xrange(N):
+                A.append(numpy.vstack((Axi[i], Az[i])))
+                
+        if (fxi_identical and fz_identical):
+            f = N*(numpy.vstack((fxi[0], fz[0])),)
+        else:
+            f = list()
+            for i in xrange(N):
+                f.append(numpy.vstack((fxi[i], fz[i])))
+                
+        if (Qxi_identical and Qz_identical and Qxiz_identical):
+            Q = N*(numpy.vstack((numpy.hstack((Qxi[0], Qxiz[0])),
+                              numpy.hstack((Qxiz[0].T, Qz[0])))),)
+        else:
+            Q = list()
+            for i in xrange(N):
+                Q.append(numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
+                              numpy.hstack((Qxiz[i].T, Qz[i])))))
+                
+        return (A, f, Q)
+    
+    def next_pdf_max(self, particles, u=None):
+        """ Implements the fwd_peak_density function for MixedNLGaussian models """
+        N = len(particles)
+        pmax = numpy.empty(N)
+        (xil, zl, Pl) = self.get_states(particles)
+        (A, f, Q) = self.calc_A_f_Q(particles, u)
+        dim=self.lxi + self.kf.lz
         zeros = numpy.zeros((dim,1))
         for i in xrange(N):
-            A = numpy.vstack((Axi[i], Az[i]))
-            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
-                              numpy.hstack((Qxiz[i].T, Qz[i]))))
-            self.Sigma = Q + A.dot(Pl[i]).dot(A.T)
+            self.Sigma = Q[i] + A[i].dot(Pl[i]).dot(A[i].T)
             pmax[i] = kalman.lognormpdf(zeros, zeros, self.Sigma)
         
         return numpy.max(pmax)
@@ -198,29 +227,14 @@ class MixedNLGaussian(RBPSBase):
         Nn = len(next_part)
         if (N > 1 and Nn == 1):
             next_part = numpy.repeat(next_part, N, 0)
-        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
-        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
-        Qxiz = self.get_cross_covariance(particles=particles, u=u)
-        (xil, zl, Pl) = self.get_states(particles)
-        if (Qxiz == None):
-            if (self.Qxiz == None):
-                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
-            else:
-                Qxiz = N*(self.Qxiz,)
-        
         lpx = numpy.empty(N)
-        
-#        #z_diff= next_part.sampled_z - self.kf.predict()[0]
-#        z_diff= next_part.sampled_z - self.cond_predict(eta_est)[0]
+        (xil, zl, Pl) = self.get_states(particles)
+        (A, f, Q) = self.calc_A_f_Q(particles, u)
         
         for i in xrange(N):
-            x_next = next_part[i,:self.lxi+self.kf.lz].reshape((-1,1))
-            A = numpy.vstack((Axi[i], Az[i]))
-            f = numpy.vstack((fxi[i], fz[i]))
-            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
-                              numpy.hstack((Qxiz[i].T, Qz[i]))))
-            xp = f + A.dot(zl[i])
-            Sigma = A.dot(Pl[i]).dot(A.T) + Q
+            x_next = next_part[i,:self.lxi+self.kf.lz].reshape((self.lxi+self.kf.lz,1))
+            xp = f[0] + A[i].dot(zl[i])
+            Sigma = A[i].dot(Pl[i]).dot(A[i].T) + Q[i]
             lpx[i] = kalman.lognormpdf(x_next,mu=xp,S=Sigma)
         
         return lpx
