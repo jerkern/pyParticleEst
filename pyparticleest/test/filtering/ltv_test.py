@@ -37,7 +37,7 @@ class Model(LTV):
                                     Q=Q, R=R)
     
     
-    def get_meas_dynamics(self, t, y):
+    def get_meas_dynamics(self, y, t):
         C = numpy.asarray(((math.cos(t), 0.0), 
                            (math.sin(t), 0.0))).reshape((2,2))
         return (y, C, None, None)
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     (x, y) = generate_dataset(steps, z0, P0, Q, R)
     model = Model(z0, P0, Q, R)
     traj = pf.ParticleTrajectory(model, num)
-    traj.measure(y[0])
+    traj.measure(y=y[0])
     for k in range(1,len(y)):
         traj.forward(u=None, y=y[k])
 

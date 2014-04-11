@@ -47,13 +47,13 @@ class Model(MixedNLGaussianInitialGaussian):
                                     Qxi=Q_xi, Qxiz=Q_xiz,
                                     Qz=Q_z, R=R)
         
-    def get_nonlin_pred_dynamics(self, particles, u):
+    def get_nonlin_pred_dynamics(self, particles, u, t):
             N = len(particles)
             tmp = numpy.vstack(particles)
             fxi = tmp[:,0].tolist()
             return (None, fxi, None)
         
-    def get_meas_dynamics(self, y, particles):
+    def get_meas_dynamics(self, particles, y, t):
             N = len(particles)
             tmp = numpy.vstack(particles)
             h = tmp[:,0].tolist()

@@ -58,11 +58,11 @@ class LTV(FFBSiInterface):
         
         return (zl, Pl)
 
-    def get_pred_dynamics(self, t, u):
+    def get_pred_dynamics(self, u, t):
         # Return (A, f, Q) 
         return (None, None, None)
 
-    def update(self, particles, u, noise):
+    def update(self, particles, u, t, noise):
         """ Update estimate using noise as input """
         # Update linear estimate with data from measurement of next non-linear
         # state 
@@ -77,15 +77,15 @@ class LTV(FFBSiInterface):
         self.set_states(particles, zl, Pl)
         self.t = self.t + 1.0
     
-    def get_meas_dynamics(self, t, y):
+    def get_meas_dynamics(self, y, t):
         return (y, None, None, None)
     
-    def measure(self, y, particles):
+    def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
 
        
         (zl, Pl) = self.get_states(particles)
-        (y, C, h, R) = self.get_meas_dynamics(self.t, y)
+        (y, C, h, R) = self.get_meas_dynamics(y=y, t=t)
         self.kf.set_dynamics(C=C, R=R, h_k=h)  
         lyz = numpy.empty((len(particles)))
         for i in xrange(len(zl)):
@@ -95,15 +95,15 @@ class LTV(FFBSiInterface):
         self.set_states(particles, zl, Pl)
         return lyz
     
-    def next_pdf(self, particles, next_cpart, u=None):
+    def next_pdf(self, particles, next_cpart, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         N = len(particles)
         return numpy.zeros((N,))
     
-    def sample_process_noise(self, particles, u=None): 
+    def sample_process_noise(self, particles, u, t): 
         return None
     
-    def sample_smooth(self, particle, next_part, u):
+    def sample_smooth(self, particle, next_part, u, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         
         (zl, Pl) = self.get_states(particle)
@@ -115,7 +115,7 @@ class LTV(FFBSiInterface):
             if (next_part != None):
                 zn = next_part[j, :lz].reshape((lz,1))
                 Pn = next_part[j, lz:lzP].reshape((lz,lz))
-                (A, f, Q) = self.get_pred_dynamics(particle, u)
+                (A, f, Q) = self.get_pred_dynamics(u=u, t=t)
                 self.kf.set_dynamics(A=A, Q=Q, f_k=f)
                 (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
             else:
@@ -127,7 +127,7 @@ class LTV(FFBSiInterface):
         return res
 
 
-    def fwd_peak_density(self, u=None):
+    def fwd_peak_density(self, u, t):
         return 0.0
 
     def calc_l1(self, z, P, z0, P0):

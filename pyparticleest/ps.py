@@ -5,11 +5,11 @@ import math
 import copy
 import pyparticleest.pf as pf
 
-def bsi_full(pa, model, next, u):
+def bsi_full(pa, model, next, u, t):
     M = len(next)
     res = numpy.empty(M, dtype=int)
     for j in xrange(M):
-        p_next = model.next_pdf(pa.part, next[j:j+1], u)
+        p_next = model.next_pdf(pa.part, next[j:j+1], u, t)
             
         w = pa.w + p_next
         w = w - numpy.max(w)
@@ -19,7 +19,7 @@ def bsi_full(pa, model, next, u):
     return res
 
 
-def bsi_rs(pa, model, next, u, maxpdf, max_iter):
+def bsi_rs(pa, model, next, u, t, maxpdf, max_iter):
     M = len(next)
     todo = numpy.asarray(range(M))
     res = numpy.empty(M, dtype=int)
@@ -30,7 +30,7 @@ def bsi_rs(pa, model, next, u, maxpdf, max_iter):
     for _i in xrange(max_iter):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
-        pn = model.next_pdf(pa.part[ind], next[todo], u)
+        pn = model.next_pdf(pa.part[ind], next[todo], u, t)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         res[todo[accept]] = ind[accept]
@@ -41,17 +41,17 @@ def bsi_rs(pa, model, next, u, maxpdf, max_iter):
     res[todo] = bsi_full(pa, model, next[todo], u)        
     return res
 
-def bsi_mcmc(pa, model, next, u, R, ancestors):
+def bsi_mcmc(pa, model, next, u, t, R, ancestors):
     M = len(next)
     ind = ancestors
     weights = numpy.copy(pa.w)
     weights -= numpy.max(weights)
     weights = numpy.exp(weights)
     weights /= numpy.sum(weights)
-    pind = model.next_pdf(pa.part[ind], next, u)                     
+    pind = model.next_pdf(pa.part[ind], next, u, t)                     
     for _j in xrange(R):
         propind = numpy.random.permutation(pf.sample(weights, M))
-        pprop = model.next_pdf(pa.part[propind], next, u)
+        pprop = model.next_pdf(pa.part[propind], next, u, t)
         diff = pprop - pind
         diff[diff > 0.0] = 0.0
         test = numpy.log(numpy.random.uniform(size=M))
@@ -61,7 +61,7 @@ def bsi_mcmc(pa, model, next, u, R, ancestors):
     
     return ind
         
-def bsi_rsas(pa, model, next, u, maxpdf, x1, P1, sv, sw, ratio):
+def bsi_rsas(pa, model, next, u, t, maxpdf, x1, P1, sv, sw, ratio):
     M = len(next)
     todo = numpy.asarray(range(M))
     res = numpy.empty(M, dtype=int)
@@ -75,7 +75,7 @@ def bsi_rsas(pa, model, next, u, maxpdf, x1, P1, sv, sw, ratio):
     while (True):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
-        pn = model.next_pdf(pa.part[ind], next[todo], u)
+        pn = model.next_pdf(pa.part[ind], next[todo], u, t)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         ak = numpy.sum(accept)
@@ -95,7 +95,7 @@ def bsi_rsas(pa, model, next, u, maxpdf, x1, P1, sv, sw, ratio):
         if (pk < stop_criteria):
             break
     
-    res[todo] = bsi_full(pa, model, next[todo], u)        
+    res[todo] = bsi_full(pa, model, next[todo], u, t)        
     return res
 
 class SmoothTrajectory(object):
@@ -117,7 +117,10 @@ class SmoothTrajectory(object):
         tmp = numpy.exp(tmp)
         tmp = tmp / numpy.sum(tmp)
         ind = pf.sample(tmp, M)
-        self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind], None, None)[numpy.newaxis,]
+        self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind],
+                                                 next_part=None,
+                                                 u=pt[-1].u,
+                                                 t=pt[-1].t)[numpy.newaxis,]
         
         
         self.u = [pt[-1].u, ]
@@ -146,21 +149,25 @@ class SmoothTrajectory(object):
             self.model.t = step.t
             pa = step.pa
             if (method=='rs'):
-                ind = bsi_rs(pa, self.model, self.traj[cur_ind+1][0], step.u,
+                ind = bsi_rs(pa, self.model, self.traj[cur_ind+1][0],
+                             step.u, step.t,
                              options['maxpdf'][cur_ind],max_iter)
             elif (method=='rsas'):
-                ind = bsi_rsas(pa, self.model, self.traj[cur_ind+1][0], step.u,
+                ind = bsi_rsas(pa, self.model, self.traj[cur_ind+1][0],
+                               step.u, step.t,
                                options['maxpdf'][cur_ind],x1,P1,sv,sw,ratio)                
             elif (method=='mcmc'):
-                ind = bsi_mcmc(pa, self.model, self.traj[cur_ind+1][0], step.u, 
+                ind = bsi_mcmc(pa, self.model, self.traj[cur_ind+1][0],
+                               step.u, step.t,
                                options['R'], ancestors)
                 ancestors = step.ancestors[ind]
             elif (method=='normal'):
-                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u)
+                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.u)
             # Select 'previous' particle
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
                                                                      self.traj[cur_ind+1][0],
-                                                                     step.u))[numpy.newaxis,]
+                                                                     step.u,
+                                                                     step.t))[numpy.newaxis,]
             self.u.append(step.u)
             self.y.append(step.y)
             self.t.append(step.t)

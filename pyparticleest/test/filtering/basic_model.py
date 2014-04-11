@@ -33,16 +33,16 @@ class Model(pyparticleest.part_utils.ParticleFilteringInterface):
     def create_initial_estimate(self, N):
         return numpy.random.normal(0.0, self.P0, (N,)) 
         
-    def sample_process_noise(self, u, particles):
+    def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
         N = len(particles)
         return numpy.random.normal(0.0, self.Q, (N,)) 
     
-    def update(self, u, noise, particles):
+    def update(self, particles, u, t, noise):
         """ Update estimate using 'data' as input """
         particles += noise
    
-    def measure(self, y, particles):
+    def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
         logyprob = numpy.empty(len(particles), dtype=float)
         for k in range(len(particles)):

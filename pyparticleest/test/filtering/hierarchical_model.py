@@ -64,19 +64,19 @@ class Model(HierarchicalRSBase):
         return (numpy.zeros((self.kf.lz,1)),
                 numpy.copy(self.P0_z))
         
-    def sample_process_noise(self, particles, u=None):
+    def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
         N = len(particles)
         return numpy.random.normal(0.0, math.sqrt(self.Q_xi), (N,)) 
 
-    def calc_xi_next(self, particles, u, noise):
+    def calc_xi_next(self, particles, u, t, noise):
         N = len(particles)
         xi_next = numpy.empty(N)
         for i in xrange(N):
             xi_next[i] =  particles[i][0] + noise[i]
         return xi_next
     
-    def next_pdf_xi(self, particles, next_xi, u):
+    def next_pdf_xi(self, particles, next_xi, u, t):
         self.pn_count = self.pn_count + len(particles)
         tmp = numpy.vstack(particles)
         xi = tmp[:,0:1,numpy.newaxis]
@@ -88,10 +88,10 @@ class Model(HierarchicalRSBase):
 #            lpxi[i] = kalman.lognormpdf(next_xi, particles[i][0:1], numpy.asarray(((self.Q_xi,),)))
 #        return lpxi
     
-    def next_pdf_xi_max(self, particles, u):
+    def next_pdf_xi_max(self, particles, u, t):
         return numpy.asarray((scipy.stats.norm.logpdf(0.0, 0.0, math.sqrt(self.Q_xi)),)*len(particles))
     
-    def measure_nonlin(self, particles, y):
+    def measure_nonlin(self, particles, y, t):
         N = len(particles)
         lpy = numpy.empty((N,))
         m = numpy.zeros((1,1))
@@ -99,7 +99,7 @@ class Model(HierarchicalRSBase):
             lpy[i] = kalman.lognormpdf(y[0]-particles[i][0], m, self.R_xi)
         return lpy
     
-    def get_lin_pred_dynamics(self, particles, u=None):
+    def get_lin_pred_dynamics(self, particles, u, t):
         """ Return matrices describing affine relation of next
             nonlinear state conditioned on current linear state
             
@@ -124,7 +124,7 @@ class Model(HierarchicalRSBase):
             
         return (Az, None, None)
     
-    def get_lin_meas_dynamics(self, y, particles):
+    def get_lin_meas_dynamics(self, particles, y, t):
         N = len(particles)
         Cz = numpy.empty((N,1,2))
         for i in xrange(N):

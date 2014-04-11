@@ -86,17 +86,17 @@ class ParticleLSB(MixedNLGaussianInitialGaussian):
                                          Az=Az, R=R,
                                          Qxi=Qxi, Qz=Qz,)
    
-    def get_nonlin_pred_dynamics(self, particles, u):
+    def get_nonlin_pred_dynamics(self, particles, u, t):
         N = len(particles)
         C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
         tmp = numpy.vstack(particles)[:,numpy.newaxis,:]
         Axi = (tmp[:,:,0]/(1+tmp[:,:,0]**2)).dot(C_theta)
         Axi = Axi[:,numpy.newaxis,:]
-        fxi = 0.5*tmp[:,:,0]+25*tmp[:,:,0]/(1+tmp[:,:,0]**2)+8*math.cos(1.2*self.t)
+        fxi = 0.5*tmp[:,:,0]+25*tmp[:,:,0]/(1+tmp[:,:,0]**2)+8*math.cos(1.2*t)
         fxi = fxi[:,numpy.newaxis,:]
         return (Axi, fxi, None)
         
-    def get_meas_dynamics(self, y, particles):
+    def get_meas_dynamics(self, particles, y, t):
         N = len(particles)
         tmp = numpy.vstack(particles)
         h = 0.05*tmp[:,0]**2

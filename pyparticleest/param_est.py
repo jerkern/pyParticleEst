@@ -3,6 +3,7 @@ import abc
 import pyparticleest.pf as pf
 import numpy
 import scipy.optimize
+import matplotlib.pyplot as plt
 
 class ParamEstInterface(object):
     """ Interface s for particles to be used with the parameter estimation
@@ -180,7 +181,7 @@ class ParamEstimation(object):
        
     def eval_logp_x0(self):
         M = self.straj.traj.shape[1]
-        logp_x0 = self.model.eval_logp_x0(numpy.vstack(self.straj.traj[0]),
+        logp_x0 = self.model.eval_logp_x0(self.straj.traj[0],
                                           self.straj.t[0])
         return numpy.sum(logp_x0)/M
     
@@ -190,7 +191,7 @@ class ParamEstimation(object):
         T = len(self.straj)
         for t in xrange(T):
             if (self.straj.y[t] != None):
-                val = self.model.eval_logp_y(numpy.vstack(self.straj.traj[t]),
+                val = self.model.eval_logp_y(self.straj.traj[t],
                                              self.straj.y[t],
                                              self.straj.t[t])
                 logp_y += numpy.sum(val)
@@ -202,8 +203,84 @@ class ParamEstimation(object):
         M = self.straj.traj.shape[1]
         T = len(self.straj)
         for t in xrange(T-1):
-            val = self.model.eval_logp_xnext(numpy.vstack(self.straj.traj[t]),
-                                                 numpy.vstack(self.straj.traj[t+1]),
-                                                 self.straj.u[t], self.straj.t[t])
+            val = self.model.eval_logp_xnext(self.straj.traj[t],
+                                             self.straj.traj[t+1],
+                                             self.straj.u[t],
+                                             self.straj.t[t])
             logp_xnext += numpy.sum(val)
         return logp_xnext/M
+    
+    def eval_logp_x0_grad(self):
+        M = self.straj.traj.shape[1]
+        logp_x0_grad = self.model.eval_logp_x0_grad(self.straj.traj[0],
+                                                    self.straj.t[0])
+        return logp_x0_grad/M
+    
+    def eval_logp_y_grad(self, ind=None, traj_ind=None):
+        logp_y_grad = numpy.zeros((len(self.model.params)))
+        M = self.straj.traj.shape[1]
+        T = len(self.straj)
+        for t in xrange(T):
+            if (self.straj.y[t] != None):
+                logp_y_grad += self.model.eval_logp_y_grad(self.straj.traj[t],
+                                                           self.straj.y[t],
+                                                           self.straj.t[t])
+        return logp_y_grad/M
+    
+    def eval_logp_xnext_grad(self, ind=None, traj_ind=None):
+        logp_xnext_grad = numpy.zeros((len(self.model.params)))
+        M = self.straj.traj.shape[1]
+        T = len(self.straj)
+        for t in xrange(T-1):
+            logp_xnext_grad += self.model.eval_logp_xnext_grad(self.straj.traj[t],
+                                                               self.straj.traj[t+1],
+                                                               self.straj.u[t], self.straj.t[t])
+        return logp_xnext_grad/M
+    
+class GradPlot():
+    def __init__(self, params, vals, diff):
+        self.params = params
+        self.vals = vals
+        self.diff = diff
+
+    def plot(self, fig_id):
+        fig = plt.figure(fig_id)
+        fig.clf()
+        plt.plot(self.params, self.vals)
+        if (self.diff != None):
+            for k in range(len(self.params)):
+                if (k % 10 == 1):
+                    self.draw_gradient(self.params[k], self.vals[k], self.params[k]-self.params[k-1], self.diff[k])
+                
+        plt.show()
+        
+    def draw_gradient(self, x, y, dx, dydx):
+        plt.plot((x-dx, x+dx), (y-dydx*dx, y+dydx*dx), 'r')
+    
+    
+class GradientTest(ParamEstimation):
+    
+    def test(self, param_id, param_vals, num=100, nums=1):
+        self.simulate(num_part=num, num_traj=nums)
+        param_steps = len(param_vals)
+        logpy = numpy.zeros((param_steps,))
+        grad_logpy = numpy.zeros((len(self.params), param_steps))
+        logpxn = numpy.zeros((param_steps,))
+        grad_logpxn = numpy.zeros((len(self.params), param_steps))
+        logpx0 = numpy.zeros((param_steps,))
+        grad_logpx0 = numpy.zeros((len(self.params), param_steps))
+        for k in range(param_steps):    
+            tmp = numpy.copy(self.params)
+            tmp[param_id] = param_vals[k]
+            self.set_params(tmp)
+            logpy[k] = self.eval_logp_y()
+            logpxn[k]  = self.eval_logp_xnext()
+            logpx0[k] = self.eval_logp_x0()
+            grad_logpy[k] = self.eval_logp_y_grad()
+            grad_logpxn[k]  = self.eval_logp_xnext_grad()
+            grad_logpx0[k] = self.eval_logp_x0_grad()
+
+        self.plot_y = GradPlot(param_vals, logpy, grad_logpy[param_id,:])
+        self.plot_xn = GradPlot(param_vals, logpxn, grad_logpxn[param_id,:])
+        self.plot_x0 = GradPlot(param_vals, logpx0, grad_logpx0[param_id,:])
+

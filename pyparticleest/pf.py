@@ -34,7 +34,7 @@ class ParticleFilter(object):
         self.res = res
         self.model = model
     
-    def forward(self, pa, u, y):
+    def forward(self, pa, u, y, t):
         pa = copy.deepcopy(pa)
         resampled = False
         if (self.res and pa.N_eff < self.res*pa.num):
@@ -43,12 +43,12 @@ class ParticleFilter(object):
         else:
             ancestors = numpy.arange(pa.num,dtype=int)
         
-        pa = self.update(pa, u)
+        pa = self.update(pa, u=u, t=t)
         if (y != None):
-            pa = self.measure(pa, y)
+            pa = self.measure(pa, y=y, t=t+1)
         return (pa, resampled, ancestors)
     
-    def update(self, pa, u, inplace=True):
+    def update(self, pa, u, t, inplace=True):
         """ Update particle approximation using u as kinematic input.
             
             If inplace=True the particles are update then returned,
@@ -67,13 +67,13 @@ class ParticleFilter(object):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
             
-        v = self.model.sample_process_noise(particles=pa.part, u=u)
-        self.model.update(particles=pa.part, u=u, noise=v)
+        v = self.model.sample_process_noise(particles=pa.part, u=u, t=t)
+        self.model.update(particles=pa.part, u=u, t=t, noise=v)
         
         return pa 
     
     
-    def measure(self, pa, r, inplace=True):
+    def measure(self, pa, y, t, inplace=True):
         """ Evaluate and update particle approximation using new measurement r
             
             If inplace=True the particles are update then returned,
@@ -85,7 +85,7 @@ class ParticleFilter(object):
             pa = pa_out
 
         #y = pa.part[k].prep_measure(r)
-        new_weights = self.model.measure(particles=pa.part, y=r)
+        new_weights = self.model.measure(particles=pa.part, y=y, t=t)
         
         pa.w = pa.w + new_weights
         # Keep the weights from going to -Inf
@@ -198,14 +198,14 @@ class ParticleTrajectory(object):
     
     def forward(self, u, y):
         self.traj[-1].u = u
-        (pa_nxt, resampled, ancestors) = self.pf.forward(self.traj[-1].pa, u, y)
+        (pa_nxt, resampled, ancestors) = self.pf.forward(self.traj[-1].pa, u=u, y=y, t=self.traj[-1].t)
         self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1, y=y, ancestors=ancestors))
         #self.traj[-1].y = y
         self.len = len(self.traj)
         return resampled
     
     def measure(self, y):
-        self.pf.measure(self.traj[-1].pa, y, inplace=True)
+        self.pf.measure(self.traj[-1].pa, y=y, t=self.traj[-1].t, inplace=True)
         
     def prep_rejection_sampling(self):
         """ Find the maximum over all inputs of the pdf for the next timestep,
@@ -250,7 +250,7 @@ class ParticleTrajectory(object):
             coeffs = numpy.empty(self.len, dtype=float)
             for k in range(self.len):
                 coeffs[k] = math.exp(self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,
-                                                                u=self.traj[k].u)) 
+                                                                u=self.traj[k].u, t=self.traj[k].t)) 
             options['maxpdf'] = coeffs
         if (method == 'mcmc'):
             options['R'] = 30

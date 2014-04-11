@@ -78,6 +78,7 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
         Pxi0 = numpy.eye(1)
         z0 = numpy.zeros((3,))
         Pz0 = 0.0*numpy.eye(3)
+
         # Linear states handled by base-class
         super(ParticleLS2,self).__init__(xi0=xi0, z0=z0, Pz0=Pz0, Pxi0=Pxi0, 
                                          Az=Az, C=C, Axi=Axi,
@@ -86,7 +87,7 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
 
 
     def get_nonlin_pred_dynamics(self, particles, u):
-        xil = numpy.vstack(particles)[:,0]
+        xil = particles[:,0]
         fxil = self.params[0]*numpy.arctan(xil)
         return (None, fxil[:,numpy.newaxis,numpy.newaxis], None)
         
@@ -101,21 +102,22 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
     def eval_logp_x0(self, particles, t):
         return self.eval_logp_xi0(particles[:,:self.lxi])
     
-    def eval_logp_xi0(self, xil):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""    
-            
-        N = len(xil)
-        return kalman.lognormpdf_vec(xil, N*(self.xi0,), N*(self.Pxi0,))
-
+    def get_pred_dynamics_grad(self, particles, u, t):
+        N = len(particles)
+        xil = particles[:,0]
+        f_grad = numpy.zeros((N, 5, 4,1))
+        f_grad[:,0,0,:] = numpy.arctan(xil)
+        
+        return (N*(self.A_grad,), f_grad, None)
+ 
+    
     def set_params(self, params):
         """ New set of parameters """
         # Update all needed matrices and derivates with respect
         # to the new parameter set
         self.params = numpy.copy(params)
         Axi = numpy.array([[params[1], 0.0, 0.0]])
+        
         Az = numpy.asarray(((1.0, params[2], 0.0), 
                             (0.0,  
                              params[3]*math.cos(params[4]), 
@@ -123,4 +125,24 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
                              (0.0,  
                              params[3]*math.sin(params[4]), 
                              params[3]*math.cos(params[4]))))
+        
+        self.A_grad = (
+            numpy.zeros((4,3)),
+            numpy.asarray(((1.0, 0.0, 0.0), 
+                           (0.0, 0.0, 0.0),
+                           (0.0, 0.0, 0.0),
+                           (0.0, 0.0, 0.0))),
+            numpy.asarray(((0.0, 0.0, 0.0),
+                           (0.0, 1.0, 0.0), 
+                           (0.0, 0.0, 0.0),
+                           (0.0, 0.0, 0.0))),
+            numpy.asarray(((0.0, 0.0, 0.0),
+                           (0.0, 0.0, 0.0), 
+                           (0.0, math.cos(params[4]), -math.sin(params[4])),
+                           (0.0, math.sin(params[4]), math.cos(params[4])))),
+            numpy.asarray(((0.0, 0.0, 0.0),
+                           (0.0, 0.0, 0.0), 
+                           (0.0, -params[3]*math.sin(params[4]), -params[3]*math.cos(params[4])),
+                           (0.0, params[3]*math.cos(params[4]), -params[3]*math.sin(params[4]))))
+            )
         self.set_dynamics(Axi=Axi, Az=Az)

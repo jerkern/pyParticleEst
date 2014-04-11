@@ -17,17 +17,17 @@ class ParticleFilteringInterface(object):
         return
      
     @abc.abstractmethod
-    def sample_process_noise(self, particles, u):
+    def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
         return
     
     @abc.abstractmethod
-    def update(self, particles, u, noise):
+    def update(self, particles, u, t, noise):
         """ Update estimate using 'data' as input """
         return
     
     @abc.abstractmethod    
-    def measure(self, particles, y):
+    def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
         return
     
@@ -43,12 +43,12 @@ class FFBSiInterface(ParticleFilteringInterface):
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
-    def next_pdf(self, particles, next_cpart, u=None):
+    def next_pdf(self, particles, next_cpart, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
     
     @abc.abstractmethod
-    def sample_smooth(self, particles, next_part, u=None):
+    def sample_smooth(self, particles, next_part, u, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         pass
 
@@ -70,12 +70,10 @@ class RBPFBase(ParticleFilteringInterface):
                                         Q=Qz, R=R,
                                         f_k=fz, h_k=hz)
         
-        self.t = t0
-        
     def set_dynamics(self, Az=None, C=None, Qz=None, R=None, fz=None, hz=None):
         return self.kf.set_dynamics(Az, C, Qz, R, fz, hz)
     
-    def get_nonlin_pred_dynamics(self, particles, u):
+    def get_nonlin_pred_dynamics(self, particles, u, t):
         """ Return matrices describing affine relation of next
             nonlinear state conditioned on current linear state
             
@@ -88,8 +86,8 @@ class RBPFBase(ParticleFilteringInterface):
             """
         return (None, None, None)
     
-    def get_nonlin_pred_dynamics_int(self, particles, u):
-        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles, u)
+    def get_nonlin_pred_dynamics_int(self, particles, u, t):
+        (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles, u=u, t=t)
         N = len(particles)
         Axi_identical = False
         fxi_identical = False
@@ -107,20 +105,7 @@ class RBPFBase(ParticleFilteringInterface):
             Qxi_identical = True
         return (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical)
     
-    def get_condlin_pred_dynamics(self, u, xi_next, particles):
-        """ Return matrices describing affine relation of next
-            nonlinear state conditioned on current linear state
-            
-            z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
-            
-            conditioned on the value of xi_{t+1}. 
-            (Not the same as the dynamics unconditioned on xi_{t+1})
-            when for example there is a noise correlation between the 
-            linear and nonlinear state dynamics) 
-            """
-        return (None, None, None)
-    
-    def get_lin_pred_dynamics(self, particles, u):
+    def get_lin_pred_dynamics(self, particles, u, t):
         """ Return matrices describing affine relation of next
             nonlinear state conditioned on current linear state
             
@@ -133,9 +118,9 @@ class RBPFBase(ParticleFilteringInterface):
             """
         return (None, None, None)
     
-    def get_lin_pred_dynamics_int(self, particles, u):
+    def get_lin_pred_dynamics_int(self, particles, u, t):
         N = len(particles)
-        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles, u)
+        (Az, fz, Qz) = self.get_lin_pred_dynamics(particles, u=u, t=t)
         Az_identical = False
         fz_identical = False
         Qz_identical = False
@@ -154,12 +139,12 @@ class RBPFBase(ParticleFilteringInterface):
             
         return (Az, fz, Qz, Az_identical, fz_identical, Qz_identical)
     
-    def get_meas_dynamics(self, particles, y):
+    def get_meas_dynamics(self, particles, y, t):
         return (y, None, None, None)
     
-    def get_meas_dynamics_int(self, particles, y):
+    def get_meas_dynamics_int(self, particles, y, t):
         N=len(particles)
-        (y, Cz, hz, Rz) = self.get_meas_dynamics(particles=particles, y=y)
+        (y, Cz, hz, Rz) = self.get_meas_dynamics(particles=particles, y=y, t=t)
         Cz_identical = False
         hz_identical = False
         Rz_identical = False
@@ -182,18 +167,17 @@ class RBPFBase(ParticleFilteringInterface):
 #    def get_condlin_meas_dynamics(self, y, xi_next, particles):
 #        return (y, None, None, None)
     
-    def update(self, particles, u, noise):
+    def update(self, particles, u, t, noise):
         """ Update estimate using noise as input """
         # Calc (xi_{t+1} | xi_t, z_t, y_t)
-        xin = self.calc_xi_next(particles=particles, noise=noise, u=u)
+        xin = self.calc_xi_next(particles=particles, u=u, t=t, noise=noise)
         # Calc (z_t | xi_{t+1}, y_t)
-        self.meas_xi_next(particles=particles, xi_next=xin, u=u)
+        self.meas_xi_next(particles=particles, xi_next=xin, u=u, t=t)
         # Calc (z_{t+1} | xi_{t+1}, y_t)
-        self.cond_predict(particles=particles, xi_next=xin, u=u)
+        self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
         
         (_xil, zl, Pl) = self.get_states(particles)
         self.set_states(particles, xin, zl, Pl)
-        self.t = self.t + 1.0
 
 
     
@@ -218,20 +202,19 @@ class RBPSBase(RBPFBase, FFBSiInterface):
         T = len(st.traj)
         
         for i in xrange(T-1):
-            self.t = st.t[i]
             if (st.y[i] != None):
-                self.measure(particles, st.y[i])
+                self.measure(particles, y=st.y[i], t=st.t[i])
             (xin, _zn, _Pn) = self.get_states(st.traj[i+1])
-            self.meas_xi_next(particles, xin, st.u[i])
+            self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
             st.traj[i] = particles
 
             particles = numpy.copy(particles)
-            self.cond_predict(particles, xin, st.u[i])
+            self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
             (_xil, zl, Pl) = self.get_states(particles)
             self.set_states(particles, xin, zl, Pl)
             
         if (st.y[-1] != None):
-            self.measure(particles, st.y[-1])
+            self.measure(particles, y=st.y[-1], t=st.t[-1])
         
         
         (_xil, zl, Pl) = self.get_states(particles)
@@ -241,10 +224,9 @@ class RBPSBase(RBPFBase, FFBSiInterface):
         
         # Backward smoothing
         for i in reversed(xrange(T-1)):
-            self.t = st.t[i]
             (xin, zn, Pn) = self.get_states(st.traj[i+1])
             (xi, z, P) = self.get_states(st.traj[i])
-            (Al, fl, Ql) = self.calc_cond_dynamics(st.traj[i], xin, st.u[i])
+            (Al, fl, Ql) = self.calc_cond_dynamics(st.traj[i], xin, u=st.u[i], t=st.t[i])
             for j in xrange(M):
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
                                               Al[j], fl[j], Ql[j])
