@@ -86,12 +86,12 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
                                          params=params)
 
 
-    def get_nonlin_pred_dynamics(self, particles, u):
+    def get_nonlin_pred_dynamics(self, particles, u, t):
         xil = particles[:,0]
         fxil = self.params[0]*numpy.arctan(xil)
         return (None, fxil[:,numpy.newaxis,numpy.newaxis], None)
         
-    def get_meas_dynamics(self, y, particles):
+    def get_meas_dynamics(self, particles, y, t):
         N = len(particles)
         xil = numpy.vstack(particles)[:,0]
         h = numpy.zeros((N,2,1))
@@ -102,11 +102,15 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
     def eval_logp_x0(self, particles, t):
         return self.eval_logp_xi0(particles[:,:self.lxi])
     
+    def eval_logp_x0_val_grad(self, particles, t):
+        return (self.eval_logp_xi0(particles[:,:self.lxi]),
+                self.eval_logp_xi0_grad(particles[:,:self.lxi]))
+    
     def get_pred_dynamics_grad(self, particles, u, t):
         N = len(particles)
         xil = particles[:,0]
         f_grad = numpy.zeros((N, 5, 4,1))
-        f_grad[:,0,0,:] = numpy.arctan(xil)
+        f_grad[:,0,0,0] = numpy.arctan(xil)
         
         return (N*(self.A_grad,), f_grad, None)
  

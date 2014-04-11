@@ -213,11 +213,11 @@ class MixedNLGaussian(RBPSBase):
         dim = self.lxi + self.kf.lz
 
         if (A_grad == None):
-            A_grad = N*(numpy.zeros((dim, dim)),)
+            A_grad = N*(numpy.zeros((len(self.params), dim, dim)),)
         if (f_grad == None):
-            f_grad = N*(numpy.zeros((dim, 1)),)
+            f_grad = N*(numpy.zeros((len(self.params), dim, 1)),)
         if (Q_grad == None):
-            Q_grad = N*(numpy.zeros((dim, dim)),)
+            Q_grad = N*(numpy.zeros((len(self.params), dim, dim)),)
                 
         return (A_grad, f_grad, Q_grad)
 
@@ -226,11 +226,11 @@ class MixedNLGaussian(RBPSBase):
         (C_grad, h_grad, R_grad) = self.get_meas_dynamics_grad(particles=particles, y=y, t=t)
 
         if (C_grad == None):
-            C_grad = N*(numpy.zeros((len(y), self.kf.lz)),)
+            C_grad = N*(numpy.zeros((len(self.params), len(y), self.kf.lz)),)
         if (h_grad == None):
-            h_grad = N*(numpy.zeros((len(y), 1)),)
+            h_grad = N*(numpy.zeros((len(self.params), len(y), 1)),)
         if (R_grad == None):
-            R_grad = N*(numpy.zeros((len(y), len(y))),)
+            R_grad = N*(numpy.zeros((len(self.params), len(y), len(y))),)
                 
         return (C_grad, h_grad, R_grad)    
     
@@ -445,7 +445,7 @@ class MixedNLGaussian(RBPSBase):
         (z0, P0) = self.get_rb_initial(xil)
         (z0_grad, P0_grad) = self.get_rb_initial_grad(xil)
         lpxi0 = self.eval_logp_xi0(xil)
-        lpxi0_grad = self.eval_grad_eta0_logpdf(xil)
+        lpxi0_grad = self.eval_logp_xi0_grad(xil)
         lpz0 = 0.0
         for i in xrange(N):
             l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
@@ -458,7 +458,7 @@ class MixedNLGaussian(RBPSBase):
                 tmp = z0_grad[i][j].dot((zl[i]-z0[i]).T)
                 dl1 = -tmp -tmp.T
     
-                lpz0_grad[j] -= 0.5*self.calc_logprod_derivative(P0[i], P0_grad[i], l1, dl1)
+                lpz0_grad[j] -= 0.5*self.calc_logprod_derivative(P0[i], P0_grad[i][j], l1, dl1)
                 
         return (lpxi0 + lpz0,
                 lpxi0_grad + lpz0_grad)
@@ -509,7 +509,7 @@ class MixedNLGaussian(RBPSBase):
         Mzl = self.get_Mz(particles)
         (xin, zn, Pn) = self.get_states(x_next)
         
-        (A, f, Q) = self.calc_A_f_Q(particles, u)
+        (A, f, Q) = self.calc_A_f_Q(particles, u, t)
         
         for i in xrange(N):
             Axi = A[i][:self.lxi]
@@ -523,7 +523,7 @@ class MixedNLGaussian(RBPSBase):
 
 
 
-    def eval_logp_xnext_grad(self, particles, x_next, u, t):
+    def eval_logp_xnext_val_grad(self, particles, x_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -536,8 +536,8 @@ class MixedNLGaussian(RBPSBase):
         Mzl = self.get_Mz(particles)
         (xin, zn, Pn) = self.get_states(x_next)
         
-        (A, f, Q) = self.calc_A_f_Q(particles, u)
-        (A_grad, f_grad, Q_grad) = self.calc_A_f_Q_grad(particles, u)
+        (A, f, Q) = self.calc_A_f_Q(particles, u, t)
+        (A_grad, f_grad, Q_grad) = self.calc_A_f_Q_grad(particles, u, t)
         
         lpxn_grad = numpy.zeros(self.params.shape)
         
@@ -549,10 +549,10 @@ class MixedNLGaussian(RBPSBase):
             tmp = numpy.linalg.solve(Q[i], l2)
             lpxn[i] = -0.5*(ld + numpy.trace(tmp))
       
-            l2_grad = self.calc_l2_grad(self, l2, pe, z[i], P[i], Mzl[i], f[i], f_grad[i], A[i], A_grad[i])
+            l2_grad = self.calc_l2_grad(l2, pe, z[i], P[i], Mzl[i], f[i], f_grad[i], A[i], A_grad[i])
             
             for j in xrange(len(self.params)):
-                lpxn_grad[j] -= 0.5*self.calc_logprod_derivative(self.Q, Q_grad, l2, l2_grad[j])
+                lpxn_grad[j] -= 0.5*self.calc_logprod_derivative(Q[i], Q_grad[i][j], l2, l2_grad[j])
             
         return (lpxn, lpxn_grad)
 
@@ -570,9 +570,9 @@ class MixedNLGaussian(RBPSBase):
         diff_l3 = numpy.zeros((len(self.params), l3.shape[0], l3.shape[1]))
         
         for j in xrange(len(self.params)):
-            tmp2 = self.C_grad[j].dot(P).dot(C.T)
-            tmp = self.C_grad[j].dot(z).dot(meas_diff.T)
-            tmp += self.h_grad[j].dot(meas_diff.T)
+            tmp2 = C_grad[j].dot(P).dot(C.T)
+            tmp = C_grad[j].dot(z).dot(meas_diff.T)
+            tmp += h_grad[j].dot(meas_diff.T)
             diff_l3[j] += -tmp -tmp.T + tmp2 + tmp2.T
         
         return diff_l3
@@ -596,7 +596,7 @@ class MixedNLGaussian(RBPSBase):
 
 
         
-    def eval_logp_y_grad(self, particles, y, t):
+    def eval_logp_y_val_grad(self, particles, y, t):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
         
@@ -618,7 +618,7 @@ class MixedNLGaussian(RBPSBase):
             # Calculate gradient
             l3_grad = self.calc_l3_grad(y, zl[i], Pl[i], Cz[i], hz[i], C_grad[i], h_grad[i])
             for j in range(len(self.params)):
-                lpy_grad[i] -= 0.5*self.calc_logprod_derivative(Rz[i], R_grad[i], l3, l3_grad[j])
+                lpy_grad[i] -= 0.5*self.calc_logprod_derivative(Rz[i], R_grad[i][j], l3, l3_grad[j])
 
         return (logpy, lpy_grad)
 
@@ -655,14 +655,15 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
     def get_rb_initial(self, xi0):
         """ Default implementation has no dependence on xi, override if needed """
         N = len(xi0)
-#        z_list = list()
-#        P_list = list()
-#        for i in xrange(N):
-#            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
-#            P_list.append(numpy.copy(self.Pz0))
         z_list = numpy.repeat(self.z0.reshape((1,self.kf.lz,1)), N, 0)
         P_list =  numpy.repeat(self.Pz0.reshape((1,self.kf.lz,self.kf.lz)), N, 0)
         return (z_list, P_list)
+
+    def get_rb_initial_grad(self, xi0):
+        """ Default implementation has no dependence on xi, override if needed """
+        N = len(xi0)
+        return (N*(numpy.zeros((N, len(self.params), self.kf.lz, 1)),),
+                N*(numpy.zeros((N, len(self.params), self.kf.lz, self.kf.lz)),))
     
     def eval_logp_xi0(self, xil):
         """ Calculate gradient of a term of the I1 integral approximation
@@ -673,9 +674,22 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
         N = len(xil)
         return kalman.lognormpdf_vec(xil, N*(self.xi0,), N*(self.Pxi0,))
     
-    # TODO, FIXME!
+    
+    def get_xi_intitial_grad(self, N):
+        return (N*(numpy.zeros((len(self.params), self.lxi, 1)),),
+                N*(numpy.zeros((len(self.params), self.lxi, self.lxi)),))
+        
     def eval_logp_xi0_grad(self, xil):
-        """ Evaluate logprob of the initial non-linear state eta,
-            default implementation assumes all are equal, override this
-            if another behavior is desired """
-        return numpy.zeros(self.params.shape)
+        """ Evaluate probabilty of xi0 """
+        N = len(xil)
+        (xi0_grad, Pxi0_grad) = self.get_xi_intitial_grad(N)
+        lpxi0_grad = numpy.zeros(self.params.shape)
+        for i in xrange(N):
+            tmp = xil[i]-self.xi0
+            l0 = tmp.dot(tmp.T)
+            for j in range(len(self.params)):
+                tmp2 = tmp.dot(xi0_grad[i][j].T)
+                l0_grad = tmp2 + tmp2.T
+                lpxi0_grad[j] -= 0.5*self.calc_logprod_derivative(self.Pxi0, Pxi0_grad[i][j], l0, l0_grad)
+                
+        return lpxi0_grad

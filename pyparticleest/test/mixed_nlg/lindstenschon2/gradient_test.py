@@ -10,22 +10,19 @@ import math
 import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
 
 if __name__ == '__main__':
-    num = 5 #0
-    nums = 4
+    num = 50
+    nums = 5
     
     theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
 
     # How many steps forward in time should our simulation run
-    steps = 20 #0
+    steps = 200
     sims = 1
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
 
     estimate = numpy.zeros((5,sims))
-
-    # How many steps forward in time should our simulation run
-    steps = 200
 
     (y, e, z) = particle_ls2.generate_dataset(theta_true, steps)
     
