@@ -9,16 +9,6 @@ import math
 import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
 import pyparticleest.param_est as param_est
 
-class LS2Est(param_est.ParamEstimation):
-        
-    def create_initial_estimate(self, params, num):
-        particles = numpy.empty(num, particle_ls2.ParticleLS2)
-        
-        for k in range(len(particles)):
-            e = numpy.array([numpy.random.normal(0.0,1.0),]).reshape((-1,1))
-            particles[k] = particle_ls2.ParticleLS2(eta0=e, params=params)
-        return particles
-
 if __name__ == '__main__':
     
     num = 50
@@ -51,7 +41,7 @@ if __name__ == '__main__':
    
         # Create an array for our particles 
         model = particle_ls2.ParticleLS2(theta_guess)
-        ParamEstimator = LS2Est(model=model, u=None, y=y)
+        ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
         ParamEstimator.set_params(theta_guess)
         #ParamEstimator.simulate(num, nums, False)
 

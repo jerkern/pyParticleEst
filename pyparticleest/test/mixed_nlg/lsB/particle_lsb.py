@@ -6,7 +6,7 @@ Fredrik Lindsten, Thomas B. Schon
 
 import numpy
 import math
-from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
+from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussianInitialGaussian
 
 C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
 def calc_Ae_fe(eta, t):
@@ -60,58 +60,32 @@ def generate_dataset(length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLSB(MixedNLGaussian):
+class ParticleLSB(MixedNLGaussianInitialGaussian):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self):
         """ Define all model variables """
         
         # No uncertainty in initial state
-        self.xi0 = numpy.array([[0.0],])
-        self.z0 =  numpy.array([[0.0],
+        xi0 = numpy.array([[0.0],])
+        z0 =  numpy.array([[0.0],
                                 [0.0],
                                 [0.0],
                                 [0.0]])
-        self.P0 = 0.0*numpy.eye(4)
+        P0 = 0.0*numpy.eye(4)
         
         Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
                           [2.0, 0.0, 0.0, 0.0],
                           [0.0, 1.0, 0.0, 0.0],
                           [0.0, 0.0, 0.5, 0.0]])
         
-        #(Axi, fxi) = calc_Axi_fxi(self.xi0, 0)
-        #h = calc_h(eta)
-        C = numpy.array([[0.0, 0.0, 0.0, 0.0]])
-        fz = numpy.zeros_like(self.z0)
         Qxi= numpy.diag([ 0.005])
         Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
         R = numpy.diag([0.1,])
 
-        super(ParticleLSB,self).__init__(lxi=1, lz=4,
-                                         Az=Az, fz=fz, C=C, R=R,
+        super(ParticleLSB,self).__init__(xi0=xi0, z0=z0, Pz0=P0,
+                                         Az=Az, R=R,
                                          Qxi=Qxi, Qz=Qz,)
-    def create_initial_estimate(self, N):
-        particles = numpy.empty((N,), dtype=numpy.ndarray)
-        lxi = len(self.xi0)
-        lz = len(self.z0)
-        dim = lxi + lz + len(self.P0.ravel())
-        
-        for i in xrange(N):
-            particles[i] = numpy.empty(dim)
-            particles[i][0:lxi] = numpy.copy(self.xi0)
-            particles[i][lxi:(lxi+lz)] = numpy.copy(self.z0).ravel()
-            particles[i][(lxi+lz):] = numpy.copy(self.P0).ravel()  
-        return numpy.vstack(particles)
-    
-    def get_rb_initial(self, xi0):
-        N = len(xi0)
-        z_list = list()
-        P_list = list()
-        for i in xrange(N):
-            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
-            P_list.append(numpy.copy(self.P0))
-        
-        return (z_list, P_list)
-        
+   
     def get_nonlin_pred_dynamics(self, particles, u):
         N = len(particles)
         C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])

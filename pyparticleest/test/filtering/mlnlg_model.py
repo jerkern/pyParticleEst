@@ -1,6 +1,6 @@
 import numpy
 import math
-from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussian
+from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussianInitialGaussian
 import pyparticleest.pf as pf
 import matplotlib.pyplot as plt
 
@@ -27,7 +27,7 @@ def wmean(logw, val):
     w.reshape((1,-1))
     return w.dot(val)
 
-class Model(MixedNLGaussian):
+class Model(MixedNLGaussianInitialGaussian):
     """ xi_{k+1} = xi_k + z_k + v_xi_k, v_xi ~ N(0,Q_xi)
         z_{k+1} = z_{k} + v_z, v_z_k ~ N(0, Q_z) 
         y_k = xi_k + +z_k + e_k, e_k ~ N(0,R_z),
@@ -37,33 +37,15 @@ class Model(MixedNLGaussian):
         Axi = numpy.eye(1)
         Az = numpy.eye(1)
         self.pn_count = 0
-        self.P0_xi = numpy.copy(P0_xi)
-        self.P0_z = numpy.copy(P0_z)
-        self.z0 = numpy.zeros((1,))
-        super(Model, self).__init__(lxi=1, lz=1,
+        P0_xi = numpy.copy(P0_xi)
+        P0_z = numpy.copy(P0_z)
+        z0 = numpy.zeros((1,))
+        xi0 = numpy.zeros((1,))
+        super(Model, self).__init__(z0=z0, Pz0=P0_z,
+                                    Pxi0=P0_xi, xi0=xi0,
                                     Axi=Axi,Az=Az,
                                     Qxi=Q_xi, Qxiz=Q_xiz,
                                     Qz=Q_z, R=R)
-        
-    def create_initial_estimate(self, N):
-        particles = numpy.empty((N,), dtype=numpy.ndarray)
-               
-        for i in xrange(N):
-            particles[i] = numpy.empty(3)
-            particles[i][0] = numpy.random.normal(0.0, math.sqrt(self.P0_xi))
-            particles[i][1] = numpy.copy(self.z0)
-            particles[i][2:] = numpy.copy(self.P0_z).ravel()  
-        return numpy.vstack(particles)
-    
-    def get_rb_initial(self, xi0):
-        N = len(xi0)
-        z_list = list()
-        P_list = list()
-        for i in xrange(N):
-            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
-            P_list.append(numpy.copy(self.P0_z))
-        
-        return (z_list, P_list)
         
     def get_nonlin_pred_dynamics(self, particles, u):
             N = len(particles)

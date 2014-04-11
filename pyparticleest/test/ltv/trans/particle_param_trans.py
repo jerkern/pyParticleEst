@@ -38,20 +38,11 @@ class ParticleParamTrans(LTV):
         super(ParticleParamTrans,self).__init__(z0=z0, P0=P0, A=A,
                                                 C=C, R=R, Q=Q,)
         
-    def prep_update(self, u):
-        """ Perform a time update of all states """
-        return
-        
-    def prep_measure(self, y):
-        """ Perform a measurement update """
-        return y
-    
     def set_params(self, params):
         """ New set of parameters """
         # Update all needed matrices and derivates with respect
         # to the new parameter set
         A= numpy.array([[1.0, params[0]], [0.0, 1.0]])
         A_grad= numpy.array([[0.0, 1.0], [0.0, 0.0]])
-        self.set_dynamics(A=A)
-        self.set_dynamics_gradient(grad_A=A_grad)
-        return super(ParticleParamTrans, self).set_params(params)
+        self.kf.set_dynamics(A=A)
+

@@ -10,18 +10,6 @@ import matplotlib.pyplot as plt
 import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
 import pyparticleest.param_est as param_est
 
-class LS2Est(param_est.ParamEstimation):
-        
-    def create_initial_estimate(self, params, num):
-        particles = numpy.empty(num, particle_ls2.ParticleLS2)
-        
-        for k in range(len(particles)):
-            e = numpy.array([numpy.random.normal(0.0,1.0),]).reshape((-1,1))
-            z0 = numpy.zeros((3,1))
-            P0 = 0.00001*numpy.eye(3,3)
-            particles[k] = particle_ls2.ParticleLS2(eta0=e, z0=z0, P0=P0, params=params)
-        return particles
-
 if __name__ == '__main__':
     
     num = 50
@@ -96,12 +84,12 @@ if __name__ == '__main__':
         
         # Create an array for our particles 
         model = particle_ls2.ParticleLS2(theta_guess)
-        ParamEstimator = LS2Est(model=model, u=None, y=y)
+        ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
         ParamEstimator.set_params(theta_guess)
         #ParamEstimator.simulate(num, nums, False)
 
         (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                             callback=callback)
+                                             callback=callback, smoother='rsas')
         
         svals = numpy.zeros((4, nums, steps+1))
  
@@ -113,8 +101,8 @@ if __name__ == '__main__':
         
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj.straj[i][j][0]
-                svals[1:,j,i]=ParamEstimator.straj.straj[i][j][1:4]
+                svals[0,j,i]=ParamEstimator.straj.traj[i,j,0]
+                svals[1:,j,i]=ParamEstimator.straj.traj[i,j,1:4]
                 
         plt.figure(fig3.number)
         plt.clf()

@@ -179,18 +179,18 @@ class ParamEstimation(object):
         return log_px0 + log_pxnext + log_py
        
     def eval_logp_x0(self):
-        M = self.straj.straj.shape[1]
-        logp_x0 = self.model.eval_logp_x0(numpy.vstack(self.straj.straj[0]),
+        M = self.straj.traj.shape[1]
+        logp_x0 = self.model.eval_logp_x0(numpy.vstack(self.straj.traj[0]),
                                           self.straj.t[0])
         return numpy.sum(logp_x0)/M
     
     def eval_logp_y(self, ind=None, traj_ind=None):
         logp_y = 0.0
-        M = self.straj.straj.shape[1]
+        M = self.straj.traj.shape[1]
         T = len(self.straj)
         for t in xrange(T):
             if (self.straj.y[t] != None):
-                val = self.model.eval_logp_y(numpy.vstack(self.straj.straj[t]),
+                val = self.model.eval_logp_y(numpy.vstack(self.straj.traj[t]),
                                              self.straj.y[t],
                                              self.straj.t[t])
                 logp_y += numpy.sum(val)
@@ -199,17 +199,11 @@ class ParamEstimation(object):
     
     def eval_logp_xnext(self, ind=None, traj_ind=None):
         logp_xnext = 0.0
-        M = self.straj.straj.shape[1]
+        M = self.straj.traj.shape[1]
         T = len(self.straj)
         for t in xrange(T-1):
-            if (self.straj.Mz != None):
-                val = self.model.eval_logp_xnext(numpy.vstack(self.straj.straj[t]),
-                                                 numpy.vstack(self.straj.straj[t+1]),
-                                                 self.straj.u[t], self.straj.t[t],
-                                                 self.straj.Mz[t])
-            else:
-                val = self.model.eval_logp_xnext(numpy.vstack(self.straj.straj[t]),
-                                 numpy.vstack(self.straj.straj[t+1]),
-                                 self.straj.u[t], self.straj.t[t], Mzl=None)
+            val = self.model.eval_logp_xnext(numpy.vstack(self.straj.traj[t]),
+                                                 numpy.vstack(self.straj.traj[t+1]),
+                                                 self.straj.u[t], self.straj.t[t])
             logp_xnext += numpy.sum(val)
         return logp_xnext/M

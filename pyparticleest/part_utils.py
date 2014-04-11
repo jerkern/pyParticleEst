@@ -248,6 +248,6 @@ class RBPSBase(RBPFBase, FFBSiInterface):
             for j in xrange(M):
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
                                               Al[j], fl[j], Ql[j])
-                self.set_states(st.traj[i][j:j+1], xi[j], (zs,), (Ps,))
-                self.set_Mz(st.traj[i][j:j+1], (Ms,))
+                self.set_states(st.traj[i][j:j+1], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
+                self.set_Mz(st.traj[i][j:j+1], Ms[numpy.newaxis])
 

@@ -4,33 +4,20 @@ import numpy
 import pyparticleest.param_est as param_est
 
 import matplotlib.pyplot as plt
-from pyparticleest.test.mixed_nlg.trans.particle_param_trans import ParticleParamTrans # Our model definition
+import pyparticleest.test.mixed_nlg.trans.particle_param_trans  as PartModel
 
 e0 = numpy.array([0.0, ])
 z0 = numpy.array([1.0, ])
 P0 = numpy.eye(1)
 
-class ParticleParamTransEst(param_est.ParamEstimation):
-        
-    def create_initial_estimate(self, params, num):
-        particles = numpy.empty(num, ParticleParamTrans)
-        
-        for k in range(len(particles)):
-            e = numpy.array([numpy.random.normal(e0,1.0),])
-            particles[k] = ParticleParamTrans(eta0=e, z0=z0, P0=P0, params=params)
-        return particles
-
 if __name__ == '__main__':
     
     num = 50
     nums = 5
-    
-    theta_true = 0.1
-    theta_guess = 0.3   
-    R = numpy.array([[0.1]])
-    Q = numpy.array([ 0.1, 0.1])
-
-    
+    theta_true = 0.3
+    R = 0.1*numpy.eye(1)
+    Qxi = 0.1*numpy.eye(1)
+    Qz = 0.1*numpy.eye(1)
 
     # How many steps forward in time should our simulation run
     steps = 200
@@ -50,43 +37,29 @@ if __name__ == '__main__':
     
     for k in range(sims):
         print k
-        # Create reference
-        e = numpy.random.normal(0.0, 1.0)
-        z = numpy.random.normal(1.0, 1.0)
-        for i in range(steps):
-    
-            # Extract linear states
-            vals[0,num,i]=e
-            # Extract non-linear state
-            vals[1,num,i]=z
-            
-            
-            e = e + theta_true * z + numpy.random.normal(0.0, 0.1)
-            z = z + numpy.random.normal(0.0, 0.1)
-            y = e
-            yvec[0,i] = y
-    
-        # Store values for last time-step aswell    
-        vals[0,num,steps]=e
-        vals[1,num,steps]=z
-    
-        y_noise = yvec.T.tolist()
-        for i in range(len(y_noise)):
-            y_noise[i][0] += numpy.random.normal(0.0,R)
+        
+        (x, y) = PartModel.generate_data(theta_true, Qxi, Qz, R, steps)
+
+        # Create an array for our particles 
+        model = PartModel.ParticleParamTrans((theta_true,), 
+                                             R=R,
+                                             Qxi=Qxi,
+                                             Qz=Qz)
         
         print "estimation start"
         
         plt.figure(fig1.number)
         plt.clf()
-        x = numpy.asarray(range(steps+1))
-        plt.plot(x[1:],numpy.asarray(y_noise)[:,0],'b.')
+        t = numpy.asarray(range(steps+1))
+        plt.plot(t[1:],numpy.asarray(y_noise)[:,0],'b.')
         plt.plot(range(steps+1),vals[0,num,:],'go')
         plt.plot(range(steps+1),vals[1,num,:],'ro')
         plt.title("Param = %s" % theta_true)
         fig1.show()
             
         # Create an array for our particles 
-        ParamEstimator = ParticleParamTransEst(u=None, y=y_noise)
+        model = ParticleParamTrans(theta_guess, R, Q)
+        ParamEstimator = param_est.ParamEstimation(u=None, y=y_noise)
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
         (param, Q) = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums, max_iter=100)
         

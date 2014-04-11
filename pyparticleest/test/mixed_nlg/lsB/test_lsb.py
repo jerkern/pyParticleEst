@@ -41,7 +41,7 @@ if __name__ == '__main__':
         model = particle_lsb.ParticleLSB()
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='mcmc')
 
         
         svals = numpy.zeros((2, nums, steps+1))

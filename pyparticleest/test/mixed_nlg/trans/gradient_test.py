@@ -89,7 +89,7 @@ if __name__ == '__main__':
     t = numpy.asarray(range(steps+1))
     
     for i in range(steps+1):
-        (xil, zl, Pl) = model.get_states(gt.straj.straj[i])
+        (xil, zl, Pl) = model.get_states(gt.straj.traj[i])
         svals[0,:,i] = numpy.vstack(xil).ravel()
         svals[1,:,i] = numpy.vstack(zl).ravel()
         (xil, zl, Pl) = model.get_states(gt.pt.traj[i].pa.part)

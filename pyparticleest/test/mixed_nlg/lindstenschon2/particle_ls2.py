@@ -6,7 +6,7 @@ Created on Nov 11, 2013
 
 import numpy
 import math
-import pyparticleest.part_utils
+import pyparticleest.models.mixed_nl_gaussian
 import pyparticleest.kalman as kalman
 
 def sign(x):
@@ -57,7 +57,7 @@ def generate_dataset(params, length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLS2(pyparticleest.part_utils.MixedNLGaussian):
+class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """
@@ -74,36 +74,17 @@ class ParticleLS2(pyparticleest.part_utils.MixedNLGaussian):
         Qxi= numpy.diag([ 0.01,])
         Qz = numpy.diag([ 0.01, 0.01, 0.01])
         R = numpy.diag([0.1, 0.1])
-        fz = numpy.zeros((3,1))
-        self.xi0 = numpy.asarray((0.0,)).reshape((-1,1))
-        self.Pxi0 = numpy.eye(1)
-        self.z0 = numpy.zeros((3,))
-        self.Pz0 = numpy.eye(3)
+        xi0 = numpy.asarray((0.0,)).reshape((-1,1))
+        Pxi0 = numpy.eye(1)
+        z0 = numpy.zeros((3,))
+        Pz0 = 0.0*numpy.eye(3)
         # Linear states handled by base-class
-        super(ParticleLS2,self).__init__(Az=Az, C=C, fz=fz, Axi=Axi,
+        super(ParticleLS2,self).__init__(xi0=xi0, z0=z0, Pz0=Pz0, Pxi0=Pxi0, 
+                                         Az=Az, C=C, Axi=Axi,
                                          R=R, Qxi=Qxi, Qz=Qz,
                                          params=params)
 
-    def create_initial_estimate(self, N):
-        particles = numpy.empty((N,), dtype=numpy.ndarray)
-               
-        for i in xrange(N):
-            particles[i] = numpy.empty(1+3+3*3)
-            particles[i][0] = numpy.random.multivariate_normal(self.xi0.ravel(), self.Pxi0)
-            particles[i][1:4] = numpy.copy(self.z0).ravel()
-            particles[i][4:] = numpy.copy(self.Pz0).ravel()  
-        return numpy.vstack(particles)        
 
-    def get_rb_initial(self, xi0):
-        N = len(xi0)
-        z_list = list()
-        P_list = list()
-        for i in xrange(N):
-            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
-            P_list.append(numpy.copy(self.P0))
-        
-        return (z_list, P_list)
-        
     def get_nonlin_pred_dynamics(self, particles, u):
         xil = numpy.vstack(particles)[:,0]
         fxil = self.params[0]*numpy.arctan(xil)
@@ -116,7 +97,10 @@ class ParticleLS2(pyparticleest.part_utils.MixedNLGaussian):
         h[:,0,0] = 0.1*numpy.fabs(xil)*xil
         return (numpy.asarray(y).reshape((-1,1)), None, h, None)
 
-    # Override this method since there is no uncertainty in z0    
+    # Override this method since there is no uncertainty in z0 
+    def eval_logp_x0(self, particles, t):
+        return self.eval_logp_xi0(particles[:,:self.lxi])
+    
     def eval_logp_xi0(self, xil):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].

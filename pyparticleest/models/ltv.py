@@ -110,7 +110,7 @@ class LTV(FFBSiInterface):
         M = len(particle)
         lz = len(self.z0)
         lzP = lz + lz*lz
-        res = numpy.empty((M,lz+2*lz*lz))
+        res = numpy.empty((M,lz+2*lz**2))
         for j in xrange(M):
             if (next_part != None):
                 zn = next_part[j, :lz].reshape((lz,1))
@@ -158,7 +158,7 @@ class LTV(FFBSiInterface):
         l2 += Pn + A.dot(P).dot(A.T) - AM.T - AM
         return (l2, A, M, predict_err)    
         
-    def eval_logp_xnext(self, particles, x_next, u, t, Mzl):
+    def eval_logp_xnext(self, particles, x_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 

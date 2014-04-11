@@ -2,6 +2,7 @@
 import pyparticleest.kalman as kalman
 from pyparticleest.part_utils import RBPSBase
 import numpy
+import numpy.random
 import copy
 
 class MixedNLGaussian(RBPSBase):
@@ -275,10 +276,13 @@ class MixedNLGaussian(RBPSBase):
         N = len(particles)
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
-        for i in xrange(N):
-            particles[i,:self.lxi] = xi_list[i].ravel()
-            particles[i,self.lxi:zend] = z_list[i].ravel()
-            particles[i,zend:Pend] = P_list[i].ravel()
+#        for i in xrange(N):
+#            particles[i,:self.lxi] = xi_list[i].ravel()
+#            particles[i,self.lxi:zend] = z_list[i].ravel()
+#            particles[i,zend:Pend] = P_list[i].ravel()
+        particles[:,:self.lxi] = xi_list.reshape((N, self.lxi))
+        particles[:,self.lxi:zend] = z_list.reshape((N, self.kf.lz))
+        particles[:,zend:Pend] = P_list.reshape((N, self.kf.lz**2))
  
     def get_states(self, particles):
         """ Return the estimate of the Rao-Blackwellized states.
@@ -286,16 +290,21 @@ class MixedNLGaussian(RBPSBase):
             expected values, the second a list of the corresponding covariance
             matrices"""
         N = len(particles)
-        xil = list()
-        zl = list()
-        Pl = list()
-        N = len(particles)
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
-        for part in particles:
-            xil.append(part[:self.lxi].reshape(self.lxi,1))
-            zl.append(part[self.lxi:zend].reshape(self.kf.lz,1))
-            Pl.append(part[zend:Pend].reshape(self.kf.lz,self.kf.lz))
+        
+#        xil = list()
+#        zl = list()
+#        Pl = list()
+#
+#        for part in particles:
+#            xil.append(part[:self.lxi].reshape(self.lxi,1))
+#            zl.append(part[self.lxi:zend].reshape(self.kf.lz,1))
+#            Pl.append(part[zend:Pend].reshape(self.kf.lz,self.kf.lz))
+        
+        xil = particles[:,:self.lxi, numpy.newaxis]
+        zl = particles[:,self.lxi:zend, numpy.newaxis]
+        Pl = particles[:,zend:Pend].reshape((N, self.kf.lz, self.kf.lz))
         
         return (xil, zl, Pl)
     
@@ -304,13 +313,14 @@ class MixedNLGaussian(RBPSBase):
             Must return two variables, the first a list containing all the
             expected values, the second a list of the corresponding covariance
             matrices"""
-        Mz = list()
+        N = len(smooth_particles)
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
         Mend = Pend + self.kf.lz**2
-        for part in smooth_particles:
-            Mz.append(part[Pend:Mend].reshape(self.kf.lz, self.kf.lz))
-        
+#        Mz = list()
+#        for part in smooth_particles:
+#            Mz.append(part[Pend:Mend].reshape(self.kf.lz, self.kf.lz))
+        Mz = smooth_particles[:,Pend:Mend].reshape((N, self.kf.lz, self.kf.lz))
         return Mz
     
     def set_Mz(self, smooth_particles, Mz):
@@ -318,8 +328,10 @@ class MixedNLGaussian(RBPSBase):
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
         Mend = Pend + self.kf.lz**2
-        for i in xrange(N):
-            smooth_particles[i,Pend:Mend] = Mz[i].ravel()
+#        for i in xrange(N):
+#            smooth_particles[i,Pend:Mend] = Mz[i].ravel()
+            
+        smooth_particles[:,Pend:Mend] = Mz.reshape((N, self.kf.lz**2))
     
 #    def eval_1st_stage_weight(self, u,y):
 ##        eta_old = copy.deepcopy(self.get_nonlin_state())
@@ -358,11 +370,11 @@ class MixedNLGaussian(RBPSBase):
             if another behavior is desired """
         return numpy.zeros((len(xil)))
     
-#    def eval_grad_eta0_logpdf(self, eta):
-#        """ Evaluate logprob of the initial non-linear state eta,
-#            default implementation assumes all are equal, override this
-#            if another behavior is desired """
-#        return numpy.zeros(self.params.shape)
+    def eval_grad_eta0_logpdf(self, eta):
+        """ Evaluate logprob of the initial non-linear state eta,
+            default implementation assumes all are equal, override this
+            if another behavior is desired """
+        return numpy.zeros(self.params.shape)
 
 
     def calc_l1(self, z, P, z0, P0):
@@ -379,13 +391,13 @@ class MixedNLGaussian(RBPSBase):
         # Calculate l1 according to (19a)
         N = len(particles)
         (xil, zl, Pl) = self.get_states(particles)
+        (z0, P0) = self.get_rb_initial(xil)
         lpxi0 = self.eval_logp_xi0(xil)
         lpz0 = numpy.empty(N)
         for i in xrange(N):
-            (z0, P0) = self.get_rb_initial([xil[i],])
-            l1 = self.calc_l1(zl[i], Pl[i], z0, P0)
-            (_tmp, ld) = numpy.linalg.slogdet(P0)
-            tmp = numpy.linalg.solve(P0, l1)
+            l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
+            (_tmp, ld) = numpy.linalg.slogdet(P0[i])
+            tmp = numpy.linalg.solve(P0[i], l1)
             lpz0[i] = -0.5*(ld + numpy.trace(tmp))
         return lpxi0 + lpz0
     
@@ -433,7 +445,7 @@ class MixedNLGaussian(RBPSBase):
         return (l2, predict_err)
     
        
-    def eval_logp_xnext(self, particles, x_next, u, t, Mzl):
+    def eval_logp_xnext(self, particles, x_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
@@ -443,24 +455,18 @@ class MixedNLGaussian(RBPSBase):
         lpxn = numpy.empty(N)
         
         (_xi, z, P) = self.get_states(particles)
+        Mzl = self.get_Mz(particles)
         (xin, zn, Pn) = self.get_states(x_next)
+        
+        (A, f, Q) = self.calc_A_f_Q(particles, u)
         
         (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u)
         (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u)
-        Qxiz = self.get_cross_covariance(particles=particles, u=u)
-        if (Qxiz == None):
-            if (self.Qxiz == None):
-                Qxiz = N*(numpy.zeros((Qxi[0].shape[0],Qz[0].shape[0])),)
-            else:
-                Qxiz = N*(self.Qxiz,)
         
         for i in xrange(N):
-            f = numpy.vstack((fxi[i], fz[i]))
-            Q = numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
-                              numpy.hstack((Qxiz[i].T, Qz[i]))))
-            (l2, _pe) = self.calc_l2(xin[i], zn[i], Pn[i], z[i], P[i], Axi[i], Az[i], f, Mzl[i])
-            (_tmp, ld) = numpy.linalg.slogdet(Q)
-            tmp = numpy.linalg.solve(Q, l2)
+            (l2, _pe) = self.calc_l2(xin[i], zn[i], Pn[i], z[i], P[i], Axi[i], Az[i], f[i], Mzl[i])
+            (_tmp, ld) = numpy.linalg.slogdet(Q[i])
+            tmp = numpy.linalg.solve(Q[i], l2)
             lpxn[i] = -0.5*(ld + numpy.trace(tmp))
       
         return lpxn
@@ -594,3 +600,54 @@ class MixedNLGaussian(RBPSBase):
 #            grad[i] = -0.5*self.calc_logprod_derivative(R, dR, l3, dl3)
 #
 #        return (val, grad)
+
+
+class MixedNLGaussianInitialGaussian(MixedNLGaussian):
+    def __init__(self, xi0, z0, Pxi0=None, Pz0=None, **kwargs):
+        
+                # No uncertainty in initial state
+        self.xi0 = numpy.copy(xi0).reshape((-1,1))
+        if (Pxi0 == None):
+            self.Pxi0 = numpy.zeros((len(self.xi0),len(self.xi0)))
+        else:
+            self.Pxi0 = numpy.copy((Pxi0))
+        if (Pz0 == None):
+            self.Pz0 = numpy.zeros((len(self.z0),len(self.z0)))
+        else:
+            self.Pz0 = numpy.copy((Pz0))
+        self.z0 =  numpy.copy(z0).reshape((-1,1))
+        self.Pz0 = numpy.copy(Pz0)
+        super(MixedNLGaussianInitialGaussian, self).__init__(lxi=len(self.xi0),
+                                                             lz=len(self.z0),
+                                                             **kwargs)
+
+    def create_initial_estimate(self, N):
+        dim = self.lxi + self.kf.lz + self.kf.lz**2
+        particles = numpy.empty((N, dim))
+        
+        for i in xrange(N):
+            particles[i,0:self.lxi] = numpy.random.multivariate_normal(self.xi0.ravel(), self.Pxi0)
+            particles[i,self.lxi:(self.lxi+self.kf.lz)] = numpy.copy(self.z0).ravel()
+            particles[i,(self.lxi+self.kf.lz):] = numpy.copy(self.Pz0).ravel()  
+        return particles     
+
+    def get_rb_initial(self, xi0):
+        """ Default implementation has no dependence on xi, override if needed """
+        N = len(xi0)
+#        z_list = list()
+#        P_list = list()
+#        for i in xrange(N):
+#            z_list.append(numpy.copy(self.z0).reshape((-1,1)))
+#            P_list.append(numpy.copy(self.Pz0))
+        z_list = numpy.repeat(self.z0.reshape((1,self.kf.lz,1)), N, 0)
+        P_list =  numpy.repeat(self.Pz0.reshape((1,self.kf.lz,self.kf.lz)), N, 0)
+        return (z_list, P_list)
+    
+    def eval_logp_xi0(self, xil):
+        """ Calculate gradient of a term of the I1 integral approximation
+            as specified in [1].
+            The gradient is an array where each element is the derivative with 
+            respect to the corresponding parameter"""    
+            
+        N = len(xil)
+        return kalman.lognormpdf_vec(xil, N*(self.xi0,), N*(self.Pxi0,))
