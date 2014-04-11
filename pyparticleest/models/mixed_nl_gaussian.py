@@ -618,7 +618,7 @@ class MixedNLGaussian(RBPSBase):
             # Calculate gradient
             l3_grad = self.calc_l3_grad(y, zl[i], Pl[i], Cz[i], hz[i], C_grad[i], h_grad[i])
             for j in range(len(self.params)):
-                lpy_grad[i] -= 0.5*self.calc_logprod_derivative(Rz[i], R_grad[i][j], l3, l3_grad[j])
+                lpy_grad[j] -= 0.5*self.calc_logprod_derivative(Rz[i], R_grad[i][j], l3, l3_grad[j])
 
         return (logpy, lpy_grad)
 

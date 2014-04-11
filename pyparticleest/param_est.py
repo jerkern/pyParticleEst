@@ -118,20 +118,24 @@ class ParamEstimation(object):
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
                  callback=None, callback_sim=None, bounds=None, meas_first=False,
-                 smoother='full'):
+                 smoother='full', analytic_gradient=False):
         
         def fval(params_val):
             self.model.set_params(params_val)
-#            (log_py, d_log_py) = self.eval_logp_y()
-#            (log_pxnext, d_log_pxnext) = self.eval_logp_xnext()
-#            (log_px0, d_log_px0) = self.eval_logp_x0()
-#            val =  (-1.0*(log_py + log_px0 + log_pxnext), -1.0*(d_log_py + d_log_px0 + d_log_pxnext).ravel())
-            #print "fval %s : %f" % (params_val, val[0])
             log_py = self.eval_logp_y()
             log_pxnext = self.eval_logp_xnext()
             log_px0 = self.eval_logp_x0()
             val =  -1.0*(log_py + log_px0 + log_pxnext)
             return val
+
+        def fval_grad(params_val):
+            self.model.set_params(params_val)
+            (logp_y, grad_logp_y)  = self.eval_logp_y_val_grad()
+            (logp_xnext, grad_logp_xnext) = self.eval_logp_xnext_val_grad()
+            (logp_x0, grad_logp_x0) = self.eval_logp_x0_val_grad()
+            val =  -1.0*(logp_y + logp_x0 + logp_xnext)
+            grad = -1.0*(grad_logp_y + grad_logp_xnext + grad_logp_x0)
+            return (val, grad)
 
         params_local = numpy.copy(param0)
         Q = -numpy.Inf
@@ -157,9 +161,12 @@ class ParamEstimation(object):
             if (callback_sim != None):
                 callback_sim(self)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
-            
-            res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=False, 
-                                          options=dict({'maxiter':10, 'maxfun':100}), bounds=bounds,)
+            if (analytic_gradient):
+                res = scipy.optimize.minimize(fun=fval_grad, x0=params_local, method='l-bfgs-b', jac=True, 
+                                              options=dict({'maxiter':10, 'maxfun':100}), bounds=bounds,)
+            else:
+                res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=False, 
+                                              options=dict({'maxiter':10, 'maxfun':100}), bounds=bounds,)                
             
             params_local = res.x
 
