@@ -4,7 +4,6 @@
 import numpy as np
 import math
 import scipy.sparse as sp
-from numba import jit, double
 #import scipy.sparse.linalg as spln
 
 l2pi = math.log(2*math.pi)
@@ -23,21 +22,6 @@ def lognormpdf_vec(xl,mul,Sl):
         S = Sl[i]
         res[i] = -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err).T.dot(err))
     return res
-
-lognormpdf_jit = jit(double[:,:](double[:,:], double[:,:,:]))(lognormpdf_vec)
-
-#@autojit
-#def lognormpdf_vec(xl,mul,Sl):
-#    """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
-#    N = len(xl)
-#    res = np.empty(N, dtype=float)
-#    for i in xrange(N):
-#        err = xl[i]-mul[i]
-#        res[i] = -0.5*(Sl[i].shape[0]*l2pi+np.linalg.slogdet(Sl[i])[1]+np.linalg.solve(Sl[i], err).T.dot(err))
-#    return res
-
-#@jit(double[:](double[:,:],double[:,:],double[:,:,:]))
-
 
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:

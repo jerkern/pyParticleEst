@@ -5,53 +5,7 @@ import scipy.linalg
 import numpy.linalg
 import numpy.random
 import copy
-
-def compute_pred_err(xin, zn, f, A, zl):
-    N = len(xin)
-    dim = len(xin[0]) + len(zn[0])
-    predict_err = numpy.zeros((N, dim, 1))
-    for i in xrange(N):
-        xn = numpy.vstack((xin[i], zn[i]))
-        predict_err[i] = xn - f[i] - A[i].dot(zl[i])
-    return predict_err
-    
-def compute_l2(perr, xin, zn, Pn, f, A, zl, Pl, M):
-    N = perr.shape[0]
-    lxi = len(xin[0])
-    l2 = numpy.zeros((N, perr.shape[1], perr.shape[1]))
-    for i in xrange(N):
-
-        l2[i] = perr[i].dot(perr[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
-        
-        Axi = A[i][:lxi]
-        Az = A[i][lxi:]
-        
-        tmp = -Axi.dot(M[i])
-        l2[i,lxi:,:lxi] += tmp.T
-        l2[i,:lxi,lxi:] += tmp
-        
-        tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
-        l2[i, lxi:,lxi:] += tmp2
-
-def compute_l2_grad(perr, lenp, lxi, zl, Pl, M, A, f_grad, A_grad):
-    N = perr.shape[0]
-    diff_l2 = numpy.zeros((N, lenp, perr.shape[1], perr.shape[1]))
-    if (f_grad != None):
-        for i in xrange(N):
-            for j in xrange(lenp):
-                tmp = f_grad[i][j].dot(perr[i].T)
-                diff_l2[i,j,:,:] -= tmp + tmp.T
-    if (A_grad != None):
-        for i in xrange(N):
-            for j in xrange(lenp):
-                tmp = A_grad[i][j].dot(zl[i]).dot(perr[i].T)
-                diff_l2[i,j,:,:] -= tmp + tmp.T
-                tmp = A_grad[i][j].dot(Pl[i]).dot(A[i].T)
-                diff_l2[i,j,:,:] += tmp + tmp.T
-                tmp = -A_grad[i][j].dot(M[i])
-                diff_l2[i,j,:,lxi:] +=  tmp
-                diff_l2[i,j, lxi:, :] += tmp.T
-    return diff_l2
+from pyparticleest.models.mlnlg_calc import *
 
 class MixedNLGaussian(RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
@@ -234,7 +188,7 @@ class MixedNLGaussian(RBPSBase):
                 Qxiz = N*(self.Qxiz,)
         
         if (Az_identical and Axi_identical):
-            A = N*(numpy.vstack((Axi[0], Az[0])),)
+            A = numpy.repeat(numpy.vstack((Axi[0], Az[0]))[numpy.newaxis],N,0)
             A_identical = True
         else:
             A = list()
@@ -489,67 +443,26 @@ class MixedNLGaussian(RBPSBase):
         return (lpxi0 + lpz0,
                 lpxi0_grad + lpz0_grad)
     
-    
-    def calc_l2(self, xin, zn, Pn, zl, Pl, A, f, M):
-        N = len(xin)
-        dim = self.lxi+self.kf.lz
-        predict_err = numpy.zeros((N, dim, 1))
-        l2 = numpy.zeros((N, dim, dim))
 
-        for i in xrange(N):
-            xn = numpy.vstack((xin[i], zn[i]))
-            predict_err[i] = xn - f[i] - A[i].dot(zl[i])
-            l2[i] = predict_err[i].dot(predict_err[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
-            
-            Axi = A[i][:self.lxi]
-            Az = A[i][self.lxi:]
-            
-            tmp = -Axi.dot(M[i])
-            l2[i,self.lxi:,:self.lxi] += tmp.T
-            l2[i,:self.lxi,self.lxi:] += tmp
-            
-            tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
-            l2[i, self.lxi:,self.lxi:] += tmp2
-            
-        return (l2, predict_err)
+    def calc_l2(self, xin, zn, Pn, zl, Pl, A, f, M):
+        perr = compute_pred_err(xin, zn, f, A, zl)
+        l2 = compute_l2(perr, xin, zn, Pn, f, A, zl, Pl, M)
+        return l2
  
     def calc_l2_grad(self, xin, zn, Pn, zl, Pl, A, f, M, f_grad, A_grad):
         N = len(xin)
-        dim = self.lxi+self.kf.lz
-        predict_err = numpy.zeros((N, dim, 1))
-        l2 = numpy.zeros((N, dim, dim))
-        diff_l2 = numpy.zeros((N, len(self.params), dim, dim))
-
-        for i in xrange(N):
-            xn = numpy.vstack((xin[i], zn[i]))
-            predict_err[i] = xn - f[i] - A[i].dot(zl[i])
-            l2[i] = predict_err[i].dot(predict_err[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
-            
-            Axi = A[i][:self.lxi]
-            Az = A[i][self.lxi:]
-            
-            tmp = -Axi.dot(M[i])
-            l2[i,self.lxi:,:self.lxi] += tmp.T
-            l2[i,:self.lxi,self.lxi:] += tmp
-            
-            tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
-            l2[i, self.lxi:,self.lxi:] += tmp2
+        perr = compute_pred_err(xin, zn, f, A, zl)
+        l2 = compute_l2(perr, xin, zn, Pn, f, A, zl, Pl, M)
+#        diff_l2 = compute_l2_grad(perr, len(self.params), self.lxi, zl, Pl, M, A, f_grad, A_grad)
+        diff_l2 = numpy.zeros((N, len(self.params), perr.shape[1], perr.shape[1]), dtype=numpy.double, order='C')
+        tmp1 = numpy.zeros((self.lxi+self.kf.lz,self.lxi+self.kf.lz), dtype=numpy.double, order='C')
+        tmp2 = numpy.zeros((self.lxi+self.kf.lz,self.kf.lz), dtype=numpy.double, order='C')
         if (f_grad != None):
-            for i in xrange(N):
-                for j in range(len(self.params)):
-                    tmp = f_grad[i][j].dot(predict_err[i].T)
-                    diff_l2[i,j,:,:] -= tmp + tmp.T
+            compute_l2_grad_f(N, len(self.params), self.lxi+self.kf.lz, diff_l2, 
+                                   perr, f_grad, tmp1)
         if (A_grad != None):
-            for i in xrange(N):
-                for j in range(len(self.params)):
-                    tmp = A_grad[i][j].dot(zl[i]).dot(predict_err[i].T)
-                    diff_l2[i,j,:,:] -= tmp + tmp.T
-                    tmp = A_grad[i][j].dot(Pl[i]).dot(A[i].T)
-                    diff_l2[i,j,:,:] += tmp + tmp.T
-                    tmp = -A_grad[i][j].dot(M[i])
-                    diff_l2[i,j,:,self.lxi:] +=  tmp
-                    diff_l2[i,j, self.lxi:, :] += tmp.T
-
+            compute_l2_grad_A(N, len(self.params), self.lxi+self.kf.lz, diff_l2, perr,
+                                   self.lxi, zl, Pl, M, A, A_grad, tmp1, tmp2)
         return (l2, diff_l2)   
        
     def eval_logp_xnext(self, particles, x_next, u, t):
@@ -566,7 +479,7 @@ class MixedNLGaussian(RBPSBase):
         (xin, zn, Pn) = self.get_states(x_next)
         
         (A, f, Q, _, _, Q_identical) = self.calc_A_f_Q(particles, u, t)
-        (l2, _) = self.calc_l2(xin, zn, Pn, z, P, A, f, Mzl)
+        l2 = self.calc_l2(xin, zn, Pn, z, P, A, f, Mzl)
         if (Q_identical):
             (_tmp, ld) = numpy.linalg.slogdet(Q[0])
             Q_lup = scipy.linalg.lu_factor(Q[0])
@@ -725,6 +638,56 @@ class MixedNLGaussian(RBPSBase):
                                                                         l3, l3_grad[j])
 
         return (logpy, lpy_grad)
+
+def compute_pred_err(xin, zn, f, A, zl):
+    N = len(xin)
+    dim = len(xin[0]) + len(zn[0])
+    predict_err = numpy.zeros((N, dim, 1))
+    for i in xrange(N):
+        xn = numpy.vstack((xin[i], zn[i]))
+        predict_err[i] = xn - f[i] - A[i].dot(zl[i])
+    return predict_err
+
+def compute_l2(perr, xin, zn, Pn, f, A, zl, Pl, M):
+    N = perr.shape[0]
+    lxi = len(xin[0])
+    l2 = numpy.zeros((N, perr.shape[1], perr.shape[1]))
+    for i in xrange(N):
+
+        l2[i] = perr[i].dot(perr[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
+        
+        Axi = A[i][:lxi]
+        Az = A[i][lxi:]
+        
+        tmp = -Axi.dot(M[i])
+        l2[i,lxi:,:lxi] += tmp.T
+        l2[i,:lxi,lxi:] += tmp
+        
+        tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
+        l2[i, lxi:,lxi:] += tmp2
+    return l2
+
+def compute_l2_grad(perr, lenp, lxi, zl, Pl, M, A, f_grad, A_grad):
+    N = perr.shape[0]
+    diff_l2 = numpy.zeros((N, lenp, perr.shape[1], perr.shape[1]))
+    if (f_grad != None):
+        for i in xrange(N):
+            for j in xrange(lenp):
+                tmp = f_grad[i][j].dot(perr[i].T)
+                diff_l2[i,j,:,:] -= tmp + tmp.T
+    if (A_grad != None):
+        for i in xrange(N):
+            for j in xrange(lenp):
+                tmp = A_grad[i][j].dot(zl[i]).dot(perr[i].T)
+                diff_l2[i,j,:,:] -= tmp + tmp.T
+                tmp = A_grad[i][j].dot(Pl[i]).dot(A[i].T)
+                diff_l2[i,j,:,:] += tmp + tmp.T
+                tmp = -A_grad[i][j,:lxi].dot(M[i])
+                diff_l2[i,j,:lxi,lxi:] +=  tmp
+                diff_l2[i,j,lxi:,:lxi] += tmp.T
+                tmp = -A_grad[i][j,lxi:].dot(M[i])
+                diff_l2[i,j,lxi:,lxi:] += tmp
+    return diff_l2
 
 
 class MixedNLGaussianInitialGaussian(MixedNLGaussian):

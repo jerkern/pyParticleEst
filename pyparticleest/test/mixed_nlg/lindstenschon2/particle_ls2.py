@@ -112,7 +112,7 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
         f_grad = numpy.zeros((N, 5, 4,1))
         f_grad[:,0,0,0] = numpy.arctan(xil)
         
-        return (N*(self.A_grad,), f_grad, None)
+        return (numpy.repeat(self.A_grad[numpy.newaxis], N, 0), f_grad, None)
  
     
     def set_params(self, params):
@@ -130,23 +130,23 @@ class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialG
                              params[3]*math.sin(params[4]), 
                              params[3]*math.cos(params[4]))))
         
-        self.A_grad = (
-            numpy.zeros((4,3)),
+        self.A_grad = numpy.vstack((
+            numpy.zeros((4,3))[numpy.newaxis],
             numpy.asarray(((1.0, 0.0, 0.0), 
                            (0.0, 0.0, 0.0),
                            (0.0, 0.0, 0.0),
-                           (0.0, 0.0, 0.0))),
+                           (0.0, 0.0, 0.0)))[numpy.newaxis],
             numpy.asarray(((0.0, 0.0, 0.0),
                            (0.0, 1.0, 0.0), 
                            (0.0, 0.0, 0.0),
-                           (0.0, 0.0, 0.0))),
+                           (0.0, 0.0, 0.0)))[numpy.newaxis],
             numpy.asarray(((0.0, 0.0, 0.0),
                            (0.0, 0.0, 0.0), 
                            (0.0, math.cos(params[4]), -math.sin(params[4])),
-                           (0.0, math.sin(params[4]), math.cos(params[4])))),
+                           (0.0, math.sin(params[4]), math.cos(params[4]))))[numpy.newaxis],
             numpy.asarray(((0.0, 0.0, 0.0),
                            (0.0, 0.0, 0.0), 
                            (0.0, -params[3]*math.sin(params[4]), -params[3]*math.cos(params[4])),
-                           (0.0, params[3]*math.cos(params[4]), -params[3]*math.sin(params[4]))))
-            )
+                           (0.0, params[3]*math.cos(params[4]), -params[3]*math.sin(params[4]))))[numpy.newaxis]
+            ))
         self.set_dynamics(Axi=Axi, Az=Az)

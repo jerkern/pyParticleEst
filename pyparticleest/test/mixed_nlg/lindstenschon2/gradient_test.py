@@ -12,7 +12,7 @@ import pyparticleest.test.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
 if __name__ == '__main__':
     num = 50
     nums = 5
-    
+    numpy.random.seed(4) #3
     theta_true = numpy.array((1.0, 1.0, 0.3, 0.968, 0.315))
 
     # How many steps forward in time should our simulation run
