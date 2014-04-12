@@ -1,9 +1,57 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
 import pyparticleest.kalman as kalman
 from pyparticleest.part_utils import RBPSBase
-import numpy
+import scipy.linalg
+import numpy.linalg
 import numpy.random
 import copy
+
+def compute_pred_err(xin, zn, f, A, zl):
+    N = len(xin)
+    dim = len(xin[0]) + len(zn[0])
+    predict_err = numpy.zeros((N, dim, 1))
+    for i in xrange(N):
+        xn = numpy.vstack((xin[i], zn[i]))
+        predict_err[i] = xn - f[i] - A[i].dot(zl[i])
+    return predict_err
+    
+def compute_l2(perr, xin, zn, Pn, f, A, zl, Pl, M):
+    N = perr.shape[0]
+    lxi = len(xin[0])
+    l2 = numpy.zeros((N, perr.shape[1], perr.shape[1]))
+    for i in xrange(N):
+
+        l2[i] = perr[i].dot(perr[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
+        
+        Axi = A[i][:lxi]
+        Az = A[i][lxi:]
+        
+        tmp = -Axi.dot(M[i])
+        l2[i,lxi:,:lxi] += tmp.T
+        l2[i,:lxi,lxi:] += tmp
+        
+        tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
+        l2[i, lxi:,lxi:] += tmp2
+
+def compute_l2_grad(perr, lenp, lxi, zl, Pl, M, A, f_grad, A_grad):
+    N = perr.shape[0]
+    diff_l2 = numpy.zeros((N, lenp, perr.shape[1], perr.shape[1]))
+    if (f_grad != None):
+        for i in xrange(N):
+            for j in xrange(lenp):
+                tmp = f_grad[i][j].dot(perr[i].T)
+                diff_l2[i,j,:,:] -= tmp + tmp.T
+    if (A_grad != None):
+        for i in xrange(N):
+            for j in xrange(lenp):
+                tmp = A_grad[i][j].dot(zl[i]).dot(perr[i].T)
+                diff_l2[i,j,:,:] -= tmp + tmp.T
+                tmp = A_grad[i][j].dot(Pl[i]).dot(A[i].T)
+                diff_l2[i,j,:,:] += tmp + tmp.T
+                tmp = -A_grad[i][j].dot(M[i])
+                diff_l2[i,j,:,lxi:] +=  tmp
+                diff_l2[i,j, lxi:, :] += tmp.T
+    return diff_l2
 
 class MixedNLGaussian(RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
@@ -131,7 +179,7 @@ class MixedNLGaussian(RBPSBase):
         
         for i in xrange(N):
             #TODO linalg.solve instead?
-            tmp = Qxiz[i].T.dot(numpy.linalg.inv(Qxi[i]))
+            tmp = Qxiz[i].T.dot(scipy.linalg.inv(Qxi[i]))
             Acond.append(Az[i] - tmp.dot(Axi[i]))
             #Acond.append(Az[i])
             fcond.append(fz[i] +  tmp.dot(xi_next[i] - fxi[i]))
@@ -174,6 +222,10 @@ class MixedNLGaussian(RBPSBase):
         Qxiz = self.get_cross_covariance(particles=particles, u=u, t=t)
         Qxiz_identical = False
 
+        A_identical = False
+        f_identical = False
+        Q_identical = False
+
         if (Qxiz == None):
             Qxiz_identical = True
             if (self.Qxiz == None):
@@ -183,6 +235,7 @@ class MixedNLGaussian(RBPSBase):
         
         if (Az_identical and Axi_identical):
             A = N*(numpy.vstack((Axi[0], Az[0])),)
+            A_identical = True
         else:
             A = list()
             for i in xrange(N):
@@ -190,6 +243,7 @@ class MixedNLGaussian(RBPSBase):
                 
         if (fxi_identical and fz_identical):
             f = N*(numpy.vstack((fxi[0], fz[0])),)
+            f_identical = True
         else:
             f = list()
             for i in xrange(N):
@@ -198,48 +252,21 @@ class MixedNLGaussian(RBPSBase):
         if (Qxi_identical and Qz_identical and Qxiz_identical):
             Q = N*(numpy.vstack((numpy.hstack((Qxi[0], Qxiz[0])),
                               numpy.hstack((Qxiz[0].T, Qz[0])))),)
+            Q_identical = True
         else:
             Q = list()
             for i in xrange(N):
                 Q.append(numpy.vstack((numpy.hstack((Qxi[i], Qxiz[i])),
                               numpy.hstack((Qxiz[i].T, Qz[i])))))
                 
-        return (A, f, Q)
-    
-    def calc_A_f_Q_grad(self, particles, u, t):
-        N = len(particles)
-        (A_grad, f_grad, Q_grad) = self.get_pred_dynamics_grad(particles=particles, u=u, t=t)
-
-        dim = self.lxi + self.kf.lz
-
-        if (A_grad == None):
-            A_grad = N*(numpy.zeros((len(self.params), dim, dim)),)
-        if (f_grad == None):
-            f_grad = N*(numpy.zeros((len(self.params), dim, 1)),)
-        if (Q_grad == None):
-            Q_grad = N*(numpy.zeros((len(self.params), dim, dim)),)
-                
-        return (A_grad, f_grad, Q_grad)
-
-    def calc_C_h_R_grad(self, particles, y, t):
-        N = len(particles)
-        (C_grad, h_grad, R_grad) = self.get_meas_dynamics_grad(particles=particles, y=y, t=t)
-
-        if (C_grad == None):
-            C_grad = N*(numpy.zeros((len(self.params), len(y), self.kf.lz)),)
-        if (h_grad == None):
-            h_grad = N*(numpy.zeros((len(self.params), len(y), 1)),)
-        if (R_grad == None):
-            R_grad = N*(numpy.zeros((len(self.params), len(y), len(y))),)
-                
-        return (C_grad, h_grad, R_grad)    
+        return (A, f, Q, A_identical, f_identical, Q_identical)
     
     def next_pdf_max(self, particles, u, t):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
         N = len(particles)
         pmax = numpy.empty(N)
         (_, _, Pl) = self.get_states(particles)
-        (A, _, Q) = self.calc_A_f_Q(particles, u=u, t=t)
+        (A, _, Q, _, _, _) = self.calc_A_f_Q(particles, u=u, t=t)
         dim=self.lxi + self.kf.lz
         zeros = numpy.zeros((dim,1))
         for i in xrange(N):
@@ -257,7 +284,7 @@ class MixedNLGaussian(RBPSBase):
             next_part = numpy.repeat(next_part, N, 0)
         lpx = numpy.empty(N)
         (_, zl, Pl) = self.get_states(particles)
-        (A, f, Q) = self.calc_A_f_Q(particles, u=u, t=t)
+        (A, f, Q, _, _, _) = self.calc_A_f_Q(particles, u=u, t=t)
         
         for i in xrange(N):
             x_next = next_part[i,:self.lxi+self.kf.lz].reshape((self.lxi+self.kf.lz,1))
@@ -389,15 +416,13 @@ class MixedNLGaussian(RBPSBase):
         """ Override this method if (C, h, R) depends on the parameters """
         return (None, None, None)
     
-    def calc_logprod_derivative(self, A, dA, B, dB):
+    def calc_logprod_derivative(self, Alup, dA, B, dB):
         """ I = logdet(A)+Tr(inv(A)*B)
             dI/dx = Tr(inv(A)*(dA - dA*inv(A)*B + dB) """
             
-        tmp = numpy.linalg.solve(A, B)
+        tmp = scipy.linalg.lu_solve(Alup, B)
         tmp2 = dA + dB - dA.dot(tmp)
-        return numpy.trace(numpy.linalg.solve(A,tmp2))
-
-
+        return numpy.trace(scipy.linalg.lu_solve(Alup,tmp2))
 
     def eval_logp_xi0(self, xil):
         """ Evaluate logprob of the initial non-linear state eta,
@@ -432,7 +457,7 @@ class MixedNLGaussian(RBPSBase):
         for i in xrange(N):
             l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
             (_tmp, ld) = numpy.linalg.slogdet(P0[i])
-            tmp = numpy.linalg.solve(P0[i], l1)
+            tmp = scipy.linalg.solve(P0[i], l1)
             lpz0 -= 0.5*(ld + numpy.trace(tmp))
         return lpxi0 + lpz0
     
@@ -450,7 +475,7 @@ class MixedNLGaussian(RBPSBase):
         for i in xrange(N):
             l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
             (_tmp, ld) = numpy.linalg.slogdet(P0[i])
-            tmp = numpy.linalg.solve(P0[i], l1)
+            tmp = scipy.linalg.solve(P0[i], l1)
             lpz0 -= 0.5*(ld + numpy.trace(tmp))
         
             # Calculate gradient
@@ -458,43 +483,74 @@ class MixedNLGaussian(RBPSBase):
                 tmp = z0_grad[i][j].dot((zl[i]-z0[i]).T)
                 dl1 = -tmp -tmp.T
     
-                lpz0_grad[j] -= 0.5*self.calc_logprod_derivative(P0[i], P0_grad[i][j], l1, dl1)
+                P0lup = scipy.linalg.lu_factor(P0[i])
+                lpz0_grad[j] -= 0.5*self.calc_logprod_derivative(P0lup, P0_grad[i][j], l1, dl1)
                 
         return (lpxi0 + lpz0,
                 lpxi0_grad + lpz0_grad)
     
     
-    def calc_l2(self, xin, zn, Pn, z, P, Axi, Az, f, M):
-        xn = numpy.vstack((xin, zn))
-        A = numpy.vstack((Axi, Az))
-        predict_err = xn - f - A.dot(z)
-        
-        l2 = predict_err.dot(predict_err.T) +A.dot(P).dot(A.T)
-        
-        tmp = -Axi.dot(M)
-        l2[len(xin):,:len(xin)] += tmp.T
-        l2[:len(xin),len(xin):] += tmp
-        
-        tmp2 = Pn - M.T.dot(P) - Az.dot(M)        
+    def calc_l2(self, xin, zn, Pn, zl, Pl, A, f, M):
+        N = len(xin)
+        dim = self.lxi+self.kf.lz
+        predict_err = numpy.zeros((N, dim, 1))
+        l2 = numpy.zeros((N, dim, dim))
 
-        l2[len(xin):,len(xin):] += tmp2
+        for i in xrange(N):
+            xn = numpy.vstack((xin[i], zn[i]))
+            predict_err[i] = xn - f[i] - A[i].dot(zl[i])
+            l2[i] = predict_err[i].dot(predict_err[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
+            
+            Axi = A[i][:self.lxi]
+            Az = A[i][self.lxi:]
+            
+            tmp = -Axi.dot(M[i])
+            l2[i,self.lxi:,:self.lxi] += tmp.T
+            l2[i,:self.lxi,self.lxi:] += tmp
+            
+            tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
+            l2[i, self.lxi:,self.lxi:] += tmp2
+            
         return (l2, predict_err)
  
-    def calc_l2_grad(self, l2, predict_err, z, P, Mz, f, f_grad, A, A_grad):
-        
-        diff_l2 = numpy.zeros((len(self.params), l2.shape[0], l2.shape[1]))
-        
-        for j in range(len(self.params)):
-                 
-            tmp = (f_grad[j] + A_grad[j].dot(z)).dot(predict_err.T)
-            diff_l2[j,:,:] = -tmp - tmp.T
-            tmp = A_grad[j].dot(P).dot(A.T)
-            diff_l2[j,:,:] += tmp + tmp.T
-            tmp = -A_grad[j].dot(Mz)
-            diff_l2[j,:,self.lxi:] +=  tmp
-            diff_l2[j, self.lxi:, :] += tmp.T
+    def calc_l2_grad(self, xin, zn, Pn, zl, Pl, A, f, M, f_grad, A_grad):
+        N = len(xin)
+        dim = self.lxi+self.kf.lz
+        predict_err = numpy.zeros((N, dim, 1))
+        l2 = numpy.zeros((N, dim, dim))
+        diff_l2 = numpy.zeros((N, len(self.params), dim, dim))
 
-        return diff_l2   
+        for i in xrange(N):
+            xn = numpy.vstack((xin[i], zn[i]))
+            predict_err[i] = xn - f[i] - A[i].dot(zl[i])
+            l2[i] = predict_err[i].dot(predict_err[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
+            
+            Axi = A[i][:self.lxi]
+            Az = A[i][self.lxi:]
+            
+            tmp = -Axi.dot(M[i])
+            l2[i,self.lxi:,:self.lxi] += tmp.T
+            l2[i,:self.lxi,self.lxi:] += tmp
+            
+            tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
+            l2[i, self.lxi:,self.lxi:] += tmp2
+        if (f_grad != None):
+            for i in xrange(N):
+                for j in range(len(self.params)):
+                    tmp = f_grad[i][j].dot(predict_err[i].T)
+                    diff_l2[i,j,:,:] -= tmp + tmp.T
+        if (A_grad != None):
+            for i in xrange(N):
+                for j in range(len(self.params)):
+                    tmp = A_grad[i][j].dot(zl[i]).dot(predict_err[i].T)
+                    diff_l2[i,j,:,:] -= tmp + tmp.T
+                    tmp = A_grad[i][j].dot(Pl[i]).dot(A[i].T)
+                    diff_l2[i,j,:,:] += tmp + tmp.T
+                    tmp = -A_grad[i][j].dot(M[i])
+                    diff_l2[i,j,:,self.lxi:] +=  tmp
+                    diff_l2[i,j, self.lxi:, :] += tmp.T
+
+        return (l2, diff_l2)   
        
     def eval_logp_xnext(self, particles, x_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
@@ -503,122 +559,170 @@ class MixedNLGaussian(RBPSBase):
             respect to the corresponding parameter"""
         # Calculate l2 according to (16)
         N = len(particles)
-        lpxn = numpy.empty(N)
+        lpxn = 0.0
         
         (_xi, z, P) = self.get_states(particles)
         Mzl = self.get_Mz(particles)
         (xin, zn, Pn) = self.get_states(x_next)
         
-        (A, f, Q) = self.calc_A_f_Q(particles, u, t)
-        
-        for i in xrange(N):
-            Axi = A[i][:self.lxi]
-            Az = A[i][self.lxi:]
-            (l2, _pe) = self.calc_l2(xin[i], zn[i], Pn[i], z[i], P[i], Axi, Az, f[i], Mzl[i])
-            (_tmp, ld) = numpy.linalg.slogdet(Q[i])
-            tmp = numpy.linalg.solve(Q[i], l2)
-            lpxn[i] = -0.5*(ld + numpy.trace(tmp))
+        (A, f, Q, _, _, Q_identical) = self.calc_A_f_Q(particles, u, t)
+        (l2, _) = self.calc_l2(xin, zn, Pn, z, P, A, f, Mzl)
+        if (Q_identical):
+            (_tmp, ld) = numpy.linalg.slogdet(Q[0])
+            Q_lup = scipy.linalg.lu_factor(Q[0])
+            for i in xrange(N):
+                tmp = scipy.linalg.lu_solve(Q_lup, l2[i])
+                lpxn -= 0.5*(ld + numpy.trace(tmp))                                             
+        else:
+            for i in xrange(N):
+                (_tmp, ld) = numpy.linalg.slogdet(Q[i])
+                tmp = scipy.linalg.solve(Q[i], l2[i])
+                lpxn -= 0.5*(ld + numpy.trace(tmp))
       
         return lpxn
-
-
 
     def eval_logp_xnext_val_grad(self, particles, x_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-            
         N = len(particles)
-        lpxn = numpy.empty(N)
-        
-        (_xi, z, P) = self.get_states(particles)
-        Mzl = self.get_Mz(particles)
-        (xin, zn, Pn) = self.get_states(x_next)
-        
-        (A, f, Q) = self.calc_A_f_Q(particles, u, t)
-        (A_grad, f_grad, Q_grad) = self.calc_A_f_Q_grad(particles, u, t)
-        
+        lpxn = 0.0
         lpxn_grad = numpy.zeros(self.params.shape)
         
-        for i in xrange(N):
-            Axi = A[i][:self.lxi]
-            Az = A[i][self.lxi:]
-            (l2, pe) = self.calc_l2(xin[i], zn[i], Pn[i], z[i], P[i], Axi, Az, f[i], Mzl[i])
-            (_tmp, ld) = numpy.linalg.slogdet(Q[i])
-            tmp = numpy.linalg.solve(Q[i], l2)
-            lpxn[i] = -0.5*(ld + numpy.trace(tmp))
-      
-            l2_grad = self.calc_l2_grad(l2, pe, z[i], P[i], Mzl[i], f[i], f_grad[i], A[i], A_grad[i])
+        (A_grad, f_grad, Q_grad) = self.get_pred_dynamics_grad(particles=particles, u=u, t=t)
+        if (A_grad == None and f_grad == None and Q_grad == None):
+            lpxn = self.eval_logp_xnext(particles, x_next, u, t)
+        else:
+        
+            (_xi, zl, Pl) = self.get_states(particles)
+            Mzl = self.get_Mz(particles)
+            (xin, zn, Pn) = self.get_states(x_next)
             
-            for j in xrange(len(self.params)):
-                lpxn_grad[j] -= 0.5*self.calc_logprod_derivative(Q[i], Q_grad[i][j], l2, l2_grad[j])
+            (A, f, Q, _, _, Q_identical) = self.calc_A_f_Q(particles, u, t)
+            
+    
+            dim = self.lxi + self.kf.lz
+    
+            if (Q_grad == None):
+                Q_grad = N*(numpy.zeros((len(self.params), dim, dim)),)
+            
+            (l2, l2_grad) = self.calc_l2_grad(xin, zn, Pn, zl, Pl, A, f, Mzl, f_grad, A_grad)
+            if (Q_identical):
+                (_tmp, ld) = numpy.linalg.slogdet(Q[0])
+                Q_lup = scipy.linalg.lu_factor(Q[0])
+                for i in xrange(N):
+                    tmp = scipy.linalg.lu_solve(Q_lup, l2[i])
+                    lpxn -= 0.5*(ld + numpy.trace(tmp))   
+                    for j in xrange(len(self.params)):
+                        lpxn_grad[j] -= 0.5*self.calc_logprod_derivative(Q_lup, Q_grad[i][j],
+                                                                         l2[i], l2_grad[i][j])                                          
+            else:
+                for i in xrange(N):
+                    (_tmp, ld) = numpy.linalg.slogdet(Q[i])
+                    Q_lup = scipy.linalg.lu_factor(Q[0])
+                    tmp = scipy.linalg.solve(Q_lup, l2[i])
+                    lpxn -= 0.5*(ld + numpy.trace(tmp))
+                    for j in xrange(len(self.params)):
+                        lpxn_grad[j] -= 0.5*self.calc_logprod_derivative(Q_lup, Q_grad[i][j],
+                                                                         l2[i], l2_grad[i][j])
+          
+
+                
             
         return (lpxn, lpxn_grad)
 
-    def calc_l3(self, y, z, P, C, h):
-        meas_diff = self.kf.measurement_diff(y,z,C, h) 
-        l3 = meas_diff.dot(meas_diff.T)
-        l3 += C.dot(P).dot(C.T)
+    def calc_l3(self, y, zl, Pl, Cl, hl):
+        N = len(zl)
+        l3 = numpy.zeros((N, len(y), len(y)))
+        for i in xrange(N):
+            meas_diff = self.kf.measurement_diff(y,zl[i],Cl[i], hl[i]) 
+            l3[i] = meas_diff.dot(meas_diff.T) + Cl[i].dot(Pl[i]).dot(Cl[i].T)
         return l3
     
-    def calc_l3_grad(self, y, z, P, C, h, C_grad, h_grad):
-        meas_diff = self.kf.measurement_diff(y,z,C, h) 
-        l3 = meas_diff.dot(meas_diff.T)
-        l3 += C.dot(P).dot(C.T)
+    def calc_l3_grad(self, y, zl, Pl, Cl, hl, C_grad, h_grad):
+        N = len(zl)
+        l3 = numpy.zeros((N, len(y), len(y)))
+        diff_l3 = numpy.zeros((N, len(self.params), len(y), len(y)))
+        meas_diff = numpy.zeros((N, len(y), 1))
         
-        diff_l3 = numpy.zeros((len(self.params), l3.shape[0], l3.shape[1]))
-        
-        for j in xrange(len(self.params)):
-            tmp2 = C_grad[j].dot(P).dot(C.T)
-            tmp = C_grad[j].dot(z).dot(meas_diff.T)
-            tmp += h_grad[j].dot(meas_diff.T)
-            diff_l3[j] += -tmp -tmp.T + tmp2 + tmp2.T
-        
-        return diff_l3
+        for i in xrange(N):
+            meas_diff[i] = self.kf.measurement_diff(y,zl[i],Cl[i], hl[i]) 
+            l3[i] = meas_diff.dot(meas_diff.T) + Cl[i].dot(Pl[i]).dot(Cl[i].T)
+            
+            if (C_grad != None):
+                C_grad = N*(numpy.zeros((len(self.params), len(y), self.kf.lz)),)
+                for j in xrange(len(self.params)):
+                    tmp2 = C_grad[i][j].dot(Pl[i]).dot(Cl[i].T)
+                    tmp = C_grad[i][j].dot(zl[i]).dot(meas_diff[i].T)
+                    diff_l3[i][j] += -tmp -tmp.T + tmp2 + tmp2.T
+            if (h_grad != None):
+                for j in xrange(len(self.params)):
+                    tmp = h_grad[i][j].dot(meas_diff.T)
+                    diff_l3[i][j] += -tmp -tmp.T
+            
+        return (l3, diff_l3)
     
     def eval_logp_y(self, particles, y, t):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
         N = len(particles)
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles, y, t)
+        (y, Cz, hz, Rz, _, _, Rz_identical) = self.get_meas_dynamics_int(particles, y, t)
         (_xil, zl, Pl) = self.get_states(particles)
         logpy = 0.0
-        for i in xrange(N):
-        # Calculate l3 according to (19b)
-            l3 = self.calc_l3(y, zl[i], Pl[i], Cz[i], hz[i])
-        
-            (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
-            tmp = numpy.linalg.solve(Rz[i], l3)
-            logpy -= 0.5*(ld + numpy.trace(tmp))
+        l3 = self.calc_l3(y, zl, Pl, Cz, hz)
+        if (Rz_identical):
+            (_tmp, ld) = numpy.linalg.slogdet(Rz[0])
+            Rz_lup = scipy.linalg.lu_factor(Rz[0])
+            for i in xrange(N):
+                tmp = scipy.linalg.lu_solve(Rz_lup, l3[i])
+                logpy -= 0.5*(ld + numpy.trace(tmp))
+        else:
+            for i in xrange(N):
+            # Calculate l3 according to (19b)
+                (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
+                tmp = scipy.linalg.solve(Rz[i], l3[i])
+                logpy -= 0.5*(ld + numpy.trace(tmp))
 
         return logpy
 
-
-        
     def eval_logp_y_val_grad(self, particles, y, t):
         """ Calculate a term of the I3 integral approximation
         and its gradient as specified in [1]"""
         
         N = len(particles)
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles, y, t)
-        (C_grad, h_grad, R_grad) = self.calc_C_h_R_grad(particles, y, t)
-        (_xil, zl, Pl) = self.get_states(particles)
         logpy = 0.0
         lpy_grad = numpy.zeros(self.params.shape)
-        for i in xrange(N):
-        # Calculate l3 according to (19b)
-            l3 = self.calc_l3(y, zl[i], Pl[i], Cz[i], hz[i])
-        
-            (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
-            tmp = numpy.linalg.solve(Rz[i], l3)
-            logpy -= 0.5*(ld + numpy.trace(tmp))
-
-
-            # Calculate gradient
-            l3_grad = self.calc_l3_grad(y, zl[i], Pl[i], Cz[i], hz[i], C_grad[i], h_grad[i])
-            for j in range(len(self.params)):
-                lpy_grad[j] -= 0.5*self.calc_logprod_derivative(Rz[i], R_grad[i][j], l3, l3_grad[j])
+        (y, Cz, hz, Rz, _, _, Rz_identical) = self.get_meas_dynamics_int(particles, y, t)
+        (C_grad, h_grad, R_grad) = self.get_meas_dynamics_grad(particles=particles, y=y, t=t)
+        if (C_grad == None and h_grad == None and R_grad == None):
+            logpy = self.eval_logp_y(particles, y, t)
+        else:
+            if (R_grad == None):
+                R_grad = N*(numpy.zeros((len(self.params), len(y), len(y))),)
+                
+            (_xil, zl, Pl) = self.get_states(particles)
+            
+            (l3, l3_grad) = self.calc_l3_grad(y, zl, Pl, Cz, hz, C_grad, h_grad)
+            
+            if (Rz_identical):
+                (_tmp, ld) = numpy.linalg.slogdet(Rz[0])
+                Rz_lup = scipy.linalg.lu_factor(Rz[0])
+                for i in xrange(N):
+                    tmp = scipy.linalg.lu_solve(Rz_lup, l3[i])
+                    logpy -= 0.5*(ld + numpy.trace(tmp))
+                    for j in range(len(self.params)):
+                        lpy_grad[j] -= 0.5*self.calc_logprod_derivative(Rz_lup, R_grad[i][j],
+                                                                        l3, l3_grad[j])
+            else:
+                for i in xrange(N):
+                    (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
+                    Rz_lup = scipy.linalg.lu_factor(Rz[i])
+                    tmp = scipy.linalg.solve(Rz_lup, l3[i])
+                    logpy -= 0.5*(ld + numpy.trace(tmp))
+                    for j in range(len(self.params)):
+                        lpy_grad[j] -= 0.5*self.calc_logprod_derivative(Rz_lup, R_grad[i][j],
+                                                                        l3, l3_grad[j])
 
         return (logpy, lpy_grad)
 
@@ -684,12 +788,13 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
         N = len(xil)
         (xi0_grad, Pxi0_grad) = self.get_xi_intitial_grad(N)
         lpxi0_grad = numpy.zeros(self.params.shape)
+        Pxi0_lup = scipy.linalg.lu_factor(self.Pxi0)
         for i in xrange(N):
             tmp = xil[i]-self.xi0
             l0 = tmp.dot(tmp.T)
             for j in range(len(self.params)):
                 tmp2 = tmp.dot(xi0_grad[i][j].T)
                 l0_grad = tmp2 + tmp2.T
-                lpxi0_grad[j] -= 0.5*self.calc_logprod_derivative(self.Pxi0, Pxi0_grad[i][j], l0, l0_grad)
+                lpxi0_grad[j] -= 0.5*self.calc_logprod_derivative(Pxi0_lup, Pxi0_grad[i][j], l0, l0_grad)
                 
         return lpxi0_grad
