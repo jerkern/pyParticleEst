@@ -3,24 +3,27 @@
     Uses scipy.sparse for handling sparse matrices, works with dense matrices aswell """
 import numpy as np
 import math
-import scipy.sparse as sp
-#import scipy.sparse.linalg as spln
+import scipy.linalg
 
 l2pi = math.log(2*math.pi)
-def lognormpdf(x,mu,S):
+def lognormpdf(err,S):
     """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
-    err = x-mu
     return -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err).T.dot(err))
 
-def lognormpdf_vec(xl,mul,Sl):
+def lognormpdf_cho(err,Schol):
     """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
-    N = len(xl)
-    res = np.empty(N, dtype=float)
+    dim = len(err)
+    ld = np.sum(np.log(np.diag(Schol[0])))*2
+    return -0.5*(dim*l2pi+ld+scipy.linalg.cho_solve(Schol, err, check_finite=False).T.dot(err))
+
+def lognormpdf_vec(err,Sl):
+    """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
+    N = len(err)
+    res = np.empty(N)
 
     for i in range(N):
-        err = xl[i]-mul[i]
         S = Sl[i]
-        res[i] = -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err).T.dot(err))
+        res[i] = -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err[i]).T.dot(err[i]))
     return res
 
 class KalmanFilter(object):
@@ -104,30 +107,26 @@ class KalmanFilter(object):
     def measure_full(self, y, z, P, C, h_k, R):
         if (C != None):
             S = C.dot(P).dot(C.T)+R
-  
-
-            if (sp.issparse(S)):
-                Sd = S.todense() # Ok if dimension of S is small compared to other matrices 
-                Sinv = np.linalg.inv(Sd)
-                K = P.dot(C.T).dot(sp.csr_matrix(Sinv))
-            else:
-                Sinv = np.linalg.inv(S)
-                K = P.dot(C.T).dot(Sinv)
-             
-            err = self.measurement_diff(y, z, C, h_k)
-            z[:] = z + K.dot(err)  
-            P[:,:] = P - K.dot(C).dot(P)
+            Schol = scipy.linalg.cho_factor(S, check_finite=False)
+            err = y - C.dot(z)
+            if (h_k != None):
+                err -= h_k
+            Sinv_err = scipy.linalg.cho_solve(Schol, err, check_finite=False)
+            z[:] = z + P.dot(C.T).dot(Sinv_err)  
+            P[:,:] = P - P.dot(C.T).dot(scipy.linalg.cho_solve(Schol, C.dot(P), check_finite=False))
         else:
             if (h_k != None):
                 err = y - h_k
             else:
                 err = y
-            S = R
-        
-        
-        
+            Schol = scipy.linalg.cho_factor(R, check_finite=False)
+            Sinv_err = scipy.linalg.cho_solve(Schol, err, check_finite=False)
+
         # Return the probability of the received measurement
-        return lognormpdf(0, err, S)
+        dim = len(y)
+        ld = np.sum(np.log(np.diag(Schol[0])))*2
+        return -0.5*(dim*l2pi+ld+err.T.dot(Sinv_err))
+
 
 
 class KalmanSmoother(KalmanFilter):

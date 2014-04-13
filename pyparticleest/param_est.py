@@ -94,7 +94,7 @@ class ParamEstimation(object):
         self.params = numpy.copy(params)
         self.model.set_params(self.params)
     
-    def simulate(self, num_part, num_traj, filter='PF', smoother='full', res=0.67, meas_first=False):
+    def simulate(self, num_part, num_traj, filter='PF', smoother='full', smoother_options=None, res=0.67, meas_first=False):
         resamplings=0
     
         # Initialise a particle filter with our particle approximation of the initial state,
@@ -113,12 +113,12 @@ class ParamEstimation(object):
                 resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates
-        self.straj = self.pt.perform_smoothing(num_traj, method=smoother)
+        self.straj = self.pt.perform_smoothing(num_traj, method=smoother, smoother_options=smoother_options)
         return resamplings
             
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
                  callback=None, callback_sim=None, bounds=None, meas_first=False,
-                 smoother='full', analytic_gradient=False):
+                 smoother='full', smoother_options=None, analytic_gradient=False):
         
         def fval(params_val):
             self.model.set_params(params_val)
@@ -157,7 +157,8 @@ class ParamEstimation(object):
                 else:
                     numt = num_traj[-1]
             
-            self.simulate(nump, numt, smoother=smoother, meas_first=meas_first)
+            self.simulate(nump, numt, smoother=smoother, smoother_options=smoother_options,
+                          meas_first=meas_first)
             if (callback_sim != None):
                 callback_sim(self)
             #res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)

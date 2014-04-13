@@ -237,7 +237,7 @@ class ParticleTrajectory(object):
             
         return signals
     
-    def perform_smoothing(self, M, method="full"):
+    def perform_smoothing(self, M, method="full", smoother_options=None):
         """ return an array of smoothed trajectories 
             M - number of smoothed trajectories """
         from pyparticleest.ps import SmoothTrajectory
@@ -253,7 +253,9 @@ class ParticleTrajectory(object):
                                                                 u=self.traj[k].u, t=self.traj[k].t)) 
             options['maxpdf'] = coeffs
         if (method == 'mcmc'):
-            options['R'] = 30
+                options['R'] = 30
+        if (smoother_options != None):
+            options.update(smoother_options)
             
         straj = SmoothTrajectory(self, M=M, method=method, options=options)
             

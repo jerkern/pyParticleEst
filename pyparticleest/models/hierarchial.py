@@ -78,7 +78,7 @@ class HierarchicalBase(RBPSBase):
             # Predict z_{t+1}
             (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
             
-            lpz[i] = kalman.lognormpdf(next_cpart[i][self.len_xi:].reshape((-1,1)), zln[i], Pln[i])
+            lpz[i] = kalman.lognormpdf(next_cpart[i][self.len_xi:].reshape((-1,1))-zln[i], Pln[i])
             
         #mul = numpy.repeat(next_cpart[1].reshape((-1,1)),N,axis=0)
         #mul = N*(next_cpart[:self.len_xi].reshape((-1,1)),)

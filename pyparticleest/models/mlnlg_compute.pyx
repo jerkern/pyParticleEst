@@ -7,9 +7,9 @@ def compute_logprod_derivative(Alup, dA, B, dB):
     """ I = logdet(A)+Tr(inv(A)*B)
         dI/dx = Tr(inv(A)*(dA - dA*inv(A)*B + dB) """
         
-    tmp = lalg.lu_solve(Alup, B, check_finite=False)
+    tmp = lalg.cho_solve(Alup, B, check_finite=False)
     tmp2 = dA + dB - dA.dot(tmp)
-    return np.trace(lalg.lu_solve(Alup,tmp2, check_finite=False))
+    return np.trace(lalg.cho_solve(Alup,tmp2, check_finite=False))
 
 #def compute_l2_grad_f_slow(N, lenp, dim, out, perr, f_grad, tmp):
 #    diff_l2 = np.zeros((N, lenp, dim, dim))

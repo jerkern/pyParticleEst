@@ -1,12 +1,11 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
-import pyparticleest.kalman as kalman
 from pyparticleest.part_utils import RBPSBase
 import scipy.linalg
-import numpy.linalg
 import numpy.random
-import copy
+import math
 import pyximport
 pyximport.install()
+import pyparticleest.kalman as kalman
 from pyparticleest.models.mlnlg_compute import *
 
 class MixedNLGaussian(RBPSBase):
@@ -225,9 +224,13 @@ class MixedNLGaussian(RBPSBase):
         (A, _, Q, _, _, _) = self.calc_A_f_Q(particles, u=u, t=t)
         dim=self.lxi + self.kf.lz
         zeros = numpy.zeros((dim,1))
+        l2pi = math.log(2*math.pi)
         for i in xrange(N):
-            self.Sigma = Q[i] + A[i].dot(Pl[i]).dot(A[i].T)
-            pmax[i] = kalman.lognormpdf(zeros, zeros, self.Sigma)
+            Sigma = Q[i] + A[i].dot(Pl[i]).dot(A[i].T)
+            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
+#            pmax[i] = kalman.lognormpdf_cho(zeros, zeros, Schol)
+            ld = numpy.sum(numpy.log(numpy.diag(Schol[0])))*2
+            pmax[i] = -0.5*(dim*l2pi+ld)
         
         return numpy.max(pmax)
         
@@ -246,7 +249,8 @@ class MixedNLGaussian(RBPSBase):
             x_next = next_part[i,:self.lxi+self.kf.lz].reshape((self.lxi+self.kf.lz,1))
             xp = f[0] + A[i].dot(zl[i])
             Sigma = A[i].dot(Pl[i]).dot(A[i].T) + Q[i]
-            lpx[i] = kalman.lognormpdf(x_next,mu=xp,S=Sigma)
+            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
+            lpx[i] = kalman.lognormpdf_cho(x_next-xp,Schol)
         
         return lpx
     
@@ -271,7 +275,7 @@ class MixedNLGaussian(RBPSBase):
             self.set_states(particles, xil, zl, Pl)
 
         for j in range(M):
-            xi = copy.copy(xil[j]).ravel()
+            xi = numpy.copy(xil[j]).ravel()
             z = numpy.random.multivariate_normal(zl[j].ravel(), 
                                                  Pl[j]).ravel()
             res[j,:self.lxi+self.kf.lz] = numpy.hstack((xi, z))
@@ -404,8 +408,10 @@ class MixedNLGaussian(RBPSBase):
         lpz0 = 0.0
         for i in xrange(N):
             l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
-            (_tmp, ld) = numpy.linalg.slogdet(P0[i])
-            tmp = scipy.linalg.solve(P0[i], l1)
+            P0cho = scipy.linalg.cho_factor(P0[i], check_finite=False)
+            #(_tmp, ld) = numpy.linalg.slogdet(P0[i])
+            ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0])))*2
+            tmp = scipy.linalg.cho_solve(P0cho[i], l1, check_finite=False)
             lpz0 -= 0.5*(ld + numpy.trace(tmp))
         return lpxi0 + lpz0
     
@@ -422,17 +428,17 @@ class MixedNLGaussian(RBPSBase):
         lpz0 = 0.0
         for i in xrange(N):
             l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
-            (_tmp, ld) = numpy.linalg.slogdet(P0[i])
-            tmp = scipy.linalg.solve(P0[i], l1)
+            P0cho = scipy.linalg.cho_factor(P0[i], check_finite=False)
+            #(_tmp, ld) = numpy.linalg.slogdet(P0[i])
+            ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0])))*2
+            tmp = scipy.linalg.cho_solve(P0cho, l1, check_finite=False)
             lpz0 -= 0.5*(ld + numpy.trace(tmp))
         
             # Calculate gradient
             for j in range(len(self.params)):
                 tmp = z0_grad[i][j].dot((zl[i]-z0[i]).T)
                 dl1 = -tmp -tmp.T
-    
-                P0lup = scipy.linalg.lu_factor(P0[i], check_finite=False)
-                lpz0_grad[j] -= 0.5*compute_logprod_derivative(P0lup, P0_grad[i][j], l1, dl1)
+                lpz0_grad[j] -= 0.5*compute_logprod_derivative(P0cho, P0_grad[i][j], l1, dl1)
                 
         return (lpxi0 + lpz0,
                 lpxi0_grad + lpz0_grad)
@@ -484,15 +490,18 @@ class MixedNLGaussian(RBPSBase):
         (A, f, Q, _, _, Q_identical) = self.calc_A_f_Q(particles, u, t)
         l2 = self.calc_l2(xin, zn, Pn, z, P, A, f, Mzl)
         if (Q_identical):
-            (_tmp, ld) = numpy.linalg.slogdet(Q[0])
-            Q_lup = scipy.linalg.lu_factor(Q[0], check_finite=False)
+            Qcho = scipy.linalg.cho_factor(Q[0], check_finite=False)
+            #(_tmp, ld) = numpy.linalg.slogdet(Q[0])
+            ld = numpy.sum(numpy.log(numpy.diagonal(Qcho[0])))*2
             for i in xrange(N):
-                tmp = scipy.linalg.lu_solve(Q_lup, l2[i], check_finite=False)
+                tmp = scipy.linalg.cho_solve(Qcho, l2[i], check_finite=False)
                 lpxn -= 0.5*(ld + numpy.trace(tmp))                                             
         else:
             for i in xrange(N):
-                (_tmp, ld) = numpy.linalg.slogdet(Q[i])
-                tmp = scipy.linalg.solve(Q[i], l2[i])
+                Qcho = scipy.linalg.cho_factor(Q[i], check_finite=False)
+                #(_tmp, ld) = numpy.linalg.slogdet(Q[i])
+                ld = numpy.sum(numpy.log(numpy.diagonal(Qcho[0])))*2
+                tmp = scipy.linalg.cho_solve(Qcho, l2[i], check_finite=False)
                 lpxn -= 0.5*(ld + numpy.trace(tmp))
       
         return lpxn
@@ -525,22 +534,24 @@ class MixedNLGaussian(RBPSBase):
             
             (l2, l2_grad) = self.calc_l2_grad(xin, zn, Pn, zl, Pl, A, f, Mzl, f_grad, A_grad)
             if (Q_identical):
-                (_tmp, ld) = numpy.linalg.slogdet(Q[0])
-                Q_lup = scipy.linalg.lu_factor(Q[0], check_finite=False)
+                Qcho = scipy.linalg.cho_factor(Q[0], check_finite=False)
+                #(_tmp, ld) = numpy.linalg.slogdet(Q[0])
+                ld = numpy.sum(numpy.log(numpy.diagonal(Qcho[0])))*2
                 for i in xrange(N):
-                    tmp = scipy.linalg.lu_solve(Q_lup, l2[i], check_finite=False)
+                    tmp = scipy.linalg.cho_solve(Qcho, l2[i], check_finite=False)
                     lpxn -= 0.5*(ld + numpy.trace(tmp))   
                     for j in xrange(len(self.params)):
-                        lpxn_grad[j] -= 0.5*compute_logprod_derivative(Q_lup, Q_grad[i][j],
+                        lpxn_grad[j] -= 0.5*compute_logprod_derivative(Qcho, Q_grad[i][j],
                                                                        l2[i], l2_grad[i][j])                                          
             else:
                 for i in xrange(N):
-                    (_tmp, ld) = numpy.linalg.slogdet(Q[i])
-                    Q_lup = scipy.linalg.lu_factor(Q[i], check_finite=False)
-                    tmp = scipy.linalg.solve(Q_lup, l2[i])
+                    Qcho = scipy.linalg.cho_factor(Q[i], check_finite=False)
+                    #(_tmp, ld) = numpy.linalg.slogdet(Q[i])
+                    ld = numpy.sum(numpy.log(numpy.diagonal(Qcho[0])))*2
+                    tmp = scipy.linalg.cho_solve(Qcho, l2[i], check_finite=False)
                     lpxn -= 0.5*(ld + numpy.trace(tmp))
                     for j in xrange(len(self.params)):
-                        lpxn_grad[j] -= 0.5*compute_logprod_derivative(Q_lup, Q_grad[i][j],
+                        lpxn_grad[j] -= 0.5*compute_logprod_derivative(Qcho, Q_grad[i][j],
                                                                        l2[i], l2_grad[i][j])
           
 
@@ -588,16 +599,19 @@ class MixedNLGaussian(RBPSBase):
         logpy = 0.0
         l3 = self.calc_l3(y, zl, Pl, Cz, hz)
         if (Rz_identical):
-            (_tmp, ld) = numpy.linalg.slogdet(Rz[0])
-            Rz_lup = scipy.linalg.lu_factor(Rz[0], check_finite=False)
+            Rzcho = scipy.linalg.cho_factor(Rz[0], check_finite=False)
+            #(_tmp, ld) = numpy.linalg.slogdet(Rz[0])
+            ld = numpy.sum(numpy.log(numpy.diagonal(Rzcho[0])))*2
             for i in xrange(N):
-                tmp = scipy.linalg.lu_solve(Rz_lup, l3[i], check_finite=False)
+                tmp = scipy.linalg.cho_solve(Rzcho, l3[i], check_finite=False)
                 logpy -= 0.5*(ld + numpy.trace(tmp))
         else:
             for i in xrange(N):
             # Calculate l3 according to (19b)
-                (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
-                tmp = scipy.linalg.solve(Rz[i], l3[i], check_finite=False)
+                Rzcho = scipy.linalg.cho_factor(Rz[i], check_finite=False)
+                #(_tmp, ld) = numpy.linalg.slogdet(Rz[i])
+                ld = numpy.sum(numpy.log(numpy.diagonal(Rzcho[0])))*2
+                tmp = scipy.linalg.cho_solve(Rzcho, l3[i], check_finite=False)
                 logpy -= 0.5*(ld + numpy.trace(tmp))
 
         return logpy
@@ -622,22 +636,24 @@ class MixedNLGaussian(RBPSBase):
             (l3, l3_grad) = self.calc_l3_grad(y, zl, Pl, Cz, hz, C_grad, h_grad)
             
             if (Rz_identical):
-                (_tmp, ld) = numpy.linalg.slogdet(Rz[0])
-                Rz_lup = scipy.linalg.lu_factor(Rz[0], check_finite=False)
+                Rzcho = scipy.linalg.cho_factor(Rz[0], check_finite=False)
+                #(_tmp, ld) = numpy.linalg.slogdet(Rz[0])
+                ld = numpy.sum(numpy.log(numpy.diagonal(Rzcho[0])))*2
                 for i in xrange(N):
-                    tmp = scipy.linalg.lu_solve(Rz_lup, l3[i], check_finite=False)
+                    tmp = scipy.linalg.cho_solve(Rzcho, l3[i], check_finite=False)
                     logpy -= 0.5*(ld + numpy.trace(tmp))
                     for j in range(len(self.params)):
-                        lpy_grad[j] -= 0.5*compute_logprod_derivative(Rz_lup, R_grad[i][j],
+                        lpy_grad[j] -= 0.5*compute_logprod_derivative(Rzcho, R_grad[i][j],
                                                                       l3, l3_grad[j])
             else:
                 for i in xrange(N):
-                    (_tmp, ld) = numpy.linalg.slogdet(Rz[i])
-                    Rz_lup = scipy.linalg.lu_factor(Rz[i], check_finite=False)
-                    tmp = scipy.linalg.solve(Rz_lup, l3[i])
+                    Rzcho = scipy.linalg.cho_factor(Rzcho, check_finite=False)
+                    #(_tmp, ld) = numpy.linalg.slogdet(Rz[i])
+                    ld = numpy.sum(numpy.log(numpy.diagonal(Rzcho[0])))*2
+                    tmp = scipy.linalg.solve(Rzcho, l3[i])
                     logpy -= 0.5*(ld + numpy.trace(tmp))
                     for j in range(len(self.params)):
-                        lpy_grad[j] -= 0.5*compute_logprod_derivative(Rz_lup, R_grad[i][j],
+                        lpy_grad[j] -= 0.5*compute_logprod_derivative(Rzcho, R_grad[i][j],
                                                                       l3, l3_grad[j])
 
         return (logpy, lpy_grad)
@@ -693,8 +709,11 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
             respect to the corresponding parameter"""    
             
         N = len(xil)
-        return kalman.lognormpdf_vec(xil, N*(self.xi0,), N*(self.Pxi0,))
-    
+        res = numpy.empty(N)
+        Pchol = scipy.linalg.cho_factor(self.Pxi0, check_finite=False)
+        for i in xrange(N):
+            res[i] = kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
+        return res
     
     def get_xi_intitial_grad(self, N):
         return (N*(numpy.zeros((len(self.params), self.lxi, 1)),),
@@ -705,13 +724,13 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
         N = len(xil)
         (xi0_grad, Pxi0_grad) = self.get_xi_intitial_grad(N)
         lpxi0_grad = numpy.zeros(self.params.shape)
-        Pxi0_lup = scipy.linalg.lu_factor(self.Pxi0, check_finite=False)
+        Pxi0cho = scipy.linalg.cho_factor(self.Pxi0, check_finite=False)
         for i in xrange(N):
             tmp = xil[i]-self.xi0
             l0 = tmp.dot(tmp.T)
             for j in range(len(self.params)):
                 tmp2 = tmp.dot(xi0_grad[i][j].T)
                 l0_grad = tmp2 + tmp2.T
-                lpxi0_grad[j] -= 0.5*compute_logprod_derivative(Pxi0_lup, Pxi0_grad[i][j], l0, l0_grad)
+                lpxi0_grad[j] -= 0.5*compute_logprod_derivative(Pxi0cho, Pxi0_grad[i][j], l0, l0_grad)
                 
         return lpxi0_grad

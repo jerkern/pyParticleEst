@@ -1,9 +1,11 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
 import abc
-import kalman
 import numpy
 import copy
 import math
+import pyximport
+pyximport.install()
+import kalman
 # This was slower than kalman.lognormpdf
 #from scipy.stats import multivariate_normal
 
