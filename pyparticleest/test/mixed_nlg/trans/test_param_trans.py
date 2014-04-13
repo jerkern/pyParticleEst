@@ -22,6 +22,8 @@ if __name__ == '__main__':
     # How many steps forward in time should our simulation run
     steps = 200
     sims = 130
+    
+    max_iter = 100
 
     # Create arrays for storing some values for later plotting    
     vals = numpy.zeros((2, num+1, steps+1))
@@ -34,6 +36,8 @@ if __name__ == '__main__':
     plt.ion()
     fig1 = plt.figure()
     fig2 = plt.figure()
+    fig3 = plt.figure()
+    fig4 = plt.figure()
     
     for k in range(sims):
         print k
@@ -51,17 +55,46 @@ if __name__ == '__main__':
         plt.figure(fig1.number)
         plt.clf()
         t = numpy.asarray(range(steps+1))
-        plt.plot(t[1:],numpy.asarray(y_noise)[:,0],'b.')
-        plt.plot(range(steps+1),vals[0,num,:],'go')
-        plt.plot(range(steps+1),vals[1,num,:],'ro')
+        plt.plot(t[1:],numpy.asarray(y),'b.')
+        plt.plot(t,numpy.asarray(x)[:,0],'g-')
+        plt.plot(t,numpy.asarray(x)[:,1],'r-')
         plt.title("Param = %s" % theta_true)
         fig1.show()
-            
+        plt.draw()
+        
+        theta_guess = numpy.random.uniform()
         # Create an array for our particles 
-        model = ParticleParamTrans(theta_guess, R, Q)
-        ParamEstimator = param_est.ParamEstimation(u=None, y=y_noise)
+        model = PartModel.ParticleParamTrans((theta_true,), 
+                                             R=R,
+                                             Qxi=Qxi,
+                                             Qz=Qz)
+        ParamEstimator = param_est.ParamEstimation(model, u=None, y=y)
         ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
-        (param, Q) = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums, max_iter=100)
+        
+        params_it = numpy.zeros((max_iter))
+        Q_it = numpy.zeros((max_iter))
+        it = 0
+        def callback(params, Q):
+            global it
+            params_it[it] = params[0]
+            Q_it[it] = Q
+            it = it+1
+            plt.figure(fig3.number)
+            plt.clf()
+            plt.plot(range(it), params_it[:it], 'b-')
+            plt.plot((0.0, it), (theta_true, theta_true), 'b--')
+            plt.figure(fig4.number)
+            plt.plot(range(it), Q_it[:it], 'r-')
+            plt.show()
+            plt.draw()
+            return
+        
+        
+        (param, Q) = ParamEstimator.maximize(param0=numpy.array((theta_guess,)),
+                                             num_part=num,
+                                             num_traj=nums,
+                                             max_iter=max_iter,
+                                             callback=callback)
         
         # Extract data from trajectories for plotting
 #        i=0
@@ -76,9 +109,9 @@ if __name__ == '__main__':
         
         for i in range(steps+1):
             for j in range(nums):
-                svals[0,j,i]=ParamEstimator.straj[j].traj[i].get_nonlin_state().ravel()
-                svals[1,j,i]=ParamEstimator.straj[j].traj[i].kf.z.ravel()
-        
+                svals[0,j,i]=ParamEstimator.straj.traj[i,j,0]
+                svals[1,j,i]=ParamEstimator.straj.traj[i,j,1]
+        plt.figure(fig1.number)
         # Does this really look right?        
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'g-')

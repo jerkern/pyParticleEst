@@ -7,7 +7,6 @@ Created on Nov 11, 2013
 import numpy
 import math
 import pyparticleest.models.mixed_nl_gaussian
-import pyparticleest.kalman as kalman
 
 def sign(x):
     if (x < 0.0):

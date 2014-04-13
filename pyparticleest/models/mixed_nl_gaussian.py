@@ -411,7 +411,7 @@ class MixedNLGaussian(RBPSBase):
             P0cho = scipy.linalg.cho_factor(P0[i], check_finite=False)
             #(_tmp, ld) = numpy.linalg.slogdet(P0[i])
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0])))*2
-            tmp = scipy.linalg.cho_solve(P0cho[i], l1, check_finite=False)
+            tmp = scipy.linalg.cho_solve(P0cho, l1, check_finite=False)
             lpz0 -= 0.5*(ld + numpy.trace(tmp))
         return lpxi0 + lpz0
     

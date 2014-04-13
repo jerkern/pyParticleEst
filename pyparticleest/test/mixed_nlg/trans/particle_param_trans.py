@@ -9,7 +9,6 @@ def generate_data(theta, Qxi, Qz, R, steps):
     z = numpy.random.normal(1.0, 1.0)
     
     x.append((numpy.vstack((e,z))))
-    y.append(None)
     
     for i in range(steps):
         
@@ -30,7 +29,8 @@ class ParticleParamTrans(MixedNLGaussianInitialGaussian):
         Axi = numpy.eye(1.0)
         Az = numpy.array([[params[0],]])
         C = numpy.array([[0.0,]])
-        
+        self.params=numpy.copy(params)
+        self.A_grad = numpy.array([[[0.0,],[1.0,]]])
         
         z0 = numpy.ones((1,1))
         Pz0 = numpy.eye(1)
@@ -43,12 +43,12 @@ class ParticleParamTrans(MixedNLGaussianInitialGaussian):
                                                 z0=z0, xi0=xi0,
                                                 Pz0=Pz0, Pxi0=Pxi0)
 
-    def get_nonlin_pred_dynamics(self, particles, u):
+    def get_nonlin_pred_dynamics(self, particles, u, t):
         xil = numpy.vstack(particles)[:,0]
         fxil = xil[:,numpy.newaxis,numpy.newaxis]
         return (None, fxil, None)
         
-    def get_meas_dynamics(self, y, particles):
+    def get_meas_dynamics(self, y, particles, t):
         xil = numpy.vstack(particles)[:,0]
         h = xil[:,numpy.newaxis,numpy.newaxis]
         return (numpy.asarray(y).reshape((-1,1)), None, h, None)
@@ -59,5 +59,10 @@ class ParticleParamTrans(MixedNLGaussianInitialGaussian):
         # to the new parameter set
         #Axi = numpy.array([[params[0],]])
         #self.set_dynamics(Axi=Axi)
+        self.params=numpy.copy(params)
         Az = numpy.array([[params[0],]])
         self.set_dynamics(Az=Az)
+        
+    def get_pred_dynamics_grad(self, particles, u, t):
+        N = len(particles)
+        return (numpy.repeat(self.A_grad[numpy.newaxis], N, 0), None, None)
