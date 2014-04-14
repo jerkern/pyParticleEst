@@ -1,5 +1,7 @@
 import numpy
 import math
+import pyximport
+pyximport.install(inplace=True)
 import pyparticleest.kalman as kalman
 import pyparticleest.part_utils
 import pyparticleest.pf as pf
@@ -46,7 +48,7 @@ class Model(pyparticleest.part_utils.ParticleFilteringInterface):
         """ Return the log-pdf value of the measurement """
         logyprob = numpy.empty(len(particles), dtype=float)
         for k in range(len(particles)):
-            logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1,1), y, self.R)
+            logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1,1)-y, self.R)
         return logyprob
 
 if __name__ == '__main__':

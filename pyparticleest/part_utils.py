@@ -4,7 +4,7 @@ import numpy
 import copy
 import math
 import pyximport
-pyximport.install()
+pyximport.install(inplace=True)
 import kalman
 # This was slower than kalman.lognormpdf
 #from scipy.stats import multivariate_normal

@@ -4,6 +4,7 @@ import pyparticleest.kalman as kalman
 import pyparticleest.part_utils
 import pyparticleest.pf as pf
 import matplotlib.pyplot as plt
+import scipy.linalg
 
 def generate_dataset(steps, P0, Q, R):
     x = numpy.zeros((steps+1,))
@@ -21,8 +22,9 @@ def wmean(logw, val):
     return numpy.sum(w*val.ravel())
 
 def calc_stuff(out, y, particles, N, R):
+    Rcho = scipy.linalg.cho_factor(R)
     for k in xrange(N):
-        out[k] = kalman.lognormpdf(particles[k].reshape(-1,1), y, R)
+        out[k] = kalman.lognormpdf_cho(particles[k].reshape(-1,1)-y, Rcho)
     return out
 
 class Model(pyparticleest.part_utils.ParticleFilteringInterface):
