@@ -90,7 +90,7 @@ if __name__ == '__main__':
 
         (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
                                              callback=callback, smoother='full', smoother_options={'R': 10},
-                                             analytic_gradient=True)
+                                             analytic_gradient=False)
         
         svals = numpy.zeros((4, nums, steps+1))
  

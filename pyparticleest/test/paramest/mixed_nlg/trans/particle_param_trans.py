@@ -30,7 +30,7 @@ class ParticleParamTrans(MixedNLGaussianInitialGaussian):
         Az = numpy.array([[params[0],]])
         C = numpy.array([[0.0,]])
         self.params=numpy.copy(params)
-        self.A_grad = numpy.array([[[0.0,],[1.0,]]])
+        self.A_grad = numpy.array([[[1.0,],[0.0,]]])
         
         z0 = numpy.ones((1,1))
         Pz0 = numpy.eye(1)
