@@ -161,8 +161,8 @@ class SmoothTrajectory(object):
                                step.u, step.t,
                                options['R'], ancestors)
                 ancestors = step.ancestors[ind]
-            elif (method=='normal'):
-                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.u)
+            elif (method=='full'):
+                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.t)
             # Select 'previous' particle
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
                                                                      self.traj[cur_ind+1][0],
