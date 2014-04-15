@@ -8,7 +8,7 @@ from pyparticleest.models.ltv import LTV
 
 R = numpy.array([[0.01]])
 Q = numpy.diag([ 0.01, 0.1])
-gradient_test = True
+gradient_test = False
 
 def generate_reference(z0, P0, theta_true, steps):
     A = numpy.asarray(((1.0, theta_true), (0.0, 1.0)))
@@ -55,7 +55,7 @@ z0 = numpy.array([0.0, 1.0, ])
 P0 = numpy.eye(2)
 
 def callback(params, Q):
-    #print "Q=%f, params=%s" % (Q, params)
+    print "Q=%f, params=%s" % (Q, params)
     return
 
 if __name__ == '__main__':
@@ -64,45 +64,51 @@ if __name__ == '__main__':
     nums = 1
     
     theta_true = 0.1
-    theta_guess = 0.3
-    #theta_guess = theta_true   
-   
 
     # How many steps forward in time should our simulation run
     steps = 200
-    sims = 10
-    max_iter = 200
-    tol = 0.0001
     model = ParticleParamTrans(z0=z0,P0=P0, params=(theta_true,))
-    
-    if (gradient_test):
-        # Create a reference which we will try to estimate using a RBPS
-        (y, x) = generate_reference(z0, P0, theta_true, steps)
+    callback_count = 0
+    def callback_sim(pe):
+        global callback_count
+        callback_count = callback_count + 1
+        print "callback_count = %d" % callback_count
+        plt.clf()
         plt.plot(range(steps+1), x[:, 0], 'r-')
         plt.plot(range(steps+1), x[:, 1], 'b-')
+        plt.plot(range(steps+1), pe.straj.traj[:,0,0], 'r--')
+        plt.plot(range(steps+1), pe.straj.traj[:,0,1], 'b--')
+        plt.plot(range(steps+1), pe.straj.traj[:,0,0]-numpy.sqrt(pe.straj.traj[:,0,2]), 'r--')
+        plt.plot(range(steps+1), pe.straj.traj[:,0,0]+numpy.sqrt(pe.straj.traj[:,0,2]), 'r--')
+        plt.plot(range(steps+1), pe.straj.traj[:,0,1]-numpy.sqrt(pe.straj.traj[:,0,5]), 'b--')
+        plt.plot(range(steps+1), pe.straj.traj[:,0,1]+numpy.sqrt(pe.straj.traj[:,0,5]), 'b--')
+        plt.draw()
+
+    if (gradient_test):
+        (y, x) = generate_reference(z0, P0, theta_true, steps)
+        gt = param_est.GradientTest(model, u=None, y=y)
+
+        gt.set_params(numpy.array((theta_true,)))
         
-        # Create an array for our particles 
-        gt = param_est.ParamEstimation(model, u=None, y=y)
-        gt.simulate(num, nums)
+        param_steps = 101
+        param_vals = numpy.linspace(-0.1, 0.3, param_steps)
+        gt.test(0, param_vals, num=num, analytic_grad=False)
         
-        plt.plot(range(steps+1), gt.straj.traj[:,0,0], 'r--')
-        plt.plot(range(steps+1), gt.straj.traj[:,0,1], 'b--')
-        plt.plot(range(steps+1), gt.straj.traj[:,0,0]-numpy.sqrt(gt.straj.traj[:,0,2]), 'r--')
-        plt.plot(range(steps+1), gt.straj.traj[:,0,0]+numpy.sqrt(gt.straj.traj[:,0,2]), 'r--')
-        plt.plot(range(steps+1), gt.straj.traj[:,0,1]-numpy.sqrt(gt.straj.traj[:,0,5]), 'b--')
-        plt.plot(range(steps+1), gt.straj.traj[:,0,1]+numpy.sqrt(gt.straj.traj[:,0,5]), 'b--')
+        plt.figure(1)
+        callback_sim(gt)
+        
+        
+        gt.plot_y.plot(2)
+        gt.plot_xn.plot(3)
+        gt.plot_x0.plot(4)
         plt.show()
-#        gt.set_params(numpy.array((theta_guess,)))
-#        
-#        param_steps = 101
-#        param_vals = numpy.linspace(-0.1, 0.3, param_steps)
-#        gt.test(0, param_vals, num=num)
-#    
-#        gt.plot_y.plot(1)
-#        gt.plot_xn.plot(2)
-#        gt.plot_x0.plot(3)
     else:
-    
+        max_iter = 400
+        sims = 10
+        tol = 0.0
+        plt.ion()
+        theta_guess = 0.3
+        #theta_guess = theta_true  
         # Create arrays for storing some values for later plotting    
         vals = numpy.zeros((2, num+1, steps+1))
         yvec = numpy.zeros((1, steps))
@@ -116,39 +122,24 @@ if __name__ == '__main__':
         for k in range(sims):
             print k
             # Create reference
-            (ylist, states) = particle_param_trans.generate_reference(z0, P0, theta_true, steps)
+            callback_count = 0
+            (y, x) = generate_reference(z0, P0, theta_true, steps)
         
             plt.figure(fig1.number)
             plt.clf()
-            x = numpy.asarray(range(steps+1))
-            plt.plot(x[1:],numpy.asarray(ylist)[:,0],'b.')
-            plt.plot(range(steps+1),states[0,:],'go')
-            plt.plot(range(steps+1),states[1,:],'ro')
-            plt.title("Param = %s" % theta_true)
-            plt.draw()
-            fig1.show()
+
                 
             # Create an array for our particles 
-            model = PartModel(z0=z0,P0=P0, params=(theta_guess,))
-            ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=ylist)
-            ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
+            pe = param_est.ParamEstimation(model=model, u=None, y=y)
+            pe.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
+            
             #ParamEstimator.simulate(num_part=num, num_traj=nums)
             print "maximization start"
-            (param, Q) = ParamEstimator.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
-                                                 max_iter=max_iter, tol=tol)
-            
-            svals = numpy.zeros((2, nums, steps+1))
-            
-            for i in range(steps+1):
-                for j in range(nums):
-                    svals[:,j,i]=ParamEstimator.straj.traj[i,j,:2]
-                    
-            for j in range(nums):
-                plt.plot(range(steps+1),svals[0,j,:],'g-')
-                plt.plot(range(steps+1),svals[1,j,:],'r-')
-    
-           
-            
+#            (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
+#                                        max_iter=max_iter, callback_sim=callback_sim, tol=tol, callback=callback,
+#                                        analytic_gradient=False)
+            (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
+                                        max_iter=max_iter,tol=tol, analytic_gradient=False)
             estimate[0,k] = param
             
             plt.figure(fig2.number)
@@ -160,9 +151,8 @@ if __name__ == '__main__':
 
         
 
-    
-    plt.hist(estimate.T)
     plt.ioff()
+    plt.hist(estimate.T)
     plt.show()
     plt.draw()
     print "exit"
