@@ -101,15 +101,17 @@ class ParamEstimation(object):
         # set the resampling threshold to 0.67 (effective particles / total particles )
         self.pt = pf.ParticleTrajectory(self.model, num_part, res,filter=filter)
         
+        offset = 0
         # Run particle filter
         if (meas_first):
             self.pt.measure(self.y[0])
+            offset = 1
         else:
             if (self.pt.forward(self.u[0], self.y[0])):
                 resamplings = resamplings + 1
         for i in range(1,len(self.y)):
             # Run PF using noise corrupted input signal
-            if (self.pt.forward(self.u[i-1], self.y[i])):
+            if (self.pt.forward(self.u[i], self.y[i+offset])):
                 resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates

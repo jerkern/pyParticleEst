@@ -87,9 +87,9 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface):
 if __name__ == '__main__':
     
     
-    data = scipy.io.loadmat("data/standard_nonlin_data0.mat")
-    N = 20
-    M = 4
+    data = scipy.io.loadmat("data/standard_nonlin_data1.mat")
+    N = 100
+    M = 20
     iter = 1000
     x = data['x'].T
     y = data['y'].T
@@ -112,8 +112,8 @@ if __name__ == '__main__':
     rmse2_smooth = 0.0
     for it in xrange(iter):
         
-        plt.clf()    
-        plt.plot(range(T), x, 'r-')
+#        plt.clf()    
+#        plt.plot(range(T), x, 'r-')
         traj = pf.ParticleTrajectory(model, N)
         traj.measure(y[0])
         for k in range(1,len(y)):
@@ -123,13 +123,13 @@ if __name__ == '__main__':
             straj = traj.perform_smoothing(M, method='full')
             est_smooth = numpy.mean(straj.traj,1)
         
-        est_filt = numpy.zeros((T,1))    
+        est_filt = numpy.zeros((T))    
         for k in xrange(T):
             est_filt[k] = wmean(traj.traj[k].pa.w, traj.traj[k].pa.part)
         
-        err = est_filt - x
+        err = est_filt - x.ravel()
         rmse_filt += numpy.sqrt(numpy.mean(err**2))
-        err = est_smooth -x 
+        err = est_smooth -x.ravel()
         rmse_smooth += numpy.sqrt(numpy.mean(err**2))
         
         tmp = 0.0
@@ -137,20 +137,20 @@ if __name__ == '__main__':
             wtmp = numpy.exp(traj.traj[t].pa.w)
             wnorm = wtmp / numpy.sum(wtmp)
             
-            tmp += numpy.sum(wnorm*(traj.traj[t].pa.part-x[t])**2)
-        rmse2_filt += numpy.sqrt(tmp)
+            tmp += numpy.sum(wnorm*(traj.traj[t].pa.part-x[t,0])**2)
+        rmse2_filt += numpy.sqrt(tmp/T)
         
         tmp = 0.0
         for k in xrange(M):
-            tmp += 1.0/M*numpy.sum((straj.traj[:,k]-x)**2)
+            tmp += 1.0/M*numpy.sum((straj.traj[:,k]-x.ravel())**2)
             #plt.plot(range(T), straj.traj[:,k], 'k--')
-        rmse2_smooth += numpy.sqrt(tmp)
-#        plt.ioff()
-        plt.plot(range(T), est_filt, 'g--')
-        plt.plot(range(T), est_smooth, 'b--')
-        
-        plt.draw()
-        plt.show()
+        rmse2_smooth += numpy.sqrt(tmp/T)
+        #plt.ioff()
+#        plt.plot(range(T), est_filt, 'g--')
+#        plt.plot(range(T), est_smooth, 'b--')
+#        
+#        plt.draw()
+#        plt.show()
     print "rmse filter = %f" % (rmse_filt / iter)
     print "rmse smooth = %f" % (rmse_smooth / iter)
     print "rmse2 filter = %f" % (rmse2_filt / iter)

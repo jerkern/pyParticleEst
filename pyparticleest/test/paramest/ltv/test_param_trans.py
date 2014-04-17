@@ -8,7 +8,7 @@ from pyparticleest.models.ltv import LTV
 
 R = numpy.array([[0.01]])
 Q = numpy.diag([ 0.01, 0.1])
-gradient_test = False
+gradient_test = True
 
 def generate_reference(z0, P0, theta_true, steps):
     A = numpy.asarray(((1.0, theta_true), (0.0, 1.0)))
@@ -103,8 +103,8 @@ if __name__ == '__main__':
         gt.plot_x0.plot(4)
         plt.show()
     else:
-        max_iter = 400
-        sims = 10
+        max_iter = 200
+        sims = 100
         tol = 0.0
         plt.ion()
         theta_guess = 0.3
@@ -152,7 +152,10 @@ if __name__ == '__main__':
         
 
     plt.ioff()
-    plt.hist(estimate.T)
-    plt.show()
-    plt.draw()
+    if (not gradient_test):
+        print "mean: %f" % numpy.mean(estimate)
+        print "stdd: %f" % numpy.std(estimate)
+        plt.hist(estimate.T)
+        plt.show()
+        plt.draw()
     print "exit"

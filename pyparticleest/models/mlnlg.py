@@ -107,7 +107,9 @@ class MixedNLGaussian(RBPSBase):
         (xil, zl, Pl) = self.get_states(particles)
         (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
         for i in xrange(N):
-            self.kf.measure_full(y=xi_next[i].reshape((self.lxi,1)), z=zl[i], P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
+            self.kf.measure_full(y=xi_next[i].reshape((self.lxi,1)),
+                                 z=zl[i].reshape((self.kf.lz,1)),
+                                 P=Pl[i], C=Axi[i], h_k=fxi[i], R=Qxi[i])
         
         # Predict next states conditioned on eta_next
         self.set_states(particles, xil, zl, Pl)
@@ -573,17 +575,16 @@ class MixedNLGaussian(RBPSBase):
         N = len(zl)
         l3 = numpy.zeros((N, len(y), len(y)))
         diff_l3 = numpy.zeros((N, len(self.params), len(y), len(y)))
-        meas_diff = numpy.zeros((N, len(y), 1))
         
         for i in xrange(N):
-            meas_diff[i] = self.kf.measurement_diff(y,zl[i],Cl[i], hl[i]) 
+            meas_diff = self.kf.measurement_diff(y,zl[i],Cl[i], hl[i]) 
             l3[i] = meas_diff.dot(meas_diff.T) + Cl[i].dot(Pl[i]).dot(Cl[i].T)
             
             if (C_grad != None):
                 C_grad = N*(numpy.zeros((len(self.params), len(y), self.kf.lz)),)
                 for j in xrange(len(self.params)):
                     tmp2 = C_grad[i][j].dot(Pl[i]).dot(Cl[i].T)
-                    tmp = C_grad[i][j].dot(zl[i]).dot(meas_diff[i].T)
+                    tmp = C_grad[i][j].dot(zl[i]).dot(meas_diff.T)
                     diff_l3[i][j] += -tmp -tmp.T + tmp2 + tmp2.T
             if (h_grad != None):
                 for j in xrange(len(self.params)):
@@ -646,7 +647,7 @@ class MixedNLGaussian(RBPSBase):
                     logpy -= 0.5*(ld + numpy.trace(tmp))
                     for j in range(len(self.params)):
                         lpy_grad[j] -= 0.5*mlnlg_compute.compute_logprod_derivative(Rzcho, R_grad[i][j],
-                                                                      l3, l3_grad[j])
+                                                                      l3[i], l3_grad[i][j])
             else:
                 for i in xrange(N):
                     Rzcho = scipy.linalg.cho_factor(Rzcho, check_finite=False)
@@ -656,7 +657,7 @@ class MixedNLGaussian(RBPSBase):
                     logpy -= 0.5*(ld + numpy.trace(tmp))
                     for j in range(len(self.params)):
                         lpy_grad[j] -= 0.5*mlnlg_compute.compute_logprod_derivative(Rzcho, R_grad[i][j],
-                                                                      l3, l3_grad[j])
+                                                                      l3[i], l3_grad[i][j])
 
         return (logpy, lpy_grad)
 
