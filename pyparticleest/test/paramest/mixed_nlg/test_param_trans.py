@@ -5,12 +5,12 @@ import pyparticleest.param_est as param_est
 from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 import matplotlib.pyplot as plt
 
-R = numpy.array([[1.0]])
-Q = numpy.diag([ 1.0, 1.0])
+R = numpy.array([[0.1]])
+Q = numpy.diag([ 0.1, 0.1])
 xi0_true = numpy.array([0.0, ])
 z0_true = numpy.array([1.0, ])
 P0 = numpy.eye(1)
-gradient_test = False
+gradient_test = True
 
 def generate_reference(z0, P0, theta_true, steps):
     A = numpy.asarray(((1.0, theta_true), (0.0, 1.0)))
@@ -100,8 +100,8 @@ if __name__ == '__main__':
         gt = param_est.GradientTest(model, u=None, y=y)
         gt.set_params(numpy.array((theta_true,)))
         gt.simulate(num, nums)
-        param_steps = 51
-        param_vals = numpy.linspace(-0.3, 0.7, param_steps)
+        param_steps = 101
+        param_vals = numpy.linspace(-0.1, 0.4, param_steps)
         gt.test(0, param_vals, num=num, nums=nums)
         plt.ion()
         plt.clf()
@@ -167,8 +167,9 @@ if __name__ == '__main__':
             fig1.show()
             plt.draw()
             
-            theta_guess = numpy.random.uniform()
- 
+            #theta_guess = numpy.random.uniform()
+            theta_guess = 0.3
+            
             ParamEstimator = param_est.ParamEstimation(model, u=None, y=y)
             ParamEstimator.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
             

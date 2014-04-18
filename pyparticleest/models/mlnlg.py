@@ -475,7 +475,7 @@ class MixedNLGaussian(RBPSBase):
                               perr, f_grad, tmp1)
         if (A_grad != None):
             mlnlg_compute.compute_l2_grad_A(N, len(self.params), self.lxi+self.kf.lz, diff_l2,
-                              perr, self.lxi, zl, Pl, M, A, A_grad, tmp1, tmp2)
+                              perr, self.lxi, Pn, zl, Pl, M, A, A_grad, tmp1, tmp2)
         return (l2, diff_l2)   
        
     def eval_logp_xnext(self, particles, x_next, u, t):
@@ -653,7 +653,7 @@ class MixedNLGaussian(RBPSBase):
                     Rzcho = scipy.linalg.cho_factor(Rzcho, check_finite=False)
                     #(_tmp, ld) = numpy.linalg.slogdet(Rz[i])
                     ld = numpy.sum(numpy.log(numpy.diagonal(Rzcho[0])))*2
-                    tmp = scipy.linalg.solve(Rzcho, l3[i])
+                    tmp = scipy.linalg.cho_solve(Rzcho, l3[i])
                     logpy -= 0.5*(ld + numpy.trace(tmp))
                     for j in range(len(self.params)):
                         lpy_grad[j] -= 0.5*mlnlg_compute.compute_logprod_derivative(Rzcho, R_grad[i][j],

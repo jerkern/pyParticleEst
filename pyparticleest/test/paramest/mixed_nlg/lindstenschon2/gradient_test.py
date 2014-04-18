@@ -8,6 +8,7 @@ import pyparticleest.param_est as param_est
 import numpy
 import math
 import pyparticleest.test.paramest.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
+import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     num = 50
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     gt = param_est.GradientTest(model=model, u=None, y=y)
     gt.set_params(theta_true)
     
-    param_id = 3
+    param_id = 4
     param_steps = 101
     tval = theta_true[param_id]
     param_vals = numpy.linspace(tval-math.fabs(tval), tval+math.fabs(tval), param_steps)
@@ -40,3 +41,4 @@ if __name__ == '__main__':
     gt.plot_y.plot(1)
     gt.plot_xn.plot(2)
     gt.plot_x0.plot(3)
+    plt.show()

@@ -62,8 +62,9 @@ def compute_l2_grad_A(unsigned int N, unsigned int lenp, unsigned int dim,
                       np.ndarray[np.double_t, ndim=4] out,
                       np.ndarray[np.double_t, ndim=3] perr,
                       unsigned int lxi,
+                      np.ndarray[np.double_t, ndim=3] Pn,
                       np.ndarray[np.double_t, ndim=3] zl,
-                      np.ndarray[np.double_t, ndim=3] Pl, 
+                      np.ndarray[np.double_t, ndim=3] Pl,
                       np.ndarray[np.double_t, ndim=3] M,
                       np.ndarray[np.double_t, ndim=3] A,
                       np.ndarray[np.double_t, ndim=4] A_grad,
@@ -111,31 +112,24 @@ def compute_l2_grad_A(unsigned int N, unsigned int lenp, unsigned int dim,
                 for l in range(dim):            
                     out[i,j,k,l] += tmp1[k,l] + tmp1[l,k]
            
-            #A_grad[i][j][:lxi,:].dot(M[i],tmp2[:lxi,:]) (lxi, dim-lxi)
-            for k in range(lxi):
+            #A_grad[i][j].dot(M[i],tmp2[:,:]) (dim, dim-lxi)
+            for k in range(dim):
                 for l in range(dim-lxi):
                     tmp2[k,l] = 0.0
                     for m in range(dim-lxi):
                         tmp2[k,l] += A_grad[i,j,k,m]*M[i,m,l]
-            
-            #diff_l2[i,j,:lxi,lxi:] +=  -tmp2[:lxi,:]
-            #diff_l2[i,j,lxi:,:lxi] += -tmp2[:lxi,:].T                      
-            for k in range(lxi):
+                        
+            #diff_l2[i,j,:,lxi:] +=  -tmp2
+            #diff_l2[i,j,lxi:,:] += -tmp2.T                      
+            for k in range(dim):
                 for l in range(dim-lxi):
                     out[i,j,k,<unsigned int>(lxi+l)] += -tmp2[k,l]
                     out[i,j,<unsigned int>(lxi+l),k] += -tmp2[k,l]
             
-            #A_grad[i][j,lxi:].dot(M[i], tmp2[lxi:,:]) (dim-lxi, dim-lxi)
-            for k in range(dim-lxi):
-                for l in range(dim-lxi):
-                    tmp2[<unsigned int>(lxi+k),l] = 0.0
-                    for m in range(dim-lxi):
-                        tmp2[<unsigned int>(lxi+k),l] += A_grad[i,j,lxi+k,m]*M[i,m,l]
-            
             #diff_l2[i,j,lxi:,lxi:] += -tmp2[lxi:,:]
-            for k in range(dim-lxi):
-                for l in range(dim-lxi):
-                    out[i,j,<unsigned int>(lxi+k),<unsigned int>(lxi+l)] += -tmp2[<unsigned int>(lxi+k),l]
+#            for k in range(dim-lxi):
+#                for l in range(dim-lxi):
+#                    out[i,j,<unsigned int>(lxi+k),<unsigned int>(lxi+l)] += Pn[i,k,l]
             
 def compute_pred_err(N, dim, xn, f, A, zl, out):
     for i in xrange(N):
@@ -144,17 +138,22 @@ def compute_pred_err(N, dim, xn, f, A, zl, out):
 def compute_l2(N, lxi, dim, perr, Pn, A, Pl, M, out):
     for i in xrange(N):
 
-        out[i] = perr[i].dot(perr[i].T) +A[i].dot(Pl[i]).dot(A[i].T)
+        out[i] = perr[i].dot(perr[i].T) + A[i].dot(Pl[i]).dot(A[i].T)
         
-        Axi = A[i][:lxi]
-        Az = A[i][lxi:]
+        #Axi = A[i][:lxi]
+        #Az = A[i][lxi:]
         
-        tmp = -Axi.dot(M[i])
-        out[i,lxi:,:lxi] += tmp.T
-        out[i,:lxi,lxi:] += tmp
+        #tmp = -Axi.dot(M[i])
+        #out[i,lxi:,:lxi] += tmp.T
+        #out[i,:lxi,lxi:] += tmp
+        tmp = -A[i].dot(M[i])
+        out[i,:,lxi:] += tmp
+        out[i,lxi:,:] += tmp.T
         
-        tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
-        out[i, lxi:,lxi:] += tmp2
+        
+        #tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
+        #out[i, lxi:,lxi:] += tmp2
+        out[i, lxi:,lxi:] += Pn[i]
 
 #def compute_l2_grad(perr, lenp, lxi, zl, Pl, M, A, f_grad, A_grad):
 #    N = perr.shape[0]

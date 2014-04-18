@@ -6,9 +6,9 @@ import pyparticleest.param_est as param_est
 import matplotlib.pyplot as plt
 from pyparticleest.models.ltv import LTV
 
-R = numpy.array([[0.01]])
-Q = numpy.diag([ 0.01, 0.1])
-gradient_test = True
+R = numpy.array([[0.1]])
+Q = numpy.diag([ 0.1, 0.1])
+gradient_test = False
 
 def generate_reference(z0, P0, theta_true, steps):
     A = numpy.asarray(((1.0, theta_true), (0.0, 1.0)))
@@ -36,6 +36,7 @@ class ParticleParamTrans(LTV):
         """ Define all model variables """
         self.params = numpy.copy(params)
         A= numpy.array([[1.0, params[0]], [0.0, 1.0]])
+        self.A_grad= numpy.array([[0.0, 1.0], [0.0, 0.0]])[numpy.newaxis]
         C = numpy.array([[1.0, 0.0]])
         z0 =  numpy.copy(z0).reshape((-1,1))
         # Linear states handled by base-class
@@ -48,8 +49,10 @@ class ParticleParamTrans(LTV):
         # to the new parameter set
         self.params = numpy.copy(params)
         A= numpy.array([[1.0, params[0]], [0.0, 1.0]])
-        A_grad= numpy.array([[0.0, 1.0], [0.0, 0.0]])
         self.kf.set_dynamics(A=A)
+        
+    def get_pred_dynamics_grad(self, u, t):
+        return (self.A_grad, None, None)
         
 z0 = numpy.array([0.0, 1.0, ])
 P0 = numpy.eye(2)
@@ -68,11 +71,8 @@ if __name__ == '__main__':
     # How many steps forward in time should our simulation run
     steps = 200
     model = ParticleParamTrans(z0=z0,P0=P0, params=(theta_true,))
-    callback_count = 0
+
     def callback_sim(pe):
-        global callback_count
-        callback_count = callback_count + 1
-        print "callback_count = %d" % callback_count
         plt.clf()
         plt.plot(range(steps+1), x[:, 0], 'r-')
         plt.plot(range(steps+1), x[:, 1], 'b-')
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         
         param_steps = 101
         param_vals = numpy.linspace(-0.1, 0.3, param_steps)
-        gt.test(0, param_vals, num=num, analytic_grad=False)
+        gt.test(0, param_vals, num=num, analytic_grad=True)
         
         plt.figure(1)
         callback_sim(gt)
@@ -122,7 +122,6 @@ if __name__ == '__main__':
         for k in range(sims):
             print k
             # Create reference
-            callback_count = 0
             (y, x) = generate_reference(z0, P0, theta_true, steps)
         
             plt.figure(fig1.number)
@@ -139,7 +138,7 @@ if __name__ == '__main__':
 #                                        max_iter=max_iter, callback_sim=callback_sim, tol=tol, callback=callback,
 #                                        analytic_gradient=False)
             (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
-                                        max_iter=max_iter,tol=tol, analytic_gradient=False)
+                                        max_iter=max_iter,tol=tol, analytic_gradient=True)
             estimate[0,k] = param
             
             plt.figure(fig2.number)

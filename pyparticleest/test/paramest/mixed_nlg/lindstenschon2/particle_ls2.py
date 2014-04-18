@@ -6,7 +6,7 @@ Created on Nov 11, 2013
 
 import numpy
 import math
-import pyparticleest.models.mixed_nl_gaussian
+import pyparticleest.models.mlnlg as mlnlg
 
 def sign(x):
     if (x < 0.0):
@@ -56,7 +56,7 @@ def generate_dataset(params, length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLS2(pyparticleest.models.mixed_nl_gaussian.MixedNLGaussianInitialGaussian):
+class ParticleLS2(mlnlg.MixedNLGaussianInitialGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """
