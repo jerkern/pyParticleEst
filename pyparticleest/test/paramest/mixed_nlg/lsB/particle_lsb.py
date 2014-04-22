@@ -6,7 +6,7 @@ Fredrik Lindsten, Thomas B. Schon
 
 import numpy
 import math
-from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussianInitialGaussian
+from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 
 C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
 def calc_Ae_fe(eta, t):

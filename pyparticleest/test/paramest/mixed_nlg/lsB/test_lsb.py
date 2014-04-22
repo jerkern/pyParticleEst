@@ -7,7 +7,7 @@ Created on Nov 11, 2013
 import numpy
 import math
 import matplotlib.pyplot as plt
-import pyparticleest.test.mixed_nlg.lsB.particle_lsb as particle_lsb
+import pyparticleest.test.paramest.mixed_nlg.lsB.particle_lsb as particle_lsb
 import pyparticleest.param_est as param_est
 import scipy.io
 

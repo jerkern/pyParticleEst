@@ -205,6 +205,7 @@ class ParticleTrajectory(object):
         return resampled
     
     def measure(self, y):
+        self.traj[-1].y = y
         self.pf.measure(self.traj[-1].pa, y=y, t=self.traj[-1].t, inplace=True)
         
     def prep_rejection_sampling(self):
@@ -249,8 +250,8 @@ class ParticleTrajectory(object):
         if (method == 'rs' or method == 'rsas'):
             coeffs = numpy.empty(self.len, dtype=float)
             for k in range(self.len):
-                coeffs[k] = math.exp(self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,
-                                                                u=self.traj[k].u, t=self.traj[k].t)) 
+                coeffs[k] = self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,
+                                                       u=self.traj[k].u, t=self.traj[k].t)
             options['maxpdf'] = coeffs
         if (method == 'mcmc'):
                 options['R'] = 30

@@ -16,9 +16,10 @@ def generate_reference(z0, P0, theta_true, steps):
     C = numpy.array([[1.0, 0.0]])
     
     states = numpy.zeros((steps+1,2))
-    y = numpy.zeros((steps,1))
+    y = numpy.zeros((steps+1,1))
     x0 = numpy.random.multivariate_normal(z0.ravel(), P0)
     states[0] = numpy.copy(x0)
+    y[0] = C.dot(x0.reshape((-1,1))).ravel() + numpy.random.multivariate_normal((0.0,),R).ravel()
     for i in range(steps):
             
         # Calc linear states
@@ -27,7 +28,7 @@ def generate_reference(z0, P0, theta_true, steps):
         states[i+1]=xn.ravel()
 
         # use the correct particle to generate the true measurement
-        y[i] = C.dot(xn).ravel() + numpy.random.multivariate_normal((0.0,),R).reshape((-1,1))
+        y[i+1] = C.dot(xn).ravel() + numpy.random.multivariate_normal((0.0,),R).ravel()
         
     return (y, states)
 
@@ -135,22 +136,24 @@ if __name__ == '__main__':
         plt.draw()
 
     max_iter = 100
-    sims = 130
+    sims = 10 #130
     tol = 0.0
     plt.ion()
     theta_guess = 0.3
 
     estimate_ltv = numpy.zeros((1,sims))
     estimate_mlnlg = numpy.zeros((1,sims))
+    estimate_mlnlg_analytic = numpy.zeros((1,sims))
     
     plt.ion()
     fig1 = plt.figure()
-    fig2 = plt.figure()
+#    fig2 = plt.figure()
+    fig3 = plt.figure()
     plt.show()
     
     for k in range(sims):
-        print k
         # Create reference
+        numpy.random.seed(k)
         (y, x) = generate_reference(z0, P0, theta_true, steps)
     
         # Create an array for our particles 
@@ -160,7 +163,6 @@ if __name__ == '__main__':
         pe_mlnlg.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
         
         #ParamEstimator.simulate(num_part=num, num_traj=nums)
-        print "maximization start"
 #            (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
 #                                        max_iter=max_iter, callback_sim=callback_sim, tol=tol, callback=callback,
 #                                        analytic_gradient=False)
@@ -168,47 +170,79 @@ if __name__ == '__main__':
                                         num_part=1, num_traj=1,
                                         max_iter=max_iter,
                                         tol=tol,
-                                        analytic_gradient=True)
+                                        analytic_gradient=True,
+                                        meas_first=True)
         estimate_ltv[0,k] = param
+        
+#        (param, Qval) = pe_mlnlg.maximize(param0=numpy.array((theta_guess,)),
+#                                          num_part=num, num_traj=nums,
+#                                          max_iter=max_iter,
+#                                          tol=tol,
+#                                          analytic_gradient=False,
+#                                          smoother='rsas')
+#        estimate_mlnlg[0,k] = param
         
         (param, Qval) = pe_mlnlg.maximize(param0=numpy.array((theta_guess,)),
                                           num_part=num, num_traj=nums,
                                           max_iter=max_iter,
                                           tol=tol,
-                                          analytic_gradient=True)
-        estimate_mlnlg[0,k] = param
+                                          analytic_gradient=True,
+                                          smoother='rsas',
+                                          meas_first=True)
+        estimate_mlnlg_analytic[0,k] = param
+        
+#        print "%d: LTV: %f MLNG: %f MLNLG Analytic: %f" % (k,
+#                                                           estimate_ltv[0,k], 
+#                                                           estimate_mlnlg[0,k],
+#                                                           estimate_mlnlg_analytic[0,k])
+        print "%d: LTV: %f MLNLG Analytic: %f" % (k,
+                                                  estimate_ltv[0,k], 
+                                                  estimate_mlnlg_analytic[0,k])
         
         plt.figure(fig1.number)
         plt.clf()
         plt.hist(estimate_ltv[0,:(k+1)].T)
         plt.title('LTV')
         
-        plt.figure(fig2.number)
+#        plt.figure(fig2.number)
+#        plt.clf()
+#        plt.hist(estimate_mlnlg[0,:(k+1)].T)
+#        plt.title('MLNLG')
+               
+        plt.figure(fig3.number)
         plt.clf()
-        plt.hist(estimate_mlnlg[0,:(k+1)].T)
-        plt.title('MLNLG')
+        plt.hist(estimate_mlnlg_analytic[0,:(k+1)].T)
+        plt.title('MLNLG Analytic')
         
         plt.show()
         plt.draw()
 
     print "mean LTV: %f" % numpy.mean(estimate_ltv)
     print "stdd LTV: %f" % numpy.std(estimate_ltv)
-    print "mean MLNLG: %f" % numpy.mean(estimate_mlnlg)
-    print "stdd MLNLG: %f" % numpy.std(estimate_mlnlg)
+#    print "mean MLNLG: %f" % numpy.mean(estimate_mlnlg)
+#    print "stdd MLNLG: %f" % numpy.std(estimate_mlnlg)
+    print "mean MLNLG Analytic: %f" % numpy.mean(estimate_mlnlg_analytic)
+    print "stdd MLNLG Analytic: %f" % numpy.std(estimate_mlnlg_analytic)
     
     
     
     plt.figure(fig1.number)
     plt.clf()
     plt.title('LTV')
-    plt.hist(estimate_ltv[0,:(k+1)].T)
+    plt.hist(estimate_ltv[0,:].T)
     
     plt.ioff()
     
-    plt.figure(fig2.number)
+#    plt.figure(fig2.number)
+#    plt.clf()
+#    plt.title('MLNLG')
+#    plt.hist(estimate_mlnlg[0,].T)
+#    
+    plt.figure(fig3.number)
     plt.clf()
-    plt.title('MLNLG')
-    plt.hist(estimate_mlnlg[0,:(k+1)].T)
+    plt.hist(estimate_mlnlg_analytic[0,:].T)
+    plt.title('MLNLG Analytic')
+    
     plt.show()
     plt.draw()
     print "exit"

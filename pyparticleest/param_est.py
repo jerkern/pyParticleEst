@@ -109,9 +109,9 @@ class ParamEstimation(object):
         else:
             if (self.pt.forward(self.u[0], self.y[0])):
                 resamplings = resamplings + 1
-        for i in range(1,len(self.y)):
+        for i in range(offset,len(self.y)):
             # Run PF using noise corrupted input signal
-            if (self.pt.forward(self.u[i], self.y[i+offset])):
+            if (self.pt.forward(self.u[i-offset], self.y[i])):
                 resamplings = resamplings + 1
             
         # Use the filtered estimates above to created smoothed estimates

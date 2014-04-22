@@ -1,6 +1,6 @@
 import numpy
 import math
-from pyparticleest.models.mixed_nl_gaussian import MixedNLGaussianInitialGaussian
+from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 import pyparticleest.pf as pf
 import matplotlib.pyplot as plt
 

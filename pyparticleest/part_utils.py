@@ -177,9 +177,6 @@ class RBPFBase(ParticleFilteringInterface):
         self.meas_xi_next(particles=particles, xi_next=xin, u=u, t=t)
         # Calc (z_{t+1} | xi_{t+1}, y_t)
         self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
-        
-        (_xil, zl, Pl) = self.get_states(particles)
-        self.set_states(particles, xin, zl, Pl)
 
 
     
@@ -201,35 +198,30 @@ class RBPSBase(RBPFBase, FFBSiInterface):
         (z0, P0) = self.get_rb_initial(xil)
         self.set_states(particles, xil, z0, P0)
 
-        T = len(st.traj)
-        
         for i in xrange(T-1):
             if (st.y[i] != None):
                 self.measure(particles, y=st.y[i], t=st.t[i])
             (xin, _zn, _Pn) = self.get_states(st.traj[i+1])
-            self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
+            #self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
             st.traj[i] = particles
 
             particles = numpy.copy(particles)
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
-            (_xil, zl, Pl) = self.get_states(particles)
-            self.set_states(particles, xin, zl, Pl)
             
         if (st.y[-1] != None):
             self.measure(particles, y=st.y[-1], t=st.t[-1])
         
-        
-        (_xil, zl, Pl) = self.get_states(particles)
-        (xin, zn, Pn) = self.get_states(st.traj[-1])
-        self.set_states(particles, xin, zl, Pl)
         st.traj[-1] = particles
         
         # Backward smoothing
         for i in reversed(xrange(T-1)):
             (xin, zn, Pn) = self.get_states(st.traj[i+1])
-            (xi, z, P) = self.get_states(st.traj[i])
-            (Al, fl, Ql) = self.calc_cond_dynamics(st.traj[i], xin, u=st.u[i], t=st.t[i])
+            particles = st.traj[i]
+            self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
+            (xi, z, P) = self.get_states(particles)
+            (Al, fl, Ql) = self.calc_cond_dynamics(particles, xin, u=st.u[i], t=st.t[i])
             for j in xrange(M):
+                
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
                                               Al[j], fl[j], Ql[j])
                 self.set_states(st.traj[i][j:j+1], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])

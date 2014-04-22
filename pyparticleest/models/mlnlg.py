@@ -152,12 +152,12 @@ class MixedNLGaussian(RBPSBase):
     def cond_predict(self, particles, xi_next, u, t):
         #Compensate for noise correlation
         (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
-        (xil, zl, Pl) = self.get_states(particles)
+        (_, zl, Pl) = self.get_states(particles)
         for i in xrange(len(zl)):
             (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
         
         # Predict next states conditioned on eta_next
-        self.set_states(particles, xil, zl, Pl)
+        self.set_states(particles, xi_next, zl, Pl)
         
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
@@ -251,7 +251,7 @@ class MixedNLGaussian(RBPSBase):
         
         for i in xrange(N):
             x_next = next_part[i,:self.lxi+self.kf.lz].reshape((self.lxi+self.kf.lz,1))
-            xp = f[0] + A[i].dot(zl[i])
+            xp = f[i] + A[i].dot(zl[i])
             Sigma = A[i].dot(Pl[i]).dot(A[i].T) + Q[i]
             Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
             lpx[i] = kalman.lognormpdf_cho(x_next-xp,Schol)
@@ -261,7 +261,7 @@ class MixedNLGaussian(RBPSBase):
     def sample_smooth(self, particles, next_part, u, t):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         M = len(particles)
-        res = numpy.zeros((M,self.lxi+self.kf.lz + 2*self.kf.lz**2))
+        res = numpy.zeros((M,self.lxi+2*(self.kf.lz + 2*self.kf.lz**2)))
         part = numpy.copy(particles)
         (xil, zl, Pl) = self.get_states(part)
         
@@ -284,6 +284,66 @@ class MixedNLGaussian(RBPSBase):
                                                  Pl[j]).ravel()
             res[j,:self.lxi+self.kf.lz] = numpy.hstack((xi, z))
         return res
+#    def post_smoothing(self, st):
+#        return
+#    
+#    def next_pdf(self, particles, next_part, u, t):
+#        """ Implements the next_pdf function for MixedNLGaussian models """
+#        
+#        N = len(particles)
+#        Nn = len(next_part)
+#        if (N > 1 and Nn == 1):
+#            next_part = numpy.repeat(next_part, N, 0)
+#        lpx = numpy.empty(N)
+#        (_, zl, Pl) = self.get_states(particles)
+#        (A, f, Q, _, _, _) = self.calc_A_f_Q(particles, u=u, t=t)
+#        
+#        for i in xrange(N):
+#            x_next = numpy.vstack((next_part[i,:self.lxi].reshape((self.lxi,1)),
+#                                   next_part[i,-self.kf.lz:].reshape((self.kf.lz,1))))
+#            xp = f[i] + A[i].dot(zl[i])
+#            Sigma = A[i].dot(Pl[i]).dot(A[i].T) + Q[i]
+#            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
+#            lpx[i] = kalman.lognormpdf_cho(x_next-xp,Schol)
+#        
+#        return lpx
+#
+#    def sample_smooth(self, particles, next_part, u, t):
+#        """ Implements the sample_smooth function for MixedNLGaussian models """
+#        M = len(particles)
+#        res = numpy.zeros((M,self.lxi+self.kf.lz + 2*self.kf.lz**2+self.kf.lz))
+#        part = numpy.copy(particles)
+#        (xil, zl, Pl) = self.get_states(part)
+#        
+#        Mz = numpy.zeros((M, self.kf.lz, self.kf.lz))
+#        
+#        if (next_part != None):
+#            (xinl, znl, Pnl) = self.get_states(next_part)
+#            (A, f, Q, _, _, _) = self.calc_A_f_Q(part, u=u, t=t)
+#            (xil, zl, Pl) = self.get_states(part)
+#            for j in range(M):
+#                W = A[j].T.dot(numpy.linalg.inv(Q[j]))
+#                Wa = W[:,:self.lxi]
+#                Wz = W[:,self.lxi:]
+#                fa = f[j][:self.lxi]
+#                fz = f[j][self.lxi:]
+#                Sigma = Pl[j] - Pl[j].dot(A[j].T).dot(
+#                                   numpy.linalg.inv(Q[j]+A[j].dot(Pl[j].dot(A[j].T)))
+#                                   ).dot(A[j]).dot(Pl[j])
+#                c = Sigma.dot(Wa.dot(xinl[j]-fa)-Wz.dot(fz)+numpy.linalg.solve(Pl[j],zl[j]))
+#                zl[j] = Sigma.dot(Wz).dot(znl[j])+c
+#                Mz[j] = Sigma.dot(Wz).dot(Pnl[j])
+#                Pl[j] = Sigma + Mz[j].dot(Wz.T).dot(Sigma)
+#               
+#               
+#        self.set_states(res, xil, zl, Pl)
+#        self.set_Mz(res, Mz)
+#
+#        for j in range(M):
+#            z = numpy.random.multivariate_normal(zl[j].ravel(), 
+#                                                 Pl[j]).ravel()
+#            res[j,-self.kf.lz:] = z
+#        return res
 
     def copy_ind(self, particles, new_ind):
         new_part = particles[new_ind]
