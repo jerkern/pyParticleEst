@@ -96,7 +96,7 @@ class Model(HierarchicalRSBase):
         lpy = numpy.empty((N,))
         m = numpy.zeros((1,1))
         for i in xrange(N):
-            lpy[i] = kalman.lognormpdf(y[0]-particles[i][0], m, self.R_xi)
+            lpy[i] = kalman.lognormpdf(y[0]-particles[i][0], self.R_xi)
         return lpy
     
     def get_lin_pred_dynamics(self, particles, u, t):

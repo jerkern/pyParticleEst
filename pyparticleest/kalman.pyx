@@ -2,7 +2,7 @@
 """ A module for handling Kalman filtering.
     Uses scipy.sparse for handling sparse matrices, works with dense matrices aswell """
 import numpy as np
-cimport numpy as np
+#cimport numpy as np
 import math
 import scipy.linalg
 

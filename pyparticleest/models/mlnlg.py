@@ -150,6 +150,8 @@ class MixedNLGaussian(RBPSBase):
         
     
     def cond_predict(self, particles, xi_next, u, t):
+        # Calc (z_t | xi_{t+1}, y_t)
+        self.meas_xi_next(particles=particles, xi_next=xi_next, u=u, t=t)
         #Compensate for noise correlation
         (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
         (_, zl, Pl) = self.get_states(particles)

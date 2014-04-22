@@ -31,7 +31,7 @@ if __name__ == '__main__':
         print k
         # Create reference
         #numpy.random.seed(1)
-        numpy.random.seed(10)
+        #numpy.random.seed(10)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    
     
@@ -41,7 +41,7 @@ if __name__ == '__main__':
         model = particle_lsb.ParticleLSB()
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='mcmc')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
 
         
         svals = numpy.zeros((2, nums, steps+1))

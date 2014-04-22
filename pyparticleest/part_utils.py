@@ -173,8 +173,6 @@ class RBPFBase(ParticleFilteringInterface):
         """ Update estimate using noise as input """
         # Calc (xi_{t+1} | xi_t, z_t, y_t)
         xin = self.calc_xi_next(particles=particles, u=u, t=t, noise=noise)
-        # Calc (z_t | xi_{t+1}, y_t)
-        self.meas_xi_next(particles=particles, xi_next=xin, u=u, t=t)
         # Calc (z_{t+1} | xi_{t+1}, y_t)
         self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
 
