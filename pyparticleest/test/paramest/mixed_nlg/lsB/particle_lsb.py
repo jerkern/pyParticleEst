@@ -90,9 +90,10 @@ class ParticleLSB(MixedNLGaussianInitialGaussian):
         N = len(particles)
         C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
         tmp = numpy.vstack(particles)[:,numpy.newaxis,:]
-        Axi = (tmp[:,:,0]/(1+tmp[:,:,0]**2)).dot(C_theta)
+        xi = tmp[:,:,0]
+        Axi = (xi/(1+xi**2)).dot(C_theta)
         Axi = Axi[:,numpy.newaxis,:]
-        fxi = 0.5*tmp[:,:,0]+25*tmp[:,:,0]/(1+tmp[:,:,0]**2)+8*math.cos(1.2*t)
+        fxi = 0.5*xi+25*xi/(1+xi**2)+8*math.cos(1.2*t)
         fxi = fxi[:,numpy.newaxis,:]
         return (Axi, fxi, None)
         

@@ -31,7 +31,7 @@ if __name__ == '__main__':
         print k
         # Create reference
         #numpy.random.seed(1)
-        #numpy.random.seed(10)
+        numpy.random.seed(86)
         (y, e, z) = particle_lsb.generate_dataset(steps)
         # Store values for last time-step aswell    
     

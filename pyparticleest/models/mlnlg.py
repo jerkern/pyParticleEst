@@ -155,10 +155,11 @@ class MixedNLGaussian(RBPSBase):
         #Compensate for noise correlation
         (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
         (_, zl, Pl) = self.get_states(particles)
+        # Predict next states conditioned on xi_next
         for i in xrange(len(zl)):
+            # Predict z_{t+1}
             (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
         
-        # Predict next states conditioned on eta_next
         self.set_states(particles, xi_next, zl, Pl)
         
     def measure(self, particles, y, t):
@@ -170,7 +171,6 @@ class MixedNLGaussian(RBPSBase):
             
         lyz = numpy.empty(N)
         for i in xrange(len(zl)):
-            # Predict z_{t+1}
             lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
             
         self.set_states(particles, xil, zl, Pl)

@@ -106,9 +106,6 @@ class ParamEstimation(object):
         if (meas_first):
             self.pt.measure(self.y[0])
             offset = 1
-        else:
-            if (self.pt.forward(self.u[0], self.y[0])):
-                resamplings = resamplings + 1
         for i in range(offset,len(self.y)):
             # Run PF using noise corrupted input signal
             if (self.pt.forward(self.u[i-offset], self.y[i])):
