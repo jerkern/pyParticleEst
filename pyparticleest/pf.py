@@ -99,68 +99,44 @@ class ParticleFilter(object):
         return pa
         
 
-class AuxiliaryParticleFilter(object):
+class AuxiliaryParticleFilter(ParticleFilter):
     """ Auxiliary Particle Filer class, creates filter estimates by calling appropriate
         methods in the supplied particle objects and handles resampling when
         a specified threshold is reach """
     
-    def __init__(self, res):
-        """ Create particle filter.
-        res - 0 or 1 if resampling on or off """
-        self.res = res
-    
-    def forward(self, pa, u, y):
-        """ Update particle approximation using u as kinematic input.
-            
-            If inplace=True the particles are update then returned,
-            otherwise a new ParticleApproximation is first created
-            leaving the original one intact """
-        
-        u = numpy.reshape(u,(-1,1))
-        pa_old = pa
+    def forward(self, pa, u, y, t):
         pa = copy.deepcopy(pa)
         resampled = False
+        N_eff = pa.N_eff
         
-        # Prepare the particle for the update, eg. for 
-        # mixed linear/non-linear calculate the variables that
-        # depend on the current state
-        for k in range(pa.num):
-            pa_old.part[k].prep_update(u)
-            pa.part[k].prep_update(u)
+        if (y != None):
+            l1w =  self.model.eval_1st_stage_weights(pa.part, u, y, t)
+            pa.w = pa.w + l1w
+            pa.w -= numpy.max(pa.w)
+            w = numpy.exp(pa.w)
+            w /= sum(w)
+            N_eff = 1 / sum(w ** 2)
         
-        l1w = numpy.zeros((pa.num,))
+        if (self.res and N_eff < self.res*pa.num):
+            ancestors = pa.resample(self.model, pa.num)
+            resampled = True
+            l1w = l1w[ancestors]
+        else:
+            ancestors = numpy.arange(pa.num,dtype=int)
         
-        for k in range(pa.num):
-            tmp = copy.deepcopy(pa.part[k])
-            l1w[k] =  tmp.eval_1st_stage_weight(u,y)
-            
-            
-        # Keep the weights from going to -Inf
-        pa.w = pa.w + l1w
-        pa.w -= numpy.max(pa.w)
+        pa = self.update(pa, u=u, t=t)
+        
+        if (y != None):
+            pa.w += self.model.measure(particles=pa.part, y=y, t=t)
+            pa.w -= l1w
+            pa.w -= numpy.max(pa.w)
+        
+        # Calc N_eff
         w = numpy.exp(pa.w)
         w /= sum(w)
-        
         pa.N_eff = 1 / sum(w ** 2)
         
-        if (self.res and pa.N_eff < self.res*pa.num):
-            new_ind = pa.resample()
-            l1w = l1w[new_ind]
-            resampled = True
-      
-        for k in range(pa.num):
-            v = pa.part[k].sample_process_noise(u)
-            pa.part[k].update(u, v)
-        
-        l2w = numpy.zeros((pa.num,))
-        for k in range(pa.num):
-            yp = pa.part[k].prep_measure(y)
-            l2w[k] = pa.part[k].measure(yp)
-            
-        pa.w = pa.w + l2w - l1w
-        pa.w -= numpy.max(pa.w)
-        return (pa, resampled, new_ind)
-    
+        return (pa, resampled, ancestors)
         
 
 class TrajectoryStep(object):
@@ -186,13 +162,12 @@ class ParticleTrajectory(object):
         pa = ParticleApproximation(particles=particles)
         self.traj = [TrajectoryStep(pa, t=t0, ancestors=numpy.arange(N)),]
         
-        self.pf = ParticleFilter(model=model, res=resample)
-#        if (filter == 'PF'):
-#            self.pf = ParticleFilter(model=model, res=resample)
-#        elif (filter == 'APF'):
-#            self.pf = AuxiliaryParticleFilter(res=resample)
-#        else:
-#            raise ValueError('Bad filter type')
+        if (filter == 'PF'):
+            self.pf = ParticleFilter(model=model, res=resample)
+        elif (filter == 'APF'):
+            self.pf = AuxiliaryParticleFilter(model=model, res=resample)
+        else:
+            raise ValueError('Bad filter type')
         self.len = 1
         return
     

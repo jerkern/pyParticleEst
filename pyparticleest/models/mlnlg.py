@@ -161,6 +161,13 @@ class MixedNLGaussian(RBPSBase):
             (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
         
         self.set_states(particles, xi_next, zl, Pl)
+
+    def eval_1st_stage_weights(self, particles, u, y, t):
+        part = numpy.copy(particles)
+        xin = self.pred_xi(part, u, t)
+        self.cond_predict(part, xin, u, t)
+        return self.measure(part, y, t)
+        
         
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
@@ -356,10 +363,7 @@ class MixedNLGaussian(RBPSBase):
         N = len(particles)
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
-#        for i in xrange(N):
-#            particles[i,:self.lxi] = xi_list[i].ravel()
-#            particles[i,self.lxi:zend] = z_list[i].ravel()
-#            particles[i,zend:Pend] = P_list[i].ravel()
+
         particles[:,:self.lxi] = xi_list.reshape((N, self.lxi))
         particles[:,self.lxi:zend] = z_list.reshape((N, self.kf.lz))
         particles[:,zend:Pend] = P_list.reshape((N, self.kf.lz**2))
@@ -372,15 +376,6 @@ class MixedNLGaussian(RBPSBase):
         N = len(particles)
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
-        
-#        xil = list()
-#        zl = list()
-#        Pl = list()
-#
-#        for part in particles:
-#            xil.append(part[:self.lxi].reshape(self.lxi,1))
-#            zl.append(part[self.lxi:zend].reshape(self.kf.lz,1))
-#            Pl.append(part[zend:Pend].reshape(self.kf.lz,self.kf.lz))
         
         xil = particles[:,:self.lxi, numpy.newaxis]
         zl = particles[:,self.lxi:zend, numpy.newaxis]
@@ -397,9 +392,7 @@ class MixedNLGaussian(RBPSBase):
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
         Mend = Pend + self.kf.lz**2
-#        Mz = list()
-#        for part in smooth_particles:
-#            Mz.append(part[Pend:Mend].reshape(self.kf.lz, self.kf.lz))
+
         Mz = smooth_particles[:,Pend:Mend].reshape((N, self.kf.lz, self.kf.lz))
         return Mz
     
@@ -408,28 +401,8 @@ class MixedNLGaussian(RBPSBase):
         zend = self.lxi+self.kf.lz
         Pend = zend+self.kf.lz**2
         Mend = Pend + self.kf.lz**2
-#        for i in xrange(N):
-#            smooth_particles[i,Pend:Mend] = Mz[i].ravel()
             
         smooth_particles[:,Pend:Mend] = Mz.reshape((N, self.kf.lz**2))
-    
-#    def eval_1st_stage_weight(self, u,y):
-##        eta_old = copy.deepcopy(self.get_nonlin_state())
-##        lin_old = copy.deepcopy(self.get_lin_est())
-##        t_old = self.t
-#        self.prep_update(u)
-#        noise = numpy.zeros_like(self.eta)
-#        self.update(u, noise)
-#        
-#        yn = self.prep_measure(y)
-#        logpy = self.measure(yn)
-#        
-#        # Restore state
-##        self.set_lin_est(lin_old)
-##        self.set_nonlin_state(eta_old)
-##        self.t = t_old
-#        
-#        return logpy
     
     def set_params(self, params):
         self.params = numpy.copy(params).reshape((-1,1))
@@ -620,9 +593,6 @@ class MixedNLGaussian(RBPSBase):
                         lpxn_grad[j] -= 0.5*mlnlg_compute.compute_logprod_derivative(Qcho, Q_grad[i][j],
                                                                        l2[i], l2_grad[i][j])
           
-
-                
-            
         return (lpxn, lpxn_grad)
 
     def calc_l3(self, y, zl, Pl, Cl, hl):
@@ -722,7 +692,6 @@ class MixedNLGaussian(RBPSBase):
                                                                       l3[i], l3_grad[i][j])
 
         return (logpy, lpy_grad)
-
 
 
 class MixedNLGaussianInitialGaussian(MixedNLGaussian):

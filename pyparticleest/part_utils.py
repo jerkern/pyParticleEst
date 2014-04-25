@@ -16,22 +16,22 @@ class ParticleFilteringInterface(object):
     @abc.abstractmethod
     def create_initial_estimate(self, N):
         """ Sample N particle from initial distribution """
-        return
+        pass
      
     @abc.abstractmethod
     def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
-        return
+        pass
     
     @abc.abstractmethod
     def update(self, particles, u, t, noise):
         """ Update estimate using 'data' as input """
-        return
+        pass
     
     @abc.abstractmethod    
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
-        return
+        pass
     
     def copy_ind(self, particles, new_ind):
         N = len(new_ind)
@@ -39,6 +39,17 @@ class ParticleFilteringInterface(object):
         for k in range(numpy.shape(new_ind)[0]):
             new_part[k] = copy.copy(particles[new_ind[k]])
         return new_part
+    
+class AuxiliaryParticleFilteringInterface(object):
+    """ Base class for particles to be used with particle filtering """
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def eval_1st_stage_weights(self, particles, u, y, t):
+        """ Evaluate "first stage weights" for the auxiliary particle filter.
+            (log-probability of measurement using some propagated statistic, such
+            as the mean, for the future state) """
+        pass
     
 class FFBSiInterface(ParticleFilteringInterface):
     """ Base class for particles to be used with particle smoothing """

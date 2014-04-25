@@ -73,7 +73,7 @@ if __name__ == '__main__':
     (x, y) = generate_dataset(steps, P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
     
     model = Model(P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
-    traj = pf.ParticleTrajectory(model, num)
+    traj = pf.ParticleTrajectory(model, num, filter='PF')
 
     for k in range(len(y)):
         traj.forward(u=None, y=y[k])

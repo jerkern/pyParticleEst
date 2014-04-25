@@ -102,10 +102,7 @@ class SmoothTrajectory(object):
     """ Store smoothed trajectory """
     def __init__(self, pt, M=1, method='normal', options=None):
         """ Create smoothed trajectory from filtered trajectory
-            pt - particle trajectory to be smoothed
-            rej_sampling - Use rejection sampling instead of evaluating all 
-                           weights (reduces time complexity to M*N from M*N^2
-            """
+            pt - particle trajectory to be smoothed  """
         
         self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
         self.Mz = None
@@ -129,7 +126,7 @@ class SmoothTrajectory(object):
         opt = dict()
         if (method=='full'):
             pass
-        elif (method=='mcmc'):
+        elif (method=='mcmc' or method=='ancestor'):
             ancestors = pt[-1].ancestors[ind]
         elif (method=='rs'):
             N = len(pt[-1].pa.part)
@@ -163,6 +160,9 @@ class SmoothTrajectory(object):
                 ancestors = step.ancestors[ind]
             elif (method=='full'):
                 ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.t)
+            elif (method=='ancestor'):
+                ind = ancestors
+                ancestors = step.ancestors[ind]
             # Select 'previous' particle
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
                                                                      self.traj[cur_ind+1][0],

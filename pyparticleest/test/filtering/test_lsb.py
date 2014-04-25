@@ -162,10 +162,15 @@ class ParticleLSB(MixedNLGaussianInitialGaussian):
 #        
 #        return logpy
 
+def wmean(logw, val):
+    w = numpy.exp(logw)
+    w = w / sum(w)
+    return numpy.sum(w*val.ravel())
+
 if __name__ == '__main__':
     
     num = 300
-    nums = 10
+    nums = 50
         
     # How many steps forward in time should our simulation run
     steps = 100
@@ -187,7 +192,7 @@ if __name__ == '__main__':
                 model = ParticleLSB()
                 # Create an array for our particles 
                 ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-                ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
+                ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='rsas')
         
                 svals = numpy.zeros((2, nums, steps+1))
                 
@@ -206,6 +211,53 @@ if __name__ == '__main__':
                 rmse_eta = numpy.sqrt(numpy.mean(sqr_err_eta[k,:]))
                 rmse_theta = numpy.sqrt(numpy.mean(sqr_err_theta[k,:]))
                 print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
+        elif (sys.argv[1] == 'apf_compare'):
+            
+            sqr_err_eta_pf = numpy.zeros((sims, steps+1))
+            sqr_err_theta_pf = numpy.zeros((sims, steps+1))
+            
+            sqr_err_eta_apf = numpy.zeros((sims, steps+1))
+            sqr_err_theta_apf = numpy.zeros((sims, steps+1))
+
+            C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
+            for k in range(sims):
+                # Create reference
+                numpy.random.seed(k)
+                (y, e, z) = generate_dataset(steps)
+        
+                model = ParticleLSB()
+                # Create an array for our particles 
+                pepf = param_est.ParamEstimation(model=model, u=None, y=y)
+                pepf.simulate(num, num_traj=1, res=0.67, filter='PF', smoother='ancestor')
+                
+                peapf = param_est.ParamEstimation(model=model, u=None, y=y)
+                peapf.simulate(num, num_traj=1, res=0.67, filter='APF', smoother='ancestor')
+        
+                avg_pf = numpy.zeros((2, steps+1))
+                avg_apf = numpy.zeros((2, steps+1))
+                for i in range(steps+1):
+                    avg_pf[0,i] = wmean(pepf.pt.traj[i].pa.w, numpy.vstack(pepf.pt.traj[i].pa.part)[:,0])
+                    avg_pf[1,i] = wmean(pepf.pt.traj[i].pa.w, numpy.vstack(pepf.pt.traj[i].pa.part)[:,1])
+                    
+                    avg_apf[0,i] = wmean(peapf.pt.traj[i].pa.w, numpy.vstack(peapf.pt.traj[i].pa.part)[:,0])
+                    avg_apf[1,i] = wmean(peapf.pt.traj[i].pa.w, numpy.vstack(peapf.pt.traj[i].pa.part)[:,1])
+                        
+                theta = 25.0+C_theta.dot(z.reshape((4,-1)))
+                sqr_err_eta_pf[k,:] = (avg_pf[0,:] - e[0,:])**2
+                sqr_err_theta_pf[k,:] = (avg_pf[1,:] - theta)**2
+                        
+                sqr_err_eta_apf[k,:] = (avg_apf[0,:] - e[0,:])**2
+                sqr_err_theta_apf[k,:] = (avg_apf[1,:] - theta)**2
+        
+                rmse_eta_pf = numpy.sqrt(numpy.mean(sqr_err_eta_pf[k,:]))
+                rmse_theta_pf = numpy.sqrt(numpy.mean(sqr_err_theta_pf[k,:]))
+                
+                rmse_eta_apf = numpy.sqrt(numpy.mean(sqr_err_eta_apf[k,:]))
+                rmse_theta_apf = numpy.sqrt(numpy.mean(sqr_err_theta_apf[k,:]))
+                
+                print "%d: %f %f: %f %f" % (k, rmse_eta_pf, rmse_theta_pf, 
+                                            rmse_eta_apf, rmse_theta_apf)
+            pass
             
     else:
     
@@ -227,7 +279,7 @@ if __name__ == '__main__':
         model = ParticleLSB()
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='rsas')
 
         
         svals = numpy.zeros((2, nums, steps+1))

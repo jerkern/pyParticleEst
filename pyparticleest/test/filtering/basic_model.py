@@ -50,6 +50,9 @@ class Model(pyparticleest.part_utils.ParticleFilteringInterface):
         for k in range(len(particles)):
             logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1,1)-y, self.R)
         return logyprob
+    
+    def sample_smooth(self, particles, next_part, u, t):
+        return particles
 
 if __name__ == '__main__':
     steps = 100
@@ -82,13 +85,17 @@ if __name__ == '__main__':
     for j in reversed(xrange(len(traj.traj)-1)):
         ind = traj.traj[j+1].ancestors[ind]
         vals[:,j] = numpy.copy(traj.traj[j].pa.part[ind])
+    plt.plot(range(steps+1), vals.T, 'g-')
+        
+    straj = traj.perform_smoothing(num, method='ancestor')
+    plt.plot(range(steps+1), straj.straj, 'b-.')
 #    for k in xrange(num):
 #        ind = k
 #        for j in reversed(xrange(len(traj.traj)-1)):
 #            ind = traj.traj[j+1].ancestors[ind]
 #            vals[k,j] = numpy.copy(traj.traj[j].pa.part[ind])
             
-    plt.plot(range(steps+1), vals.T, 'g-')
+    
         
             
     plt.show()
