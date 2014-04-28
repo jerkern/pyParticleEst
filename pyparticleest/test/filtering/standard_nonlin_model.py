@@ -42,7 +42,6 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface):
         self.P0 = numpy.copy(P0)
         self.Q= numpy.copy(Q)
         self.R=numpy.copy(R)
-        self.t = 0
     
     def create_initial_estimate(self, N):
         return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)) 
@@ -54,8 +53,7 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface):
     
     def update(self, particles, u, noise, t):
         """ Update estimate using 'data' as input """
-        particles[:] = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*self.t)  + noise
-        self.t = self.t + 1
+        particles[:] = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)  + noise
    
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
@@ -70,7 +68,7 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         #N = len(particles)
         #logpn = numpy.empty(N, dtype=float)
-        pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*self.t)
+        pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)
         #return calc_stuff(logpn, next_cpart, pn, N, self.Q)
         #return scipy.stats.norm.logpdf(pn, next_cpart, numpy.sqrt(self.Q)).ravel()
         return lognormpdf(pn-next_cpart.ravel(), self.Q)

@@ -77,7 +77,7 @@ class RBPFBase(ParticleFilteringInterface):
     __metaclass__ = abc.ABCMeta
     
     def __init__(self, lz, Az=None, fz=None, Qz=None,
-                 C=None ,hz=None, R=None, t0=0):
+                 C=None ,hz=None, R=None):
         
         self.kf = kalman.KalmanSmoother(lz, A=Az, C=C, 
                                         Q=Qz, R=R,

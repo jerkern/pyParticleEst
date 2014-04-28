@@ -16,7 +16,7 @@ class MixedNLGaussian(RBPSBase):
         Implement this type of system by extending this class and provide the methods for returning 
         the system matrices at each time instant  """
     def __init__(self, lxi, lz, Az=None, C=None, Qz=None, R=None, fz=None,
-                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None, t0=0):
+                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None):
         if (Axi != None):
             self.Axi = numpy.copy(Axi)
         else:
@@ -39,8 +39,7 @@ class MixedNLGaussian(RBPSBase):
         return super(MixedNLGaussian, self).__init__(lz=lz,
                                                      Az=Az, C=C, 
                                                      Qz=Qz, R=R,
-                                                     hz=h, fz=fz,
-                                                     t0=t0)
+                                                     hz=h, fz=fz)
 
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Axi=None, fxi=None, Qxi=None, Qxiz=None, 
