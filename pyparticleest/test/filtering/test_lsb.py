@@ -109,58 +109,44 @@ class ParticleLSB(MixedNLGaussianInitialGaussian):
         
         return (numpy.asarray(y).reshape((-1,1)), None, h, None)
 
-#class ParticleLSB_JN(ParticleLSB):
-#    """ Model 60 & 61 from Lindsten & Schon (2011) """
-#    def __init__(self):
-#        """ Define all model variables """
-#        
-#        # No uncertainty in initial state
-#        eta = numpy.array([[0.0],])
-#        z0 =  numpy.array([[0.0],
-#                           [0.0],
-#                           [0.0],
-#                           [0.0]])
-#        P0 = 0.0*numpy.eye(4)
-#        
-#        Az = numpy.array([[3.0, -1.691, 0.849, -0.3201],
-#                          [2.0, 0.0, 0.0, 0.0],
-#                          [0.0, 1.0, 0.0, 0.0],
-#                          [0.0, 0.0, 0.5, 0.0]])
-#        
-#        (Ae, fe) = calc_Ae_fe(eta, 0)
-#        h = calc_h(eta)
-#        C = numpy.array([[0.0, 0.0, 0.0, 0.0]])
-#        
-#        Qe= numpy.diag([ 0.005])
-#        Qz = numpy.diag([ 0.01, 0.01, 0.01, 0.01])
-#        R = numpy.diag([0.1,])
-#
-#        super(ParticleLSB,self).__init__(z0=numpy.reshape(z0,(-1,1)),
-#                                         P0=P0, e0 = eta,
-#                                         Az=Az, C=C, Ae=Ae,
-#                                         R=R, Qe=Qe, Qz=Qz,
-#                                         fe=fe, h=h)
-#        
-#    def eval_1st_stage_weight(self, u,y):
-##        eta_old = copy.deepcopy(self.get_nonlin_state())
-##        lin_old = copy.deepcopy(self.get_lin_est())
-##        t_old = self.t
-#        self.prep_update(u)
-#        noise = numpy.zeros_like(self.eta)
-#        self.update(u, noise)
-#        
-#        dh = numpy.asarray(((0.05*2*self.eta,),))
-#        
-#        yn = self.prep_measure(y)
-#        self.kf.R = self.kf.R + dh*self.Qe*dh
-#        logpy = self.measure(yn)
-#        
-#        # Restore state
-##        self.set_lin_est(lin_old)
-##        self.set_nonlin_state(eta_old)
-##        self.t = t_old
-#        
-#        return logpy
+class ParticleLSB_EKF(ParticleLSB):
+
+    def calc_Sigma_xi(self, particles, u, t): 
+        """ Return sampled process noise for the non-linear states """
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        (_xil, zl, Pl) = self.get_states(particles)
+        N = len(particles)
+                    
+        Sigma = numpy.zeros((N, self.lxi, self.lxi))
+        for i in xrange(N):
+            Sigma[i] = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
+        return Sigma
+
+    def eval_1st_stage_weights(self, particles, u, y, t):
+        N = len(particles)
+        part = numpy.copy(particles)
+        xin = self.pred_xi(part, u, t)
+        Sigma = self.calc_Sigma_xi(particles, u, t)
+        self.cond_predict(part, xin, u, t)
+        return self.measure_1st(part, Sigma, y, t)
+    
+    def measure_1st(self, particles, Sigma, y, t):
+        """ Return the log-pdf value of the measurement """
+        
+        (xil, zl, Pl) = self.get_states(particles)
+        N = len(particles)
+        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=y, t=t)
+        h_grad = self.get_h_grad(particles, y, t)
+        lyz = numpy.empty(N)
+        for i in xrange(len(zl)):
+            Rext = Rz[i]+h_grad[i].dot(Sigma[i]).dot(h_grad[i].T)
+            lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rext)
+        return lyz
+    
+    def get_h_grad(self, particles, y, t):
+        tmp = numpy.vstack(particles)
+        h_grad = 0.1*tmp[:,0]
+        return h_grad[:,numpy.newaxis,numpy.newaxis]
 
 def wmean(logw, val):
     w = numpy.exp(logw)
@@ -175,21 +161,19 @@ if __name__ == '__main__':
     # How many steps forward in time should our simulation run
     steps = 100
     
-    sims = 1000
-    
     if (len(sys.argv) > 1):
         if (sys.argv[1] == 'nogui'):
-        
+            sims = 1000
             sqr_err_eta = numpy.zeros((sims, steps+1))
             sqr_err_theta = numpy.zeros((sims, steps+1))
 
-            C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
             for k in range(sims):
                 # Create reference
                 numpy.random.seed(k)
                 (y, e, z) = generate_dataset(steps)
         
                 model = ParticleLSB()
+
                 # Create an array for our particles 
                 ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
                 ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='rsas')
@@ -213,51 +197,83 @@ if __name__ == '__main__':
                 print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
         elif (sys.argv[1] == 'apf_compare'):
             
-            sqr_err_eta_pf = numpy.zeros((sims, steps+1))
-            sqr_err_theta_pf = numpy.zeros((sims, steps+1))
+            sims = 10000
+            part_count = (5, 10, 15, 20, 30, 50, 100, 200, 500)
             
-            sqr_err_eta_apf = numpy.zeros((sims, steps+1))
-            sqr_err_theta_apf = numpy.zeros((sims, steps+1))
-
-            C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
-            for k in range(sims):
-                # Create reference
-                numpy.random.seed(k)
-                (y, e, z) = generate_dataset(steps)
-        
-                model = ParticleLSB()
-                # Create an array for our particles 
-                pepf = param_est.ParamEstimation(model=model, u=None, y=y)
-                pepf.simulate(num, num_traj=1, res=0.67, filter='PF', smoother='ancestor')
+            model = ParticleLSB()
+            model_ekf = ParticleLSB_EKF()
+            
+            for pc in part_count:
+                rmse_eta_pf = numpy.zeros(sims)
+                rmse_theta_pf = numpy.zeros(sims)
+            
+                rmse_eta_apf = numpy.zeros(sims)
+                rmse_theta_apf = numpy.zeros(sims)
                 
-                peapf = param_est.ParamEstimation(model=model, u=None, y=y)
-                peapf.simulate(num, num_traj=1, res=0.67, filter='APF', smoother='ancestor')
-        
-                avg_pf = numpy.zeros((2, steps+1))
-                avg_apf = numpy.zeros((2, steps+1))
-                for i in range(steps+1):
-                    avg_pf[0,i] = wmean(pepf.pt.traj[i].pa.w, numpy.vstack(pepf.pt.traj[i].pa.part)[:,0])
-                    avg_pf[1,i] = wmean(pepf.pt.traj[i].pa.w, numpy.vstack(pepf.pt.traj[i].pa.part)[:,1])
+                rmse_eta_apfekf = numpy.zeros(sims)
+                rmse_theta_apfekf = numpy.zeros(sims)
+            
+                for k in range(sims):
+                    # Create reference
+                    numpy.random.seed(k)
+                    (y, e, z) = generate_dataset(steps)
+            
                     
-                    avg_apf[0,i] = wmean(peapf.pt.traj[i].pa.w, numpy.vstack(peapf.pt.traj[i].pa.part)[:,0])
-                    avg_apf[1,i] = wmean(peapf.pt.traj[i].pa.w, numpy.vstack(peapf.pt.traj[i].pa.part)[:,1])
+                    # Create an array for our particles 
+                    pepf = param_est.ParamEstimation(model=model, u=None, y=y)
+                    pepf.simulate(pc, num_traj=1, res=0.67, filter='PF', smoother='ancestor')
+                    
+                    peapf = param_est.ParamEstimation(model=model, u=None, y=y)
+                    peapf.simulate(pc, num_traj=1, res=0.67, filter='APF', smoother='ancestor')
+                    
+                    peapfekf = param_est.ParamEstimation(model=model_ekf, u=None, y=y)
+                    peapfekf.simulate(pc, num_traj=1, res=0.67, filter='APF', smoother='ancestor')
+            
+                    avg_pf = numpy.zeros((2, steps+1))
+                    avg_apf = numpy.zeros((2, steps+1))
+                    avg_apfekf = numpy.zeros((2, steps+1))
+                    for i in range(steps+1):
+                        avg_pf[0,i] = wmean(pepf.pt.traj[i].pa.w, numpy.vstack(pepf.pt.traj[i].pa.part)[:,0])
+                        zest = numpy.vstack(pepf.pt.traj[i].pa.part)[:,1:5].T
+                        thetaest = 25.0+C_theta.dot(zest)
+                        avg_pf[1,i] = wmean(pepf.pt.traj[i].pa.w, thetaest)
                         
-                theta = 25.0+C_theta.dot(z.reshape((4,-1)))
-                sqr_err_eta_pf[k,:] = (avg_pf[0,:] - e[0,:])**2
-                sqr_err_theta_pf[k,:] = (avg_pf[1,:] - theta)**2
+                        avg_apf[0,i] = wmean(peapf.pt.traj[i].pa.w, numpy.vstack(peapf.pt.traj[i].pa.part)[:,0])
+                        zest = numpy.vstack(peapf.pt.traj[i].pa.part)[:,1:5].T
+                        thetaest = 25.0+C_theta.dot(zest)                        
+                        avg_apf[1,i] = wmean(peapf.pt.traj[i].pa.w, thetaest)
                         
-                sqr_err_eta_apf[k,:] = (avg_apf[0,:] - e[0,:])**2
-                sqr_err_theta_apf[k,:] = (avg_apf[1,:] - theta)**2
-        
-                rmse_eta_pf = numpy.sqrt(numpy.mean(sqr_err_eta_pf[k,:]))
-                rmse_theta_pf = numpy.sqrt(numpy.mean(sqr_err_theta_pf[k,:]))
+                        avg_apfekf[0,i] = wmean(peapfekf.pt.traj[i].pa.w, numpy.vstack(peapfekf.pt.traj[i].pa.part)[:,0])
+                        zest = numpy.vstack(peapfekf.pt.traj[i].pa.part)[:,1:5].T
+                        thetaest = 25.0+C_theta.dot(zest)                        
+                        avg_apfekf[1,i] = wmean(peapfekf.pt.traj[i].pa.w, thetaest)
+                            
+                    theta = 25.0+C_theta.dot(z.reshape((4,-1)))
+                    sqr_err_eta_pf = (avg_pf[0,:] - e[0,:])**2
+                    sqr_err_theta_pf = (avg_pf[1,:] - theta)**2
+                            
+                    sqr_err_eta_apf = (avg_apf[0,:] - e[0,:])**2
+                    sqr_err_theta_apf = (avg_apf[1,:] - theta)**2
+                    
+                    sqr_err_eta_apfekf = (avg_apfekf[0,:] - e[0,:])**2
+                    sqr_err_theta_apfekf = (avg_apfekf[1,:] - theta)**2
+            
+                    rmse_eta_pf[k] = numpy.sqrt(numpy.mean(sqr_err_eta_pf))
+                    rmse_theta_pf[k] = numpy.sqrt(numpy.mean(sqr_err_theta_pf))
+                    
+                    rmse_eta_apf[k] = numpy.sqrt(numpy.mean(sqr_err_eta_apf))
+                    rmse_theta_apf[k] = numpy.sqrt(numpy.mean(sqr_err_theta_apf))
+                    
+                    rmse_eta_apfekf[k] = numpy.sqrt(numpy.mean(sqr_err_eta_apfekf))
+                    rmse_theta_apfekf[k] = numpy.sqrt(numpy.mean(sqr_err_theta_apfekf))
+                    
+                print "%d: pf=(%f, %f), apf=(%f, %f), epf=(%f, %f)" % (pc, numpy.mean(rmse_eta_pf),
+                                                                       numpy.mean(rmse_theta_pf),
+                                                                       numpy.mean(rmse_eta_apf),
+                                                                       numpy.mean(rmse_theta_apf),
+                                                                       numpy.mean(rmse_eta_apfekf),
+                                                                       numpy.mean(rmse_theta_apfekf))
                 
-                rmse_eta_apf = numpy.sqrt(numpy.mean(sqr_err_eta_apf[k,:]))
-                rmse_theta_apf = numpy.sqrt(numpy.mean(sqr_err_theta_apf[k,:]))
-                
-                print "%d: %f %f: %f %f" % (k, rmse_eta_pf, rmse_theta_pf, 
-                                            rmse_eta_apf, rmse_theta_apf)
-            pass
             
     else:
     

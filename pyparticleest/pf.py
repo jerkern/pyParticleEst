@@ -111,7 +111,7 @@ class AuxiliaryParticleFilter(ParticleFilter):
         
         if (y != None):
             l1w =  self.model.eval_1st_stage_weights(pa.part, u, y, t)
-            pa.w = pa.w + l1w
+            pa.w += l1w
             pa.w -= numpy.max(pa.w)
             w = numpy.exp(pa.w)
             w /= sum(w)
