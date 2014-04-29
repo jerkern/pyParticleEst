@@ -353,9 +353,11 @@ class MixedNLGaussian(RBPSBase):
 #            res[j,-self.kf.lz:] = z
 #        return res
 
-    def copy_ind(self, particles, new_ind):
-        new_part = particles[new_ind]
-        return new_part
+    def copy_ind(self, particles, new_ind=None):
+        if (new_ind != None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
     
     def set_states(self, particles, xi_list, z_list, P_list):
         """ Set the estimate of the Rao-Blackwellized states """

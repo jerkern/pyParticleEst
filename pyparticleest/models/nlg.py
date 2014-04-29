@@ -8,8 +8,12 @@ import pyximport
 pyximport.install(inplace=True)
 import pyparticleest.models.mlnlg_compute as mlnlg_compute
 import pyparticleest.kalman as kalman
+from exceptions import ValueError
 
-
+def lognormpdf_scalar(err, var):
+    coeff = 0.5*math.log(2*math.pi*var[0,0])
+    exp = -0.5/var[0,0]*(err.ravel())**2
+    return exp - coeff
 
 class NonlinearGaussian(part_utils.FFBSiRSInterface):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
@@ -20,7 +24,7 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
     __metaclass__ = abc.ABCMeta
     
     def get_f(self, particles, u, t):
-        None
+        return None
 
     def get_Q(self, particles, u, t):
         return None
@@ -41,13 +45,13 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         else:
             self.g = None
         if (Q != None):
-            self.Q = numpy.copy(Q)
-        else:
-            self.Q = None
+            self.Qchol = scipy.linalg.cho_factor(Q)
+            self.Qcholtri = numpy.triu(self.Qchol[0])
+            ld = numpy.sum(numpy.log(numpy.diag(self.Qchol[0])))*2
+            self.logpdfmax = -0.5*(lxi*math.log(2*math.pi)+ld)
         if (R != None):
-            self.R = numpy.copy(R)
-        else:
-            self.R = None
+            self.Rchol = scipy.linalg.cho_factor(R)
+            self.Rcholtri = numpy.triu(self.Rchol[0])
             
         self.lxi = lxi
         
@@ -57,26 +61,20 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         Q = self.get_Q(particles=particles, u=u, t=t)
         noise = numpy.random.normal(size=(self.lxi,N))
         if (Q == None):
-            Q = self.Q
-            Qchol = numpy.triu(scipy.linalg.cho_factor(Q)[0])
-            noise = Qchol.dot(noise)
+            noise = self.Qcholtri.dot(noise)
         else:
             for i in xrange(N):
-                Qchol = numpy.triu(scipy.linalg.cho_factor(Q[i])[0])
+                Qchol = numpy.triu(scipy.linalg.cho_factor(Q[i], check_finite=False)[0])
                 noise[:,i] =  Qchol.dot(noise[:,i])
            
         return noise.T
 
     def update(self, particles, u, t, noise):
         """ Update estimate using 'data' as input """
-        N = len(particles)
         f = self.get_f(particles=particles, u=u, t=t)
         if (f == None):
             f = self.f
-            particles += f + noise
-        else:
-            for i in xrange(N):
-                particles[i] += f[i] + noise[i]
+        particles[:] = f + noise 
         return particles
 
     def measure(self, particles, y, t):
@@ -85,26 +83,19 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         R = self.get_R(particles=particles, t=t)
         N = len(particles)
         lpy = numpy.empty(N)
-        if (g == None and R == None):
-            g = self.g
-            R = self.R
-            Rchol = scipy.linalg.cho_factor(self.R)
-            lp = kalman.lognormpdf_cho(y-self.g,Rchol)
-            for i in xrange(N):
-                lpy[i] = lp
-        elif (R == None):
-            Rchol = scipy.linalg.cho_factor(self.R)
-            for i in xrange(N):
-                lpy[i] = kalman.lognormpdf_cho(y-g[i],Rchol)
-        elif (g == None):
-            diff = y-self.g
-            for i in xrange(N):
-                Rchol = scipy.linalg.cho_factor(R[i])
-                lpy[i] = kalman.lognormpdf_cho(diff,Rchol)
+        if (g == None):
+            g = numpy.repeat(self.g, N, 0)
+        diff = y-g
+        if (R == None):
+            if (self.Rcholtri.shape[0] == 1):
+                lpy = lognormpdf_scalar(diff, self.Rcholtri)
+            else:
+                lpy = kalman.lognormpdf_cho_vec(diff,self.Rchol)
         else:
+            lpy = numpy.empty(N)
             for i in xrange(N):
-                Rchol = scipy.linalg.cho_factor(R[i])
-                lpy[i] = kalman.lognormpdf_cho(y-g[i],Rchol)
+                Rchol = scipy.linalg.cho_factor(R[i], check_finite=False)
+                lpy[i] = kalman.lognormpdf_cho(diff[i],Rchol)
             
         return lpy
     
@@ -115,19 +106,57 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         return self.measure(part, y, t)
         
     def next_pdf_max(self, particles, u, t):
-        pass
+        Q = self.get_Q(particles, u, t)
+        dim=self.lxi
+        zeros = numpy.zeros((dim,1))
+        l2pi = math.log(2*math.pi)
+        if (Q == None):
+            return self.logpdfmax
+        else:
+            N = len(particles)
+            pmax = numpy.empty(N)
+            for i in xrange(N):
+                Qchol = scipy.linalg.cho_factor(Q[i], check_finite=False)
+                ld = numpy.sum(numpy.log(numpy.diag(Qchol[0])))*2
+                pmax[i] = -0.5*(dim*l2pi+ld)
+            return numpy.max(pmax)
         
     def next_pdf(self, particles, next_part, u, t):
-        """ Implements the next_pdf function for MixedNLGaussian models """
-        pass
-    
+        """ Implements the next_pdf function for NonlinearGaussian models """
+#        N = len(particles)
+#        Nn = len(next_part)
+#        
+#        if (Nn == 1 and N > 1):
+#            next_part = numpy.repeat(next_part, N, 0)
+        f = self.get_f(particles, u, t)
+        if (f == None):
+            f = self.f
+        diff = next_part - f 
+        Q = self.get_Q(particles, u, t)
+        if (Q == None):
+            if (self.Qcholtri.shape[0] == 1):
+                lpx = lognormpdf_scalar(diff, self.Qcholtri)
+            else:
+                lpx = kalman.lognormpdf_cho_vec(diff,self.Qchol)
+        else:
+            N = len(particles)
+            lpx = numpy.empty(N)
+            for i in xrange(N):
+                Qchol = scipy.linalg.cho_factor(Q[i], check_finite=False)
+                lpx[i] = kalman.lognormpdf_cho(diff[i],Qchol)
+        
+        return lpx
+            
     def sample_smooth(self, particles, next_part, u, t):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         return particles
     
-    def copy_ind(self, particles, new_ind):
-        new_part = particles[new_ind]
-        return new_part
+    def copy_ind(self, particles, new_ind=None):
+        if (new_ind != None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
+
     
     def set_params(self, params):
         self.params = numpy.copy(params).reshape((-1,1))
@@ -344,9 +373,17 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
 
 
 class NonlinearGaussianInitialGaussian(NonlinearGaussian):
-    def __init__(self, x0, Px0=None, **kwargs):
+    def __init__(self, x0=None, Px0=None, lxi=None, **kwargs):
         
-        self.x0 = numpy.copy(x0).reshape((-1,1))
+        if (x0 != None):
+            self.x0 = numpy.copy(x0).reshape((-1,1))
+        elif (lxi != None):
+            self.x0 = numpy.zeros((lxi, 1))
+        elif (Px0 != None):
+            self.x0 = numpy.zeros((Px0.shape[0], 1))
+        else:
+            raise ValueError()
+
         if (Px0 == None):
             self.Px0 = numpy.zeros((len(self.x0),len(self.x0)))
         else:

@@ -17,6 +17,16 @@ def lognormpdf_cho(err,Schol):
     ld = np.sum(np.log(np.diag(Schol[0])))*2
     return -0.5*(dim*l2pi+ld+scipy.linalg.cho_solve(Schol, err, check_finite=False).T.dot(err))
 
+def lognormpdf_cho_vec(err,Schol):
+    """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
+    N = err.shape[0]
+    dim = err.shape[1]
+    ld = np.sum(np.log(np.diag(Schol[0])))*2
+    res = np.ones((N,))*(-0.5*(dim*l2pi+ld))
+    for i in xrange(N):
+        res[i] += -0.5*scipy.linalg.cho_solve(Schol, err[i], check_finite=False).T.dot(err[i])
+    return res
+
 def lognormpdf_vec(err,Sl):
     """ Calculate gaussian probability density of x, when x ~ N(mu,sigma) """
     N = len(err)

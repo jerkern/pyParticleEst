@@ -14,12 +14,7 @@ def sample(w, n):
     wc = numpy.cumsum(w)
     wc /= wc[-1] # Normalize
     u = (range(n)+numpy.random.rand(1))/n
-    new_ind = numpy.zeros(n, dtype=numpy.int)
-    for k in range(n):
-        # First index in wc that is greater than u[k]
-        new_ind[k] = numpy.argmax(wc > u[k])
-        
-    return new_ind  
+    return numpy.searchsorted(wc, u)
 
 
 class ParticleFilter(object):
@@ -35,9 +30,10 @@ class ParticleFilter(object):
         self.model = model
     
     def forward(self, pa, u, y, t):
-        pa = copy.deepcopy(pa)
+        pa = ParticleApproximation(self.model.copy_ind(pa.part), pa.w)
+        
         resampled = False
-        if (self.res and pa.N_eff < self.res*pa.num):
+        if (self.res and pa.calc_Neff() < self.res*pa.num):
             ancestors = pa.resample(self.model, pa.num)
             resampled = True
         else:
@@ -91,11 +87,6 @@ class ParticleFilter(object):
         # Keep the weights from going to -Inf
         pa.w -= numpy.max(pa.w)
         
-        # Calc N_eff
-        w = numpy.exp(pa.w)
-        w /= sum(w)
-        pa.N_eff = 1 / sum(w ** 2)
-        
         return pa
         
 
@@ -107,17 +98,13 @@ class AuxiliaryParticleFilter(ParticleFilter):
     def forward(self, pa, u, y, t):
         pa = copy.deepcopy(pa)
         resampled = False
-        N_eff = pa.N_eff
         
         if (y != None):
             l1w =  self.model.eval_1st_stage_weights(pa.part, u, y, t)
             pa.w += l1w
             pa.w -= numpy.max(pa.w)
-            w = numpy.exp(pa.w)
-            w /= sum(w)
-            N_eff = 1 / sum(w ** 2)
-        
-        if (self.res and N_eff < self.res*pa.num):
+            
+        if (self.res and pa.calc_Neff < self.res*pa.num):
             ancestors = pa.resample(self.model, pa.num)
             resampled = True
             l1w = l1w[ancestors]
@@ -130,11 +117,6 @@ class AuxiliaryParticleFilter(ParticleFilter):
             pa.w += self.model.measure(particles=pa.part, y=y, t=t)
             pa.w -= l1w
             pa.w -= numpy.max(pa.w)
-        
-        # Calc N_eff
-        w = numpy.exp(pa.w)
-        w /= sum(w)
-        pa.N_eff = 1 / sum(w ** 2)
         
         return (pa, resampled, ancestors)
         
@@ -200,10 +182,6 @@ class ParticleTrajectory(object):
             the current one """
         return ParticleTrajectory(copy.deepcopy(self.traj[-1].pa), resample=self.pf.res, t0=self.traj[-1].t, lp_hack=self.pf.lp_hack)
 
-    def efficiency(self):
-        """ Calculate the ratio of effective particles / total particles """
-        return self.traj[-1].pa.N_eff/self.traj[-1].pa.num
-    
     def extract_signals(self):
         """ Throw away the particle approxmation and return a list contaning just
             inputs, output and timestamps """
@@ -246,7 +224,7 @@ class ParticleApproximation(object):
         
         Use either seed and num or particles (and optionally weights
         if not uniform) """
-    def __init__(self, particles=None, weights=None, seed=None, num=None):
+    def __init__(self, particles=None, logw=None, seed=None, num=None):
         if (particles != None):
             self.part = numpy.asarray(particles)
             num = len(particles)
@@ -255,28 +233,26 @@ class ParticleApproximation(object):
             for k in range(num):
                 self.part[k] = copy.deepcopy(seed)
         
-        if (weights != None):
-            weights = numpy.asarray(weights)
-            weights /= sum(weights)
+        if (logw != None):
+            self.w = numpy.copy(logw)
         else:
-            weights = numpy.ones(num, numpy.float) / num
+            self.w = -math.log(num)*numpy.ones(num)
         
-        self.w = numpy.log(weights)
         self.num = num
-        n_eff = 1 / sum(weights ** 2)
-        self.N_eff = n_eff
-        return
     
     def __len__(self):
         return len(self.part)
+    
+    def calc_Neff(self):
+        tmp = numpy.exp(self.w)
+        tmp /= numpy.sum(tmp)
+        return 1.0 / sum(tmp ** 2)
     
     def resample(self, model, N=None):
         """ Resample approximation so all particles have the same weight,
             new number of particles is N. If left out the number of particles
             remains the same """
         
-        #print "Resample! %f/%d (%0.2f%%)" % (self.N_eff, self.num, 100.0*self.N_eff/self.num)
-        # To few effective particles, trigger resampling
         if (N  == None):
             N = self.num
         
@@ -286,7 +262,6 @@ class ParticleApproximation(object):
         self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
         self.part = new_part
         self.num = N
-        self.N_eff = 1 / sum(numpy.exp(self.w) ** 2)
         return new_ind
         
     def sample(self):
