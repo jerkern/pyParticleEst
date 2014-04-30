@@ -120,6 +120,7 @@ class ParticleLSB_EKF(ParticleLSB):
         Sigma = numpy.zeros((N, self.lxi, self.lxi))
         for i in xrange(N):
             Sigma[i] = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
+
         return Sigma
 
     def eval_1st_stage_weights(self, particles, u, y, t):
@@ -128,25 +129,48 @@ class ParticleLSB_EKF(ParticleLSB):
         xin = self.pred_xi(part, u, t)
         Sigma = self.calc_Sigma_xi(particles, u, t)
         self.cond_predict(part, xin, u, t)
-        return self.measure_1st(part, Sigma, y, t)
-    
-    def measure_1st(self, particles, Sigma, y, t):
-        """ Return the log-pdf value of the measurement """
         
-        (xil, zl, Pl) = self.get_states(particles)
-        N = len(particles)
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=y, t=t)
-        h_grad = self.get_h_grad(particles, y, t)
-        lyz = numpy.empty(N)
-        for i in xrange(len(zl)):
-            Rext = Rz[i]+h_grad[i].dot(Sigma[i]).dot(h_grad[i].T)
-            lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rext)
-        return lyz
-    
-    def get_h_grad(self, particles, y, t):
-        tmp = numpy.vstack(particles)
+        tmp = numpy.vstack(part)
+        h = 0.05*tmp[:,0]**2
         h_grad = 0.1*tmp[:,0]
-        return h_grad[:,numpy.newaxis,numpy.newaxis]
+        
+        tmp = (h_grad**2)
+        Rext = self.kf.R + Sigma*tmp[:,numpy.newaxis, numpy.newaxis]
+        logRext = numpy.log(Rext)
+        diff = y - h
+        
+        lyz = numpy.empty(N)
+        l2pi = math.log(2*math.pi)
+        for i in xrange(N):
+            lyz[i] = -0.5*(l2pi + logRext[0,0] + (diff[i].ravel()**2)/Rext[0,0])
+        return lyz
+
+
+#    def eval_1st_stage_weights(self, particles, u, y, t):
+#        N = len(particles)
+#        part = numpy.copy(particles)
+#        xin = self.pred_xi(part, u, t)
+#        Sigma = self.calc_Sigma_xi(particles, u, t)
+#        self.cond_predict(part, xin, u, t)
+#        return self.measure_1st(part, Sigma, y, t)
+#    
+#    def measure_1st(self, particles, Sigma, y, t):
+#        """ Return the log-pdf value of the measurement """
+#        
+#        (xil, zl, Pl) = self.get_states(particles)
+#        N = len(particles)
+#        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=y, t=t)
+#        h_grad = self.get_h_grad(particles, y, t)
+#        lyz = numpy.empty(N)
+#        for i in xrange(len(zl)):
+#            Rext = Rz[i]+h_grad[i].dot(Sigma[i]).dot(h_grad[i].T)
+#            lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rext)
+#        return lyz
+#    
+#    def get_h_grad(self, particles, y, t):
+#        tmp = numpy.vstack(particles)
+#        h_grad = 0.1*tmp[:,0]
+#        return h_grad[:,numpy.newaxis,numpy.newaxis]
 
 def wmean(logw, val):
     w = numpy.exp(logw)
