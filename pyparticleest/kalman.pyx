@@ -137,8 +137,25 @@ class KalmanFilter(object):
         dim = len(y)
         ld = np.sum(np.log(np.diag(Schol[0])))*2
         return -0.5*(dim*l2pi+ld+err.T.dot(Sinv_err))
+    
+    def measure_full_scalar(self, y, z, P, C, h_k, R):
+        if (C != None):
+            S = C.dot(P).dot(C.T)+R
+            err = y - C.dot(z)
+            if (h_k != None):
+                err -= h_k
+            z[:] = z + P.dot(C.T).dot(err)/S[0,0] 
+            tmp = C.dot(P)
+            P[:,:] = P - tmp.T.dot(tmp)/S[0,0] 
+        else:
+            S = R
+            if (h_k != None):
+                err = y - h_k
+            else:
+                err = y
 
-
+        # Return the probability of the received measurement
+        return -0.5*(l2pi + math.log(S[0,0]) + (err.ravel()**2)/S[0,0])
 
 class KalmanSmoother(KalmanFilter):
     """ Forward/backward Kalman smoother

@@ -173,9 +173,17 @@ class MixedNLGaussian(RBPSBase):
         
         (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=y, t=t)
+        (y, Cz, hz, Rz, _, _, Rz_identical) = self.get_meas_dynamics_int(particles=particles, y=y, t=t)
             
         lyz = numpy.empty(N)
+        if (Rz_identical):
+            if (Rz[0].shape[0] == 1):
+                for i in xrange(len(zl)):
+                    lyz[i] = self.kf.measure_full_scalar(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
+            else:
+                for i in xrange(len(zl)):
+                    lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
+        
         for i in xrange(len(zl)):
             lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
             
