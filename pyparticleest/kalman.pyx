@@ -37,6 +37,9 @@ def lognormpdf_vec(err,Sl):
         res[i] = -0.5*(S.shape[0]*l2pi+np.linalg.slogdet(S)[1]+np.linalg.solve(S, err[i]).T.dot(err[i]))
     return res
 
+def lognormpdf_scalar(err, S):
+    return -0.5*(l2pi + math.log(S[0,0]) + (err.ravel()**2)/S[0,0])
+
 class KalmanFilter(object):
     """ A Kalman filter class, does filtering for systems of the type:
         z_{k+1} = A*z_{k}+f_k + v_k
@@ -155,7 +158,8 @@ class KalmanFilter(object):
                 err = y
 
         # Return the probability of the received measurement
-        return -0.5*(l2pi + math.log(S[0,0]) + (err.ravel()**2)/S[0,0])
+        return lognormpdf_scalar(err, S)
+        #return -0.5*(l2pi + math.log(S[0,0]) + (err.ravel()**2)/S[0,0])
 
 class KalmanSmoother(KalmanFilter):
     """ Forward/backward Kalman smoother
