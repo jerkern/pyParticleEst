@@ -26,7 +26,7 @@ class ParamEstInterface(object):
         pass
     
     @abc.abstractmethod
-    def eval_logp_xnext(self, particles, particles_next, u, t, Mz=None):
+    def eval_logp_xnext(self, particles, particles_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 

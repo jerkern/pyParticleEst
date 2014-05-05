@@ -116,7 +116,13 @@ class SmoothTrajectory(object):
         elif (method=='ancestor'):
             self.perform_ancestors(pt=pt, M=M)
         elif (method=='mhips'):
-            pass
+            self.perform_ancestors(pt=pt, M=M)
+            if 'R' in options:
+                R = options['R']
+            else:
+                R = 10
+            for _i in xrange(R):
+                self.perform_mhips_pass(pt=pt, M=M, options=options)
         elif (method=='bp'):
             pass
         else:
@@ -245,13 +251,6 @@ class SmoothTrajectory(object):
         self.y.reverse()
         self.t.reverse()
         
-        if (method=='mhips' and len(self.traj) > 1):
-            # The trajectories are initialised using the forward filters,
-            # now run the backard proposer using these as initial input
-            iter = options['mhips_iter']
-            for i in xrange(iter):
-                self.perform_mhips()
-        
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
             self.straj = self.model.post_smoothing(self)
@@ -259,21 +258,109 @@ class SmoothTrajectory(object):
             self.straj = self.traj
     
     def perform_bp(self):
+        pass
+    
+    def perform_mhips_pass(self, pt, M, options):
         T = len(self.traj)
-        self.traj[T-1] = self.model.propose_smooth(self.traj[T-2],
-                                                   self.u[T-2],
-                                                   self.u[T-1],
-                                                   self.y[T-1],
-                                                   None)
-        for i in reversed(xrange((1, T-1))):
-            self.traj[i] = self.model.propose_smooth(self.traj[i-1],
-                                                     self.u[i-1],
-                                                     self.u[i],
-                                                     self.y[i],
-                                                     self.traj[i+1])
-        self.traj[0] = self.model.propose_smooth(None,
-                                                 None,
-                                                 self.u[0],
-                                                 self.y[0],
-                                                 self.traj[1])
-
+        for i in reversed(xrange((T))):
+            if (i == T-1):
+                partp=self.traj[i-1]
+                up=self.u[i-1]
+                tp=self.t[i-1]
+                y=self.y[i]
+                u=self.u[i]
+                t=self.t[i]
+                partn=None
+            elif (i == 0):
+                partp=None
+                up=None
+                tp=None
+                y=self.y[i]
+                u=self.u[i]
+                t=self.t[i]
+                partn=self.traj[i+1]
+            else:
+                partp=self.traj[i-1]
+                up=self.u[i-1]
+                tp=self.t[i-1]
+                y=self.y[i]
+                u=self.u[i]
+                t=self.t[i]
+                partn=self.traj[i+1]
+                
+            
+            xprop = self.model.propose_smooth(partp=partp, 
+                                              up=up,
+                                              tp=tp,
+                                              y=y,
+                                              u=u,
+                                              t=t,
+                                              partn=partn)
+            
+            # Accept/reject new sample
+            logp_q_prop = self.model.logp_smooth(xprop,
+                                                 partp=partp, 
+                                                 up=up,
+                                                 tp=tp,
+                                                 y=y,
+                                                 u=u,
+                                                 t=t,
+                                                 partn=partn)
+            logp_q_curr = self.model.logp_smooth(self.traj[i],
+                                                 partp=partp, 
+                                                 up=up,
+                                                 tp=tp,
+                                                 y=y,
+                                                 u=u,
+                                                 t=t,
+                                                 partn=partn)
+            
+            
+            if (i > 0):
+                logp_prev_prop = self.model.next_pdf(particles=self.traj[i-1],
+                                                     next_part=xprop,
+                                                     u=self.u[i-1],
+                                                     t=self.t[i-1])
+                logp_prev_curr = self.model.next_pdf(particles=self.traj[i-1],
+                                                     next_part=self.traj[i],
+                                                     u=self.u[i-1],
+                                                     t=self.t[i-1])
+            else:
+                logp_prev_prop = numpy.zeros(M)
+                logp_prev_curr = numpy.zeros(M)
+                                         
+            if (self.y[i] != None):
+                logp_y_prop = self.model.measure(particles=numpy.copy(xprop),
+                                                 y=self.y[i],
+                                                 t=self.t[i])
+                                              
+                logp_y_curr = self.model.measure(particles=numpy.copy(self.traj[i]),
+                                                 y=self.y[i],
+                                                 t=self.t[i])
+            else:
+                logp_y_prop = numpy.zeros(M)
+                logp_y_curr = numpy.zeros(M)
+                
+            if (i < T-1):
+                logp_next_prop = self.model.next_pdf(particles=xprop,
+                                                     next_part=self.traj[i+1],
+                                                     u=self.u[i],
+                                                     t=self.t[i])
+                logp_next_curr = self.model.next_pdf(particles=self.traj[i],
+                                                     next_part=self.traj[i+1],
+                                                     u=self.u[i],
+                                                     t=self.t[i])
+            else:
+                logp_next_prop = numpy.zeros(M)
+                logp_next_curr = numpy.zeros(M)                                  
+        
+ 
+            # Calc ratio
+            ratio = ((logp_prev_prop - logp_prev_curr) + 
+                     (logp_y_prop - logp_y_curr) +
+                     (logp_next_prop - logp_next_curr) +
+                     (logp_q_curr - logp_q_prop))
+            
+            test = numpy.log(numpy.random.uniform(size=M))
+            ind = test < ratio
+            self.traj[i][ind] = xprop[ind]
