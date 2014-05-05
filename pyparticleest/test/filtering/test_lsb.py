@@ -221,82 +221,51 @@ if __name__ == '__main__':
                 print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
         elif (sys.argv[1] == 'apf_compare'):
             
+            mode = sys.argv[2]
+            
+            print "Running tests for %s" % mode
+            
             sims = 20000
             part_count = (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            rmse_eta = numpy.zeros((sims, len(part_count)))
+            rmse_theta = numpy.zeros((sims, len(part_count)))
+            filter = 'PF'
+            model=ParticleLSB()
+            if (mode == 'EPF'):
+                model = ParticleLSB_EKF()
+                filter = 'APF'
+            elif (mode== 'APF'):
+                filter = 'APF'
+            else:
+                pass
             
-            model = ParticleLSB()
-            model_ekf = ParticleLSB_EKF()
-            
-            for pc in part_count:
-                rmse_eta_pf = numpy.zeros(sims)
-                rmse_theta_pf = numpy.zeros(sims)
-            
-                rmse_eta_apf = numpy.zeros(sims)
-                rmse_theta_apf = numpy.zeros(sims)
+            for k in range(sims):
                 
-                rmse_eta_apfekf = numpy.zeros(sims)
-                rmse_theta_apfekf = numpy.zeros(sims)
-            
-                for k in range(sims):
-                    # Create reference
-                    numpy.random.seed(k)
-                    (y, e, z) = generate_dataset(steps)
-            
+                # Create reference
+                numpy.random.seed(k)
+                (y, e, z) = generate_dataset(steps)
+                pe = param_est.ParamEstimation(model=model, u=None, y=y)
                     
-                    # Create an array for our particles 
-                    pepf = param_est.ParamEstimation(model=model, u=None, y=y)
-                    pepf.simulate(pc, num_traj=1, res=0.67, filter='PF', smoother='ancestor')
-                    
-                    peapf = param_est.ParamEstimation(model=model, u=None, y=y)
-                    peapf.simulate(pc, num_traj=1, res=0.67, filter='APF', smoother='ancestor')
-                    
-                    peapfekf = param_est.ParamEstimation(model=model_ekf, u=None, y=y)
-                    peapfekf.simulate(pc, num_traj=1, res=0.67, filter='APF', smoother='ancestor')
-            
-                    avg_pf = numpy.zeros((2, steps+1))
-                    avg_apf = numpy.zeros((2, steps+1))
-                    avg_apfekf = numpy.zeros((2, steps+1))
+                for ind, pc in enumerate(part_count):
+                
+                    pe.simulate(pc, num_traj=1, res=0.67, filter=filter, smoother='ancestor')
+                    avg = numpy.zeros((2, steps+1))
+
                     for i in range(steps+1):
-                        avg_pf[0,i] = wmean(pepf.pt.traj[i].pa.w, numpy.vstack(pepf.pt.traj[i].pa.part)[:,0])
-                        zest = numpy.vstack(pepf.pt.traj[i].pa.part)[:,1:5].T
+                        avg[0,i] = wmean(pe.pt.traj[i].pa.w, numpy.vstack(pe.pt.traj[i].pa.part)[:,0])
+                        zest = numpy.vstack(pe.pt.traj[i].pa.part)[:,1:5].T
                         thetaest = 25.0+C_theta.dot(zest)
-                        avg_pf[1,i] = wmean(pepf.pt.traj[i].pa.w, thetaest)
+                        avg[1,i] = wmean(pe.pt.traj[i].pa.w, thetaest)
                         
-                        avg_apf[0,i] = wmean(peapf.pt.traj[i].pa.w, numpy.vstack(peapf.pt.traj[i].pa.part)[:,0])
-                        zest = numpy.vstack(peapf.pt.traj[i].pa.part)[:,1:5].T
-                        thetaest = 25.0+C_theta.dot(zest)                        
-                        avg_apf[1,i] = wmean(peapf.pt.traj[i].pa.w, thetaest)
-                        
-                        avg_apfekf[0,i] = wmean(peapfekf.pt.traj[i].pa.w, numpy.vstack(peapfekf.pt.traj[i].pa.part)[:,0])
-                        zest = numpy.vstack(peapfekf.pt.traj[i].pa.part)[:,1:5].T
-                        thetaest = 25.0+C_theta.dot(zest)                        
-                        avg_apfekf[1,i] = wmean(peapfekf.pt.traj[i].pa.w, thetaest)
-                            
                     theta = 25.0+C_theta.dot(z.reshape((4,-1)))
-                    sqr_err_eta_pf = (avg_pf[0,:] - e[0,:])**2
-                    sqr_err_theta_pf = (avg_pf[1,:] - theta)**2
+                    sqr_err_eta = (avg[0,:] - e[0,:])**2
+                    sqr_err_theta = (avg[1,:] - theta)**2
                             
-                    sqr_err_eta_apf = (avg_apf[0,:] - e[0,:])**2
-                    sqr_err_theta_apf = (avg_apf[1,:] - theta)**2
+                    rmse_eta[k, ind] = numpy.sqrt(numpy.mean(sqr_err_eta))
+                    rmse_theta[k, ind] = numpy.sqrt(numpy.mean(sqr_err_theta))
                     
-                    sqr_err_eta_apfekf = (avg_apfekf[0,:] - e[0,:])**2
-                    sqr_err_theta_apfekf = (avg_apfekf[1,:] - theta)**2
-            
-                    rmse_eta_pf[k] = numpy.sqrt(numpy.mean(sqr_err_eta_pf))
-                    rmse_theta_pf[k] = numpy.sqrt(numpy.mean(sqr_err_theta_pf))
-                    
-                    rmse_eta_apf[k] = numpy.sqrt(numpy.mean(sqr_err_eta_apf))
-                    rmse_theta_apf[k] = numpy.sqrt(numpy.mean(sqr_err_theta_apf))
-                    
-                    rmse_eta_apfekf[k] = numpy.sqrt(numpy.mean(sqr_err_eta_apfekf))
-                    rmse_theta_apfekf[k] = numpy.sqrt(numpy.mean(sqr_err_theta_apfekf))
-                    
-                print "%d: pf=(%f, %f), apf=(%f, %f), epf=(%f, %f)" % (pc, numpy.mean(rmse_eta_pf),
-                                                                       numpy.mean(rmse_theta_pf),
-                                                                       numpy.mean(rmse_eta_apf),
-                                                                       numpy.mean(rmse_theta_apf),
-                                                                       numpy.mean(rmse_eta_apfekf),
-                                                                       numpy.mean(rmse_theta_apfekf))
+            for ind, pc in enumerate(part_count):
+                print "%d: (%f, %f)" % (pc, numpy.mean(rmse_eta[:,ind]), numpy.mean(rmse_theta[:,ind]))
                 
             
     else:
