@@ -104,7 +104,7 @@ class AuxiliaryParticleFilter(ParticleFilter):
             pa.w += l1w
             pa.w -= numpy.max(pa.w)
             
-        if (self.res and pa.calc_Neff < self.res*pa.num):
+        if (self.res and pa.calc_Neff() < self.res*pa.num):
             ancestors = pa.resample(self.model, pa.num)
             resampled = True
             l1w = l1w[ancestors]

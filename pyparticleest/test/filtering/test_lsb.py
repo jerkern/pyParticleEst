@@ -221,7 +221,7 @@ if __name__ == '__main__':
                 print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
         elif (sys.argv[1] == 'apf_compare'):
             
-            sims = 50000
+            sims = 20000
             part_count = (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             
             model = ParticleLSB()
