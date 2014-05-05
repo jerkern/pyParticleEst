@@ -104,11 +104,34 @@ class SmoothTrajectory(object):
         """ Create smoothed trajectory from filtered trajectory
             pt - particle trajectory to be smoothed  """
         
-        self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
-        self.Mz = None
+        self.traj = None
+        self.straj = None
+        self.u = None
+        self.y = None
+        self.t = None
+        
         self.model =  pt.pf.model
-        # Initialise from end time estimates
-
+        if (method=='full' or method=='mcmc' or method=='rs' or method=='rsas'):
+            self.perform_bsi(pt=pt, M=M, method=method, options=options)
+        elif (method=='ancestor'):
+            self.perform_ancestors(pt=pt, M=M)
+        elif (method=='mhips'):
+            pass
+        elif (method=='bp'):
+            pass
+        else:
+            raise ValueError('Unknown smoother: %s' % method)
+        
+    def __len__(self):
+        return len(self.traj)
+    
+    def perform_ancestors(self, pt, M):
+        
+        self.u = [pt[-1].u, ]
+        self.y = [pt[-1].y, ]
+        self.t = [pt[-1].t, ]
+        self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
+        
         tmp = numpy.copy(pt[-1].pa.w)
         tmp -= numpy.max(tmp)
         tmp = numpy.exp(tmp)
@@ -118,51 +141,15 @@ class SmoothTrajectory(object):
                                                  next_part=None,
                                                  u=pt[-1].u,
                                                  t=pt[-1].t)[numpy.newaxis,]
-        
-        
-        self.u = [pt[-1].u, ]
-        self.y = [pt[-1].y, ]
-        self.t = [pt[-1].t, ]
-        opt = dict()
-        if (method=='full'):
-            pass
-        elif (method=='mcmc' or method=='ancestor'):
-            ancestors = pt[-1].ancestors[ind]
-        elif (method=='rs'):
-            N = len(pt[-1].pa.part)
-            max_iter = int(0.1*N)
-        elif (method=='rsas'):
-            x1 = 1.0
-            P1 = 1.0
-            sv = 1.0
-            sw = 1.0
-            ratio = 1.0
-        else:
-            raise ValueError('Unknown sampler: %s' % method)
-        
+        ancestors = pt[-1].ancestors[ind]
         
         for cur_ind in reversed(xrange(len(pt)-1)):
             step = pt[cur_ind]
             self.model.t = step.t
             pa = step.pa
-            if (method=='rs'):
-                ind = bsi_rs(pa, self.model, self.traj[cur_ind+1][0],
-                             step.u, step.t,
-                             options['maxpdf'][cur_ind],max_iter)
-            elif (method=='rsas'):
-                ind = bsi_rsas(pa, self.model, self.traj[cur_ind+1][0],
-                               step.u, step.t,
-                               options['maxpdf'][cur_ind],x1,P1,sv,sw,ratio)                
-            elif (method=='mcmc'):
-                ind = bsi_mcmc(pa, self.model, self.traj[cur_ind+1][0],
-                               step.u, step.t,
-                               options['R'], ancestors)
-                ancestors = step.ancestors[ind]
-            elif (method=='full'):
-                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.t)
-            elif (method=='ancestor'):
-                ind = ancestors
-                ancestors = step.ancestors[ind]
+            
+            ind = ancestors
+            ancestors = step.ancestors[ind]
             # Select 'previous' particle
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
                                                                      self.traj[cur_ind+1][0],
@@ -183,29 +170,110 @@ class SmoothTrajectory(object):
             self.straj = self.model.post_smoothing(self)
         else:
             self.straj = self.traj
-            
         
-    def __len__(self):
-        return len(self.traj)
     
-#def replay(pt, signals, ind, callback=None):
-#    """ Run a particle filter with signals extracted from another filter,
-#        useful to e.g. have one filter which (partially) overlapps with another
-#        """
-#    print "len(pt)=%d. len(signals)=%d, ind=%d" % (len(pt), len(signals), ind)
-#    if (ind == len(signals)-1):
-#        # Nothing to do, all measurements already used
-#        return
-#    
-#    # The starting index has already incorporated the measurement from the smoothing.
-#    pt.update(signals[ind].u)
-#    for i in range(ind+1, len(signals)):
-#        print i
-#        if (signals[i].y):
-#            pt.measure(signals[i].y)
-#            if (callback != None):
-#                callback(pt)
-#        if (signals[i].u):
-#            pt.update(signals[i].u)
-#            if (callback != None):
-#                callback(pt)
+    def perform_bsi(self, pt, M, method, options):
+        self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
+        # Initialise from end time estimates
+
+        tmp = numpy.copy(pt[-1].pa.w)
+        tmp -= numpy.max(tmp)
+        tmp = numpy.exp(tmp)
+        tmp = tmp / numpy.sum(tmp)
+        ind = pf.sample(tmp, M)
+        self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind],
+                                                 next_part=None,
+                                                 u=pt[-1].u,
+                                                 t=pt[-1].t)[numpy.newaxis,]
+        
+        
+        self.u = [pt[-1].u, ]
+        self.y = [pt[-1].y, ]
+        self.t = [pt[-1].t, ]
+        opt = dict()
+        if (method=='full'):
+            pass
+        elif (method=='mcmc' or method=='ancestor' or method=='mhips'):
+            ancestors = pt[-1].ancestors[ind]
+        elif (method=='rs'):
+            N = len(pt[-1].pa.part)
+            max_iter = int(0.1*N)
+        elif (method=='rsas'):
+            x1 = 1.0
+            P1 = 1.0
+            sv = 1.0
+            sw = 1.0
+            ratio = 1.0
+        else:
+            raise ValueError('Unknown sampler: %s' % method)
+        
+        for cur_ind in reversed(xrange(len(pt)-1)):
+            step = pt[cur_ind]
+            self.model.t = step.t
+            pa = step.pa
+
+            if (method=='rs'):
+                ind = bsi_rs(pa, self.model, self.traj[cur_ind+1][0],
+                             step.u, step.t,
+                             options['maxpdf'][cur_ind],max_iter)
+            elif (method=='rsas'):
+                ind = bsi_rsas(pa, self.model, self.traj[cur_ind+1][0],
+                               step.u, step.t,
+                               options['maxpdf'][cur_ind],x1,P1,sv,sw,ratio)                
+            elif (method=='mcmc'):
+                ind = bsi_mcmc(pa, self.model, self.traj[cur_ind+1][0],
+                               step.u, step.t,
+                               options['R'], ancestors)
+                ancestors = step.ancestors[ind]
+            elif (method=='full'):
+                ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.t)
+            elif (method=='ancestor' or method=='bp'):
+                ind = ancestors
+                ancestors = step.ancestors[ind]
+            # Select 'previous' particle
+            self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
+                                                                     self.traj[cur_ind+1][0],
+                                                                     step.u,
+                                                                     step.t))[numpy.newaxis,]
+            self.u.append(step.u)
+            self.y.append(step.y)
+            self.t.append(step.t)
+        
+        self.traj = numpy.vstack(self.traj)
+        # Reorder so the list are ordered with increasing time
+        self.u.reverse()
+        self.y.reverse()
+        self.t.reverse()
+        
+        if (method=='mhips' and len(self.traj) > 1):
+            # The trajectories are initialised using the forward filters,
+            # now run the backard proposer using these as initial input
+            iter = options['mhips_iter']
+            for i in xrange(iter):
+                self.perform_mhips()
+        
+        if hasattr(self.model, 'post_smoothing'):
+            # Do e.g. constrained smoothing for RBPS models
+            self.straj = self.model.post_smoothing(self)
+        else:
+            self.straj = self.traj
+    
+    def perform_bp(self):
+        T = len(self.traj)
+        self.traj[T-1] = self.model.propose_smooth(self.traj[T-2],
+                                                   self.u[T-2],
+                                                   self.u[T-1],
+                                                   self.y[T-1],
+                                                   None)
+        for i in reversed(xrange((1, T-1))):
+            self.traj[i] = self.model.propose_smooth(self.traj[i-1],
+                                                     self.u[i-1],
+                                                     self.u[i],
+                                                     self.y[i],
+                                                     self.traj[i+1])
+        self.traj[0] = self.model.propose_smooth(None,
+                                                 None,
+                                                 self.u[0],
+                                                 self.y[0],
+                                                 self.traj[1])
+

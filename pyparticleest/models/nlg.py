@@ -10,11 +10,6 @@ import pyparticleest.models.mlnlg_compute as mlnlg_compute
 import pyparticleest.kalman as kalman
 from exceptions import ValueError
 
-def lognormpdf_scalar(err, var):
-    coeff = 0.5*math.log(2*math.pi*var[0,0])
-    exp = -0.5/var[0,0]*(err.ravel())**2
-    return exp - coeff
-
 class NonlinearGaussian(part_utils.FFBSiRSInterface):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
@@ -88,7 +83,7 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         diff = y-g
         if (R == None):
             if (self.Rcholtri.shape[0] == 1):
-                lpy = lognormpdf_scalar(diff, self.Rcholtri)
+                lpy = kalman.lognormpdf_scalar(diff, self.Rcholtri)
             else:
                 lpy = kalman.lognormpdf_cho_vec(diff,self.Rchol)
         else:
@@ -135,7 +130,7 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         Q = self.get_Q(particles, u, t)
         if (Q == None):
             if (self.Qcholtri.shape[0] == 1):
-                lpx = lognormpdf_scalar(diff, self.Qcholtri)
+                lpx = kalman.lognormpdf_scalar(diff, self.Qcholtri)
             else:
                 lpx = kalman.lognormpdf_cho_vec(diff,self.Qchol)
         else:
@@ -150,6 +145,19 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
     def sample_smooth(self, particles, next_part, u, t):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         return particles
+    
+    def propose_smooth(self, prev_part, up, u, y, t, next_part):
+        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
+        # Trivial coice of q, discard y_T and x_{t+1}
+        noise = self.sample_process_noise(prev_part, up, t-1)
+        prop_part = numpy.copy(prev_part)
+        self.update(prop_part, up, t-1, noise)
+        return prop_part
+
+    def logp_smooth(self, prop_part, prev_part, up, u, y, t, next_part):
+        """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
+        self.next_pdf(prev_part, prop_part, up, t-1)
+        pass  
     
     def copy_ind(self, particles, new_ind=None):
         if (new_ind != None):
