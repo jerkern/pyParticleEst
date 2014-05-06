@@ -364,3 +364,50 @@ class SmoothTrajectory(object):
             test = numpy.log(numpy.random.uniform(size=M))
             ind = test < ratio
             self.traj[i][ind] = xprop[ind]
+            
+    def perform_mhips_pass_reduced(self, pt, M, options):
+        """ Runs MHIPS with the proposal density q and p(x_{t+1}|x_t) """
+        T = len(self.traj)
+        for i in reversed(xrange((T))):
+                
+            if (i > 0):
+                xprop = numpy.copy(self.traj[i-1])
+                noise = self.model.sample_process_noise(xprop, self.u[i-1], self.t[i-1])
+                xprop= self.model.update(xprop, self.u[i-1], self.t[i-1], noise)
+            else:
+                xprop = self.model.create_initial_estimate(M)
+            
+            if (self.y[i] != None):
+                logp_y_prop = self.model.measure(particles=numpy.copy(xprop),
+                                                 y=self.y[i],
+                                                 t=self.t[i])
+                                              
+                logp_y_curr = self.model.measure(particles=numpy.copy(self.traj[i]),
+                                                 y=self.y[i],
+                                                 t=self.t[i])
+            else:
+                logp_y_prop = numpy.zeros(M)
+                logp_y_curr = numpy.zeros(M)
+                
+            if (i < T-1):
+                logp_next_prop = self.model.next_pdf(particles=xprop,
+                                                     next_part=self.traj[i+1],
+                                                     u=self.u[i],
+                                                     t=self.t[i])
+                logp_next_curr = self.model.next_pdf(particles=self.traj[i],
+                                                     next_part=self.traj[i+1],
+                                                     u=self.u[i],
+                                                     t=self.t[i])
+            else:
+                logp_next_prop = numpy.zeros(M)
+                logp_next_curr = numpy.zeros(M)                                  
+        
+ 
+            # Calc ratio
+            ratio = ((logp_y_prop - logp_y_curr) +
+                     (logp_next_prop - logp_next_curr))
+            
+            test = numpy.log(numpy.random.uniform(size=M))
+            ind = test < ratio
+            self.traj[i][ind] = xprop[ind]
+

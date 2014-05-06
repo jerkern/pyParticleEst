@@ -60,7 +60,7 @@ if __name__ == '__main__':
     plt.plot(range(steps+1), x,'r-')
     plt.plot(range(1,steps+1), y, 'bx')
     straj = traj.perform_smoothing(M, method='ancestor')
-    plt.plot(range(steps+1), straj.straj[:,:,0], 'g-')
+    plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
     plt.ion()
     plt.show()
     time.sleep(5)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         plt.plot(range(1,steps+1), y, 'bx')
         plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
         plt.draw()
-        straj.perform_mhips_pass(straj.straj, M, None)
+        straj.perform_mhips_pass_reduced(straj.straj, M, None)
         time.sleep(1)
         
     plt.ioff()
