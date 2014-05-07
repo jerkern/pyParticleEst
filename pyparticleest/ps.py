@@ -106,9 +106,14 @@ class SmoothTrajectory(object):
         
         self.traj = None
         self.straj = None
-        self.u = None
-        self.y = None
-        self.t = None
+        T = len(pt)
+        self.u = numpy.empty(T, dtype=object)
+        self.y = numpy.empty(T, dtype=object)
+        self.t = numpy.empty(T, dtype=object)
+        for i in xrange(T):
+            self.u[i] = pt[i].u
+            self.y[i] = pt[i].y
+            self.t[i] = pt[i].t
         
         self.model =  pt.pf.model
         if (method=='full' or method=='mcmc' or method=='rs' or method=='rsas'):
@@ -124,7 +129,11 @@ class SmoothTrajectory(object):
             for _i in xrange(R):
                 self.perform_mhips_pass(pt=pt, M=M, options=options)
         elif (method=='bp'):
-            pass
+            if 'R' in options:
+                R = options['R']
+            else:
+                R = 10
+            self.perform_bp(pt, M, R)
         else:
             raise ValueError('Unknown smoother: %s' % method)
         
@@ -133,9 +142,6 @@ class SmoothTrajectory(object):
     
     def perform_ancestors(self, pt, M):
         
-        self.u = [pt[-1].u, ]
-        self.y = [pt[-1].y, ]
-        self.t = [pt[-1].t, ]
         self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
         
         tmp = numpy.copy(pt[-1].pa.w)
@@ -161,16 +167,9 @@ class SmoothTrajectory(object):
                                                                      self.traj[cur_ind+1][0],
                                                                      step.u,
                                                                      step.t))[numpy.newaxis,]
-            self.u.append(step.u)
-            self.y.append(step.y)
-            self.t.append(step.t)
         
         self.traj = numpy.vstack(self.traj)
-        # Reorder so the list are ordered with increasing time
-        self.u.reverse()
-        self.y.reverse()
-        self.t.reverse()
-        
+
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
             self.straj = self.model.post_smoothing(self)
@@ -192,10 +191,6 @@ class SmoothTrajectory(object):
                                                  u=pt[-1].u,
                                                  t=pt[-1].t)[numpy.newaxis,]
         
-        
-        self.u = [pt[-1].u, ]
-        self.y = [pt[-1].y, ]
-        self.t = [pt[-1].t, ]
         opt = dict()
         if (method=='full'):
             pass
@@ -215,7 +210,6 @@ class SmoothTrajectory(object):
         
         for cur_ind in reversed(xrange(len(pt)-1)):
             step = pt[cur_ind]
-            self.model.t = step.t
             pa = step.pa
 
             if (method=='rs'):
@@ -241,15 +235,8 @@ class SmoothTrajectory(object):
                                                                      self.traj[cur_ind+1][0],
                                                                      step.u,
                                                                      step.t))[numpy.newaxis,]
-            self.u.append(step.u)
-            self.y.append(step.y)
-            self.t.append(step.t)
-        
+       
         self.traj = numpy.vstack(self.traj)
-        # Reorder so the list are ordered with increasing time
-        self.u.reverse()
-        self.y.reverse()
-        self.t.reverse()
         
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
@@ -257,8 +244,99 @@ class SmoothTrajectory(object):
         else:
             self.straj = self.traj
     
-    def perform_bp(self):
-        pass
+    def perform_bp(self, pt, M, R):
+        
+        T = len(pt)
+        self.traj = numpy.zeros((T,), dtype=numpy.ndarray)
+        
+        # Initialise from end time estimates
+        tmp = numpy.copy(pt[-1].pa.w)
+        tmp -= numpy.max(tmp)
+        tmp = numpy.exp(tmp)
+        tmp = tmp / numpy.sum(tmp)
+        ind = pf.sample(tmp, M)
+        self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind],
+                                                 next_part=None,
+                                                 u=self.u[-1],
+                                                 t=self.t[-1])[numpy.newaxis,]
+         
+        anc = pt[-1].ancestors[ind]
+        ancanc = pt[-2].ancestors[anc]
+        
+        for t in reversed(xrange(1,T-1)):
+            
+            # Initialise with true ancestor
+            self.traj[t] = numpy.copy(self.model.sample_smooth(pt[t].pa.part[ind],
+                                                               self.traj[t+1][0],
+                                                               self.u[t],
+                                                               self.t[t]))[numpy.newaxis,]
+ 
+            # Propose new ancestors 
+            for _ in xrange(R):
+                
+                # Propose new ancestor indices
+                tmp = numpy.copy(pt[t-1].pa.w)
+                tmp -= numpy.max(tmp)
+                tmp = numpy.exp(tmp)
+                tmp = tmp / numpy.sum(tmp)
+                panc = pf.sample(tmp, M)
+             
+                (pprop, acc) = mc_step(model=self.model,
+                                       partp_prop=pt[t-1].pa.part[panc],
+                                       partp_curr=pt[t-1].pa.part[ancanc],
+                                       up=self.u[t-1],
+                                       tp=self.t[t-1],
+                                       curpart=self.traj[t][0],
+                                       y=self.y[t],
+                                       u=self.u[t],
+                                       t=self.t[t],
+                                       partn=self.traj[t+1][0])
+             
+                # Update with accepted proposals
+                self.traj[t][:1,acc] = pprop[acc][numpy.newaxis,]
+                ancanc[acc] = panc[acc]
+            anc = ancanc
+            ancanc = pt[t-1].ancestors[ancanc]
+            
+            
+        
+        # Propose new ancestors for t=0
+        self.traj[0] = self.model.sample_smooth(pt[0].pa.part[anc],
+                                                next_part=self.traj[1][0],
+                                                u=self.u[0],
+                                                t=self.t[0])[numpy.newaxis,]
+        
+        for _ in xrange(R):
+            
+            # Propose new ancestor indices
+            tmp = numpy.copy(pt[0].pa.w)
+            tmp -= numpy.max(tmp)
+            tmp = numpy.exp(tmp)
+            tmp = tmp / numpy.sum(tmp)
+            panc = pf.sample(tmp, M)
+         
+            (pprop, acc) = mc_step(model=self.model,
+                                   partp_prop=None,
+                                   partp_curr=None,
+                                   up=None,
+                                   tp=None,
+                                   curpart=self.traj[0][0],
+                                   y=self.y[t],
+                                   u=self.u[t],
+                                   t=self.t[t],
+                                   partn=self.traj[t+1][0])
+             
+            # Update with accepted proposals
+            self.traj[t][:1,acc] = pprop[acc][numpy.newaxis,]
+            ancanc[acc] = pt[t-1].ancestors[ancanc][acc]
+                                                                                                
+        self.traj = numpy.vstack(self.traj)
+         
+        if hasattr(self.model, 'post_smoothing'):
+            # Do e.g. constrained smoothing for RBPS models
+            self.straj = self.model.post_smoothing(self)
+        else:
+            self.straj = self.traj
     
     def perform_mhips_pass(self, pt, M, options):
         T = len(self.traj)
@@ -288,82 +366,10 @@ class SmoothTrajectory(object):
                 t=self.t[i]
                 partn=self.traj[i+1]
                 
-            
-            xprop = self.model.propose_smooth(partp=partp, 
-                                              up=up,
-                                              tp=tp,
-                                              y=y,
-                                              u=u,
-                                              t=t,
-                                              partn=partn)
-            
-            # Accept/reject new sample
-            logp_q_prop = self.model.logp_smooth(xprop,
-                                                 partp=partp, 
-                                                 up=up,
-                                                 tp=tp,
-                                                 y=y,
-                                                 u=u,
-                                                 t=t,
-                                                 partn=partn)
-            logp_q_curr = self.model.logp_smooth(self.traj[i],
-                                                 partp=partp, 
-                                                 up=up,
-                                                 tp=tp,
-                                                 y=y,
-                                                 u=u,
-                                                 t=t,
-                                                 partn=partn)
-            
-            
-            if (i > 0):
-                logp_prev_prop = self.model.next_pdf(particles=self.traj[i-1],
-                                                     next_part=xprop,
-                                                     u=self.u[i-1],
-                                                     t=self.t[i-1])
-                logp_prev_curr = self.model.next_pdf(particles=self.traj[i-1],
-                                                     next_part=self.traj[i],
-                                                     u=self.u[i-1],
-                                                     t=self.t[i-1])
-            else:
-                logp_prev_prop = numpy.zeros(M)
-                logp_prev_curr = numpy.zeros(M)
-                                         
-            if (self.y[i] != None):
-                logp_y_prop = self.model.measure(particles=numpy.copy(xprop),
-                                                 y=self.y[i],
-                                                 t=self.t[i])
-                                              
-                logp_y_curr = self.model.measure(particles=numpy.copy(self.traj[i]),
-                                                 y=self.y[i],
-                                                 t=self.t[i])
-            else:
-                logp_y_prop = numpy.zeros(M)
-                logp_y_curr = numpy.zeros(M)
-                
-            if (i < T-1):
-                logp_next_prop = self.model.next_pdf(particles=xprop,
-                                                     next_part=self.traj[i+1],
-                                                     u=self.u[i],
-                                                     t=self.t[i])
-                logp_next_curr = self.model.next_pdf(particles=self.traj[i],
-                                                     next_part=self.traj[i+1],
-                                                     u=self.u[i],
-                                                     t=self.t[i])
-            else:
-                logp_next_prop = numpy.zeros(M)
-                logp_next_curr = numpy.zeros(M)                                  
-        
- 
-            # Calc ratio
-            ratio = ((logp_prev_prop - logp_prev_curr) + 
-                     (logp_y_prop - logp_y_curr) +
-                     (logp_next_prop - logp_next_curr) +
-                     (logp_q_curr - logp_q_prop))
-            
-            test = numpy.log(numpy.random.uniform(size=M))
-            ind = test < ratio
-            self.traj[i][ind] = xprop[ind]
+            (prop, acc) = mc_step(model=self.model, partp_prop=partp, partp_curr=partp, up=up, tp=tp,
+                                  curpart=self.traj[i], y=y, u=u, t=t,
+                                  partn=partn)
+            self.traj[i][acc] = prop[acc]
             
     def perform_mhips_pass_reduced(self, pt, M, options):
         """ Runs MHIPS with the proposal density q and p(x_{t+1}|x_t) """
@@ -411,3 +417,79 @@ class SmoothTrajectory(object):
             ind = test < ratio
             self.traj[i][ind] = xprop[ind]
 
+
+def mc_step(model, partp_prop, partp_curr, up, tp, curpart, y, u, t, partn):
+    M = len(curpart)
+    xprop = model.propose_smooth(partp=partp_prop, 
+                                 up=up,
+                                 tp=tp,
+                                 y=y,
+                                 u=u,
+                                 t=t,
+                                 partn=partn)
+    
+    # Accept/reject new sample
+    logp_q_prop = model.logp_smooth(xprop,
+                                    partp=partp_prop, 
+                                    up=up,
+                                    tp=tp,
+                                    y=y,
+                                    u=u,
+                                    t=t,
+                                    partn=partn)
+    logp_q_curr = model.logp_smooth(curpart,
+                                    partp=partp_curr, 
+                                    up=up,
+                                    tp=tp,
+                                    y=y,
+                                    u=u,
+                                    t=t,
+                                    partn=partn)
+
+    
+    if (partp_prop != None and partp_curr != None):
+        logp_prev_prop = model.next_pdf(particles=partp_prop,
+                                        next_part=xprop,
+                                        u=up,
+                                        t=tp)
+        logp_prev_curr = model.next_pdf(particles=partp_curr,
+                                        next_part=curpart,
+                                        u=up,
+                                        t=tp)
+    else:
+        logp_prev_prop = numpy.zeros(M)
+        logp_prev_curr = numpy.zeros(M)
+                                 
+    if (y != None):
+        logp_y_prop = model.measure(particles=numpy.copy(xprop),
+                                    y=y, t=y)
+                                      
+        logp_y_curr = model.measure(particles=numpy.copy(curpart),
+                                    y=y, t=t)
+    else:
+        logp_y_prop = numpy.zeros(M)
+        logp_y_curr = numpy.zeros(M)
+        
+    if (partn != None):
+        logp_next_prop = model.next_pdf(particles=xprop,
+                                        next_part=partn,
+                                        u=u,
+                                        t=t)
+        logp_next_curr = model.next_pdf(particles=curpart,
+                                        next_part=partn,
+                                        u=u,
+                                        t=t)
+    else:
+        logp_next_prop = numpy.zeros(M)
+        logp_next_curr = numpy.zeros(M)                                  
+    
+    
+    # Calc ratio
+    ratio = ((logp_prev_prop - logp_prev_curr) + 
+             (logp_y_prop - logp_y_curr) +
+             (logp_next_prop - logp_next_curr) +
+             (logp_q_curr - logp_q_prop))
+    
+    test = numpy.log(numpy.random.uniform(size=M))
+    acc = test < ratio
+    return (xprop, acc)   
