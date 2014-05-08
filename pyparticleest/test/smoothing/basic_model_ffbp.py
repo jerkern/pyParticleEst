@@ -46,7 +46,7 @@ class Model(pyparticleest.models.nlg.NonlinearGaussianInitialGaussian):
 if __name__ == '__main__':
     steps = 80
     num = 40
-    M = 10
+    M = 20
     P0 = 1.0
     Q = 1.0
     R = numpy.asarray(((1.0,),))

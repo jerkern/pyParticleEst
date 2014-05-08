@@ -94,7 +94,7 @@ if __name__ == '__main__':
         rmse2_filt += numpy.sqrt(tmp/T)
         
         if (M > 0):
-            straj = traj.perform_smoothing(M, method='bp', smoother_options={'R': 50})
+            straj = traj.perform_smoothing(M, method='bp', smoother_options={'R': 20})
             est_smooth = numpy.mean(straj.traj,1)
         
             err = est_smooth -x

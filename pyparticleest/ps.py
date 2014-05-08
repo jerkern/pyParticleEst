@@ -254,81 +254,63 @@ class SmoothTrajectory(object):
         tmp -= numpy.max(tmp)
         tmp = numpy.exp(tmp)
         tmp = tmp / numpy.sum(tmp)
-        ind = pf.sample(tmp, M)
-        self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind],
-                                                 next_part=None,
-                                                 u=self.u[-1],
-                                                 t=self.t[-1])[numpy.newaxis,]
-         
-        anc = pt[-1].ancestors[ind]
-        ancanc = pt[-2].ancestors[anc]
-        
-        for t in reversed(xrange(1,T-1)):
-            
-            # Initialise with true ancestor
-            self.traj[t] = numpy.copy(self.model.sample_smooth(pt[t].pa.part[ind],
-                                                               self.traj[t+1][0],
-                                                               self.u[t],
-                                                               self.t[t]))[numpy.newaxis,]
+        anc = pf.sample(tmp, M)
  
-            # Propose new ancestors 
-            for _ in xrange(R):
-                
-                # Propose new ancestor indices
+        for t in reversed(xrange(T)):
+
+            # Initialise from filtered estimate
+            if (t < T-1):
+                self.traj[t] = numpy.copy(self.model.sample_smooth(pt[t].pa.part[anc],
+                                                                   self.traj[t+1][0],
+                                                                   self.u[t],
+                                                                   self.t[t]))[numpy.newaxis,]
+            else:
+                self.traj[t] = numpy.copy(self.model.sample_smooth(pt[t].pa.part[anc],
+                                                                   None,
+                                                                   self.u[t],
+                                                                   self.t[t]))[numpy.newaxis,]
+
+            if (t > 0):
+                anc = pt[t].ancestors[anc]
                 tmp = numpy.copy(pt[t-1].pa.w)
                 tmp -= numpy.max(tmp)
                 tmp = numpy.exp(tmp)
                 tmp = tmp / numpy.sum(tmp)
-                panc = pf.sample(tmp, M)
-             
+
+            for _ in xrange(R):
+
+                if (t > 0):
+                    # Propose new ancestors
+                    panc = pf.sample(tmp, M)
+                    partp_prop=pt[t-1].pa.part[panc]
+                    partp_curr=pt[t-1].pa.part[anc]
+                    up = self.u[t-1]
+                    tp=self.t[t-1]
+                else:
+                    partp_prop = None
+                    partp_curr = None
+                    up = None
+                    tp = None
+
+                if (t < T-1):
+                    partn = self.traj[t+1][0]
+                else:
+                    partn = None
+
                 (pprop, acc) = mc_step(model=self.model,
-                                       partp_prop=pt[t-1].pa.part[panc],
-                                       partp_curr=pt[t-1].pa.part[ancanc],
-                                       up=self.u[t-1],
-                                       tp=self.t[t-1],
+                                       partp_prop=partp_prop,
+                                       partp_curr=partp_curr,
+                                       up=up,
+                                       tp=tp,
                                        curpart=self.traj[t][0],
                                        y=self.y[t],
                                        u=self.u[t],
                                        t=self.t[t],
-                                       partn=self.traj[t+1][0])
+                                       partn=partn)
              
                 # Update with accepted proposals
                 self.traj[t][:1,acc] = pprop[acc][numpy.newaxis,]
-                ancanc[acc] = panc[acc]
-            anc = ancanc
-            ancanc = pt[t-1].ancestors[ancanc]
-            
-            
-        
-        # Propose new ancestors for t=0
-        self.traj[0] = self.model.sample_smooth(pt[0].pa.part[anc],
-                                                next_part=self.traj[1][0],
-                                                u=self.u[0],
-                                                t=self.t[0])[numpy.newaxis,]
-        
-        for _ in xrange(R):
-            
-            # Propose new ancestor indices
-            tmp = numpy.copy(pt[0].pa.w)
-            tmp -= numpy.max(tmp)
-            tmp = numpy.exp(tmp)
-            tmp = tmp / numpy.sum(tmp)
-            panc = pf.sample(tmp, M)
-         
-            (pprop, acc) = mc_step(model=self.model,
-                                   partp_prop=None,
-                                   partp_curr=None,
-                                   up=None,
-                                   tp=None,
-                                   curpart=self.traj[0][0],
-                                   y=self.y[0],
-                                   u=self.u[0],
-                                   t=self.t[0],
-                                   partn=self.traj[1][0])
-             
-            # Update with accepted proposals
-            self.traj[0][:1,acc] = pprop[acc][numpy.newaxis,]
-            ancanc[acc] = pt[0].ancestors[ancanc][acc]
+                anc[acc] = panc[acc]
                                                                                                 
         self.traj = numpy.vstack(self.traj)
          
