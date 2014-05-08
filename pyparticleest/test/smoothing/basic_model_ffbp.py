@@ -46,7 +46,7 @@ class Model(pyparticleest.models.nlg.NonlinearGaussianInitialGaussian):
 if __name__ == '__main__':
     steps = 80
     num = 40
-    M = 20
+    M = 10
     P0 = 1.0
     Q = 1.0
     R = numpy.asarray(((1.0,),))
@@ -59,6 +59,6 @@ if __name__ == '__main__':
         traj.forward(u=None, y=y[k])
     plt.plot(range(steps+1), x,'r-')
     plt.plot(range(1,steps+1), y, 'bx')
-    straj = traj.perform_smoothing(M, method='bp')
+    straj = traj.perform_smoothing(M, method='bp', smoother_options={'R': 50})
     plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
     plt.show()

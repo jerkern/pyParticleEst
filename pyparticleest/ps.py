@@ -321,14 +321,14 @@ class SmoothTrajectory(object):
                                    up=None,
                                    tp=None,
                                    curpart=self.traj[0][0],
-                                   y=self.y[t],
-                                   u=self.u[t],
-                                   t=self.t[t],
-                                   partn=self.traj[t+1][0])
+                                   y=self.y[0],
+                                   u=self.u[0],
+                                   t=self.t[0],
+                                   partn=self.traj[1][0])
              
             # Update with accepted proposals
-            self.traj[t][:1,acc] = pprop[acc][numpy.newaxis,]
-            ancanc[acc] = pt[t-1].ancestors[ancanc][acc]
+            self.traj[0][:1,acc] = pprop[acc][numpy.newaxis,]
+            ancanc[acc] = pt[0].ancestors[ancanc][acc]
                                                                                                 
         self.traj = numpy.vstack(self.traj)
          
