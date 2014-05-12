@@ -152,6 +152,7 @@ class SmoothTrajectory(object):
         self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind],
                                                  next_part=None,
                                                  u=pt[-1].u,
+                                                 y=pt[-1].y,
                                                  t=pt[-1].t)[numpy.newaxis,]
         ancestors = pt[-1].ancestors[ind]
         
@@ -166,6 +167,7 @@ class SmoothTrajectory(object):
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
                                                                      self.traj[cur_ind+1][0],
                                                                      step.u,
+                                                                     step.y,
                                                                      step.t))[numpy.newaxis,]
         
         self.traj = numpy.vstack(self.traj)
@@ -189,6 +191,7 @@ class SmoothTrajectory(object):
         self.traj[-1] = self.model.sample_smooth(pt[-1].pa.part[ind],
                                                  next_part=None,
                                                  u=pt[-1].u,
+                                                 y=pt[-1].y,
                                                  t=pt[-1].t)[numpy.newaxis,]
         
         opt = dict()
@@ -234,6 +237,7 @@ class SmoothTrajectory(object):
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
                                                                      self.traj[cur_ind+1][0],
                                                                      step.u,
+                                                                     step.y,
                                                                      step.t))[numpy.newaxis,]
        
         self.traj = numpy.vstack(self.traj)
@@ -263,11 +267,13 @@ class SmoothTrajectory(object):
                 self.traj[t] = numpy.copy(self.model.sample_smooth(pt[t].pa.part[anc],
                                                                    self.traj[t+1][0],
                                                                    self.u[t],
+                                                                   self.y[t],
                                                                    self.t[t]))[numpy.newaxis,]
             else:
                 self.traj[t] = numpy.copy(self.model.sample_smooth(pt[t].pa.part[anc],
                                                                    None,
                                                                    self.u[t],
+                                                                   self.y[t],
                                                                    self.t[t]))[numpy.newaxis,]
 
             if (t > 0):

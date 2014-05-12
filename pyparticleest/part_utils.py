@@ -65,7 +65,7 @@ class FFBSiInterface(ParticleFilteringInterface):
         pass
     
     @abc.abstractmethod
-    def sample_smooth(self, particles, next_part, u, t):
+    def sample_smooth(self, particles, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         pass
 

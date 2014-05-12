@@ -86,7 +86,7 @@ class HierarchicalBase(RBPSBase):
         #lpz = kalman.lognormpdf_jit(zl, mul, Pl)
         return lpxi + lpz
     
-    def sample_smooth(self, particles, next_part, u, t):
+    def sample_smooth(self, particles, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         M = len(particles)
         res = numpy.empty((M,self.len_xi+self.kf.lz,1))

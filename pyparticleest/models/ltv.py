@@ -107,7 +107,7 @@ class LTV(FFBSiInterface):
     def sample_process_noise(self, particles, u, t): 
         return None
     
-    def sample_smooth(self, particle, next_part, u, t):
+    def sample_smooth(self, particle, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         
         (zl, Pl) = self.get_states(particle)

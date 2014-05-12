@@ -185,6 +185,14 @@ class MixedNLGaussian(RBPSBase):
                 else:
                     Rchol = scipy.linalg.cho_factor(Rz[0])
                     lyz = kalman.lognormpdf_cho_vec(diff.reshape((-1,dim,1)), Rchol)
+            else:
+                if (Rz[0].shape[0] == 1):
+                    for i in xrange(len(zl)):
+                        lyz[i] = self.kf.measure_full_scalar(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
+                else:
+                    for i in xrange(len(zl)):
+                        lyz[i] = self.kf.measure_full(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
+        else:
             if (Rz[0].shape[0] == 1):
                 for i in xrange(len(zl)):
                     lyz[i] = self.kf.measure_full_scalar(y=y, z=zl[i], P=Pl[i], C=Cz[i], h_k=hz[i], R=Rz[i])
@@ -279,7 +287,7 @@ class MixedNLGaussian(RBPSBase):
         
         return lpx
     
-    def sample_smooth(self, particles, next_part, u, t):
+    def sample_smooth(self, particles, next_part, u, y, t):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         M = len(particles)
         res = numpy.zeros((M,self.lxi+2*(self.kf.lz + 2*self.kf.lz**2)))

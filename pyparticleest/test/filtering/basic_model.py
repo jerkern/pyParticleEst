@@ -51,7 +51,7 @@ class Model(pyparticleest.part_utils.ParticleFilteringInterface):
             logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1,1)-y, self.R)
         return logyprob
     
-    def sample_smooth(self, particles, next_part, u, t):
+    def sample_smooth(self, particles, next_part, u, y, t):
         return particles
 
 if __name__ == '__main__':

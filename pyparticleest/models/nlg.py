@@ -142,7 +142,7 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
         
         return lpx
             
-    def sample_smooth(self, particles, next_part, u, t):
+    def sample_smooth(self, particles, next_part, u, y, t):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         return particles
     

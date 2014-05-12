@@ -47,8 +47,8 @@ if __name__ == '__main__':
     
     
     data = scipy.io.loadmat("data/standard_nonlin_data0.mat")
-    N = 100
-    M = 20
+    N = 20
+    M = 4
     iter = 1000
     x = data['x'].T
     y = data['y'].T
@@ -94,7 +94,7 @@ if __name__ == '__main__':
         rmse2_filt += numpy.sqrt(tmp/T)
         
         if (M > 0):
-            straj = traj.perform_smoothing(M, method='bp', smoother_options={'R': 20})
+            straj = traj.perform_smoothing(M, method='rsas', smoother_options={'R': 20})
             est_smooth = numpy.mean(straj.traj,1)
         
             err = est_smooth -x

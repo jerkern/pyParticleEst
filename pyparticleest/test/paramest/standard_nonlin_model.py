@@ -83,7 +83,7 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterfa
         #return scipy.stats.norm.logpdf(0.0, 0.0, numpy.sqrt(self.Q))
         return lognormpdf(0.0, self.Q)
     
-    def sample_smooth(self, particles, next_part, u, t):
+    def sample_smooth(self, particles, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         return particles
     
