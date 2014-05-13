@@ -1,6 +1,6 @@
 import numpy
 import math
-import pyparticleest.models.mlnlg as mlnlg
+import pyparticleest.models.mlnlg2 as mlnlg
 import pyparticleest.pf as pf
 import matplotlib.pyplot as plt
 
@@ -56,7 +56,7 @@ class Model(mlnlg.MixedNLGaussianInitialGaussian):
     def get_meas_dynamics(self, particles, y, t):
             N = len(particles)
             tmp = numpy.vstack(particles)
-            h = tmp[:,0].tolist()
+            h = tmp[:,0].reshape(N,1,1)
             return (y, None, h, None)
    
     
@@ -100,8 +100,8 @@ if __name__ == '__main__':
             
         for j in xrange(nums):
             tmp = numpy.hstack(straj.traj[:,j])
-            xi = straj.traj[:,j,0]
-            z = straj.traj[:,j,1]
+            xi = straj.straj[:,j,0]
+            z = straj.straj[:,j,1]
             plt.plot(range(steps+1), xi,'r--')
             plt.plot(range(steps+1), z,'b--')
             

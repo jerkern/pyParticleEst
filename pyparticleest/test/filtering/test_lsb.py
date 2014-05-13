@@ -7,7 +7,7 @@ Created on Nov 11, 2013
 import numpy
 import math
 import matplotlib.pyplot as plt
-from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
+from pyparticleest.models.mlnlg2 import MixedNLGaussianInitialGaussian
 import pyparticleest.param_est as param_est
 import scipy.io
 import sys
@@ -102,10 +102,12 @@ class ParticleLSB(MixedNLGaussianInitialGaussian):
         return (Axi, fxi, None)
         
     def get_meas_dynamics(self, particles, y, t):
-        N = len(particles)
-        tmp = numpy.vstack(particles)
-        h = 0.05*tmp[:,0]**2
-        h = h[:,numpy.newaxis,numpy.newaxis]
+        if (y == None):
+            return (y, None, None, None)
+        else:
+            tmp = numpy.vstack(particles)
+            h = 0.05*tmp[:,0]**2
+            h = h[:,numpy.newaxis,numpy.newaxis]
         
         return (numpy.asarray(y).reshape((-1,1)), None, h, None)
 
@@ -288,14 +290,14 @@ if __name__ == '__main__':
         model = ParticleLSB()
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='rsas')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
 
         
         svals = numpy.zeros((2, nums, steps+1))
         vals = numpy.zeros((2, num, steps+1))
  
         for i in range(steps+1):
-            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.traj[i])
+            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i])
             svals[0,:,i] = numpy.vstack(xil).ravel()
             svals[1,:,i] = 25.0+C_theta.dot(numpy.hstack(zl)).ravel()
             (xil, zl, Pl) = model.get_states(ParamEstimator.pt.traj[i].pa.part)

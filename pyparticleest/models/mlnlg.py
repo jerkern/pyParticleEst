@@ -290,7 +290,7 @@ class MixedNLGaussian(RBPSBase):
     def sample_smooth(self, particles, next_part, u, y, t):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         M = len(particles)
-        res = numpy.zeros((M,self.lxi+2*(self.kf.lz + 2*self.kf.lz**2)))
+        res = numpy.zeros((M,self.lxi+self.kf.lz + 2*self.kf.lz**2))
         part = numpy.copy(particles)
         (xil, zl, Pl) = self.get_states(part)
         

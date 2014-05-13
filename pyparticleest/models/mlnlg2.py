@@ -8,7 +8,9 @@ pyximport.install(inplace=True)
 import pyparticleest.models.mlnlg_compute as mlnlg_compute
 import pyparticleest.kalman as kalman
 
-
+def factor_psd(A):
+    (U, s, V) = numpy.linalg.svd(A)
+    return U.dot(numpy.diag(numpy.sqrt(s)))
 
 class MixedNLGaussian(RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
@@ -20,7 +22,7 @@ class MixedNLGaussian(RBPSBase):
         
         # This implementation can't currently handle noise correlation between the
         # linear and non-linear dynamics
-        assert(Qxiz == None)
+        assert(Qxiz == None or numpy.count_nonzero(Qxiz) == 0)
         
         if (Axi != None):
             self.Axi = numpy.copy(Axi)
@@ -275,21 +277,23 @@ class MixedNLGaussian(RBPSBase):
         (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
         
         for j in xrange(M):
-            F = numpy.triu(scipy.linalg.cho_factor(Qz[j])[0])
+            F = factor_psd(Qz[j])
             m = LHnl[j] -OHnl[j].dot(fz[j])
             Mt =  F.T.dot(OHnl[j]).dot(F)+numpy.eye(lz)
             Tau_t = 0.0
             xidiff = xinl[j]-fxi[j]
             Tau_t += xidiff.T.dot(numpy.linalg.solve(Qxi[j], xidiff))
-            Tau_t += fz[j].T.dot(numpy.linalg.solve(OHnl[j], fz[j]))
+            Tau_t += fz[j].T.dot(OHnl[j]).dot(fz[j])
             Tau_t += -2.0*LHnl[j].T.dot(fz[j])
             tmp = F.T.dot(m)
             Tau_t += tmp.T.dot(numpy.linalg.solve(Mt, tmp))
             
-            Omega[j] = (Az[j].T.dot(OHnl[j]-OHnl[j].dot(F).dot(numpy.linalg.solve(Mt, F.T.dot(OHnl[j])))).dot(Az[j]) +
+            tmp = F.dot(numpy.linalg.solve(Mt, F.T))
+
+            Omega[j] = (Az[j].T.dot(OHnl[j]-OHnl[j].dot(tmp).dot(OHnl[j])).dot(Az[j]) +
                         Axi[j].T.dot(numpy.linalg.solve(Qxi[j], Axi[j])))
             
-            Lambda[j] = (Az[j].T.dot(numpy.eye(lz)-OHnl[j].dot(F.dot(numpy.linalg.solve(Mt, F.T)))).dot(m) +
+            Lambda[j] = (Az[j].T.dot(numpy.eye(lz)-OHnl[j].dot(tmp)).dot(m) +
                          Axi[j].T.dot(numpy.linalg.solve(Qxi[j], xidiff)))
             
             logZ[j] = -0.5*(numpy.linalg.slogdet(Mt)[1] + numpy.linalg.slogdet(Qxi[j])[1] + Tau_t)
@@ -304,12 +308,12 @@ class MixedNLGaussian(RBPSBase):
         (_, zl, Pl) = self.get_states(particles)
         
         for j in xrange(M):
-            Gamma = numpy.triu(scipy.linalg.cho_factor(Pl[j])[0])
+            Gamma = factor_psd(Pl[j])
             L[j] = Gamma.T.dot(Omega[j]).dot(Gamma) + numpy.eye(self.kf.lz)
             tmp = Gamma.T.dot(Lambda[j]-Omega[j].dot(zl[j]))
-            eta[j] = ( zl[j].T.dot(numpy.linalg.solve(Omega[j], zl[j])) -
+            eta[j] = ( zl[j].T.dot(Omega[j]).dot(zl[j]) -
                        2.0 * Lambda[j].T.dot(zl[j]) -
-                       tmp.T.dot(L[j]).dot(tmp) )
+                       tmp.T.dot(numpy.linalg.solve(L[j],tmp)) )
         return (eta, L)
                         
     
@@ -324,10 +328,10 @@ class MixedNLGaussian(RBPSBase):
         #(_, zl, Pl) = self.get_states(particles)
         
         (logZ, Omega, Lambda) = self.calc_prop1(particles, next_part, u, t)
-        (eta, L) = self.calc_prop3(particles, next_part, u, t)
+        (eta, L) = self.calc_prop3(particles, Omega, Lambda, u, t)
         
         for i in xrange(N):
-            lpx[i] = logZ[i] - 0.5*numpy.linalg.slogdet(L[i])[1] - 0.5*eta[i]
+            lpx[i] = logZ[i] - 0.5*(numpy.linalg.slogdet(L[i])[1] + eta[i])
 
         
         return lpx
@@ -337,10 +341,18 @@ class MixedNLGaussian(RBPSBase):
         M = len(particles)
         lxi = self.lxi
         lz = self.kf.lz
-        ly = len(y)
+
+        if (next_part != None):
+            (_, Omega, Lambda) = self.calc_prop1(particles, next_part, u, t)
+
         OHind = lxi
         OHlen = lz*lz
-        LHlen = lz*ly
+        if (y != None):
+            ly = len(y)
+            LHlen = lz*ly
+        else:
+            LHlen = lz*Lambda[0].shape[1]
+
         LHind = lxi+OHlen
         res = numpy.zeros((M,lxi + OHlen + LHlen))
         
@@ -349,15 +361,16 @@ class MixedNLGaussian(RBPSBase):
         res[:,:lxi] = particles[:, :lxi]
         
         if (next_part != None):
-            (_, Omega, Lambda) = self.calc_prop1(particles, next_part, u, t)
             for j in range(M):
                 res[j, OHind:OHind+OHlen] = Omega[j].ravel()
                 res[j, LHind:] = Lambda[j].ravel()
 
         for j in range(M):
-            tmp = numpy.linalg.solve(Rz[j], Cz[j])
-            res[j, OHind:OHind+OHlen] += (Cz[j].T.dot(tmp)).ravel()
-            res[j, LHind:] += (tmp.T.dot(y-hz[j])).ravel()
+            if (Cz != None and Cz[j] != None):
+                tmp = numpy.linalg.solve(Rz[j], Cz[j])
+                res[j, OHind:OHind+OHlen] += (Cz[j].T.dot(tmp)).ravel()
+            if (y != None):
+                res[j, LHind:] += (tmp.T.dot(y-hz[j])).ravel()
 
         return res
 #    def post_smoothing(self, st):

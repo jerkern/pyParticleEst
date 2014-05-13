@@ -166,11 +166,11 @@ class RBPFBase(ParticleFilteringInterface):
         hz_identical = False
         Rz_identical = False
         if (Cz == None):
-#            if (self.kf.C == None):
-#                Cz=N*(numpy.zeros((len(y), self.kf.lz)))
-#            else:
-#                Cz=N*(self.kf.C,)
-            Cz=N*(self.kf.C,)
+            if (self.kf.C == None and hz != None):
+                Cz=N*(numpy.zeros((len(hz[0]), self.kf.lz)),)
+            else:
+                Cz=N*(self.kf.C,)
+            #Cz=N*(self.kf.C,)
             Cz_identical = True
         if (hz == None):
             hz=N*(self.kf.h_k,)
@@ -207,6 +207,8 @@ class RBPSBase(RBPFBase, FFBSiInterface):
         M = st.traj.shape[1]
 
         particles = numpy.copy(st.traj[0])
+        lx = particles.shape[1]
+        straj = numpy.zeros((T,M, self.lxi+self.kf.lz+2*self.kf.lz**2))
         (xil, _zl, _Pl) = self.get_states(particles)
         (z0, P0) = self.get_rb_initial(xil)
         self.set_states(particles, xil, z0, P0)
@@ -216,20 +218,19 @@ class RBPSBase(RBPFBase, FFBSiInterface):
                 self.measure(particles, y=st.y[i], t=st.t[i])
             (xin, _zn, _Pn) = self.get_states(st.traj[i+1])
             #self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
-            st.traj[i] = particles
+            straj[i,:,:lx] = particles
 
-            particles = numpy.copy(particles)
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
             
         if (st.y[-1] != None):
             self.measure(particles, y=st.y[-1], t=st.t[-1])
         
-        st.traj[-1] = particles
+        straj[-1,:,:lx] = particles
         
         # Backward smoothing
         for i in reversed(xrange(T-1)):
-            (xin, zn, Pn) = self.get_states(st.traj[i+1])
-            particles = st.traj[i]
+            (xin, zn, Pn) = self.get_states(straj[i+1])
+            particles = straj[i]
             self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
             (xi, z, P) = self.get_states(particles)
             (Al, fl, Ql) = self.calc_cond_dynamics(particles, xin, u=st.u[i], t=st.t[i])
@@ -237,6 +238,7 @@ class RBPSBase(RBPFBase, FFBSiInterface):
                 
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
                                               Al[j], fl[j], Ql[j])
-                self.set_states(st.traj[i][j:j+1], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
-                self.set_Mz(st.traj[i][j:j+1], Ms[numpy.newaxis])
+                self.set_states(straj[i,j:j+1,:], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
+                self.set_Mz(straj[i,j:j+1,:], Ms[numpy.newaxis])
 
+        return straj
