@@ -7,9 +7,10 @@ Created on Nov 11, 2013
 import numpy
 import math
 import matplotlib.pyplot as plt
-from pyparticleest.models.mlnlg2 import MixedNLGaussianInitialGaussian
+from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 import pyparticleest.param_est as param_est
 import scipy.io
+import scipy.linalg
 import sys
 
 C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
@@ -144,7 +145,52 @@ class ParticleLSB_EKF(ParticleLSB):
         lyz = numpy.empty(N)
         l2pi = math.log(2*math.pi)
         for i in xrange(N):
-            lyz[i] = -0.5*(l2pi + logRext[0,0] + (diff[i].ravel()**2)/Rext[0,0])
+            lyz[i] = -0.5*(l2pi + logRext[i,0,0] + (diff[i].ravel()**2)/Rext[i,0,0])
+        return lyz
+
+class ParticleLSB_UKF(ParticleLSB):
+
+    def eval_1st_stage_weights(self, particles, u, y, t):
+        N = len(particles)
+        part = numpy.copy(particles)
+        #xin = self.pred_xi(part, u, t)
+
+        (Axi, fxi, _, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        (Az, fz, _, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u, t=t)
+        (_xil, zl, Pl) = self.get_states(particles)
+
+        Rext = numpy.empty(N)
+        diff = numpy.empty(N)
+
+        for i in xrange(N):
+            m = numpy.vstack((zl[i], numpy.zeros((6,1))))
+            K = scipy.linalg.block_diag(Pl[i], self.Qxi, self.kf.Q, self.kf.R)
+            Na = len(K)
+            (U,s,V) = numpy.linalg.svd(Na*K)
+            Kroot = U.dot(numpy.diag(numpy.sqrt(s)))
+
+            ypred = numpy.empty(2*Na)
+            # Some ugly hard-coding here of the function f and g
+            # g = 0.05*xi**2
+            for j in xrange(Na):
+                val = m + Kroot[:,j:j+1]
+                xin = fxi[i]+Axi[i].dot(val[:4])+val[4]
+                ypred[j] = 0.05*(xin)**2+val[9]
+
+                val = m - Kroot[:,j:j+1]
+                xin = fxi[i]+Axi[i].dot(val[:4])+val[4]
+                ypred[Na+j] = 0.05*(xin)**2+val[9]
+
+            # Construct estimate of covariance for predicted measurement
+            Rext[i] = numpy.cov(ypred)
+            diff[i] = y - numpy.mean(ypred)
+
+        logRext = numpy.log(Rext)
+
+        lyz = numpy.empty(N)
+        l2pi = math.log(2*math.pi)
+        for i in xrange(N):
+            lyz[i] = -0.5*(l2pi + logRext[i] + (diff[i].ravel()**2)/Rext[i])
         return lyz
 
 
@@ -227,16 +273,19 @@ if __name__ == '__main__':
             
             print "Running tests for %s" % mode
             
-            sims = 20000
+            sims = 50000
             part_count = (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
             filter = 'PF'
             model=ParticleLSB()
-            if (mode == 'EPF'):
+            if (mode.lower() == 'epf'):
                 model = ParticleLSB_EKF()
                 filter = 'APF'
-            elif (mode== 'APF'):
+            elif (mode.lower() == 'upf'):
+                model = ParticleLSB_UKF()
+                filter = 'APF'
+            elif (mode.lower() == 'apf'):
                 filter = 'APF'
             else:
                 pass
@@ -280,7 +329,7 @@ if __name__ == '__main__':
         plt.ion()
 
         # Create reference
-        #numpy.random.seed(1)
+        numpy.random.seed(1)
         #numpy.random.seed(86)
         (y, e, z) = generate_dataset(steps)
         # Store values for last time-step aswell    
@@ -290,7 +339,7 @@ if __name__ == '__main__':
         model = ParticleLSB()
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='full')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='mcmc')
 
         
         svals = numpy.zeros((2, nums, steps+1))
