@@ -7,7 +7,7 @@ Created on Nov 11, 2013
 import numpy
 import math
 import pyparticleest.test.paramest.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2
-import pyparticleest.paramest.param_est as param_est
+import pyparticleest.paramest.paramest as param_est
 
 if __name__ == '__main__':
     
