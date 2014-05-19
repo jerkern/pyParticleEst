@@ -79,18 +79,18 @@ class ParamEstimation(Simulator):
         return log_px0 + log_pxnext + log_py
        
     def eval_logp_x0(self):
-        M = self.straj.traj.shape[1]
-        logp_x0 = self.model.eval_logp_x0(self.straj.traj[0],
+        M = self.straj.straj.shape[1]
+        logp_x0 = self.model.eval_logp_x0(self.straj.straj[0],
                                           self.straj.t[0])
         return numpy.sum(logp_x0)/M
     
     def eval_logp_y(self, ind=None, traj_ind=None):
         logp_y = 0.0
-        M = self.straj.traj.shape[1]
+        M = self.straj.straj.shape[1]
         T = len(self.straj)
         for t in xrange(T):
             if (self.straj.y[t] != None):
-                val = self.model.eval_logp_y(self.straj.traj[t],
+                val = self.model.eval_logp_y(self.straj.straj[t],
                                              self.straj.y[t],
                                              self.straj.t[t])
                 logp_y += numpy.sum(val)
@@ -99,30 +99,30 @@ class ParamEstimation(Simulator):
     
     def eval_logp_xnext(self, ind=None, traj_ind=None):
         logp_xnext = 0.0
-        M = self.straj.traj.shape[1]
+        M = self.straj.straj.shape[1]
         T = len(self.straj)
         for t in xrange(T-1):
-            val = self.model.eval_logp_xnext(self.straj.traj[t],
-                                             self.straj.traj[t+1],
+            val = self.model.eval_logp_xnext(self.straj.straj[t],
+                                             self.straj.straj[t+1],
                                              self.straj.u[t],
                                              self.straj.t[t])
             logp_xnext += numpy.sum(val)
         return logp_xnext/M
     
     def eval_logp_x0_val_grad(self):
-        M = self.straj.traj.shape[1]
-        (logp_x0, logp_x0_grad) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
+        M = self.straj.straj.shape[1]
+        (logp_x0, logp_x0_grad) = self.model.eval_logp_x0_val_grad(self.straj.straj[0],
                                                                    self.straj.t[0])
         return (logp_x0/M, logp_x0_grad/M)
     
     def eval_logp_y_val_grad(self, ind=None, traj_ind=None):
         logp_y_grad = numpy.zeros((len(self.model.params)))
         logp_y = 0.0
-        M = self.straj.traj.shape[1]
+        M = self.straj.straj.shape[1]
         T = len(self.straj)
         for t in xrange(T):
             if (self.straj.y[t] != None):
-                (val, grad) = self.model.eval_logp_y_val_grad(self.straj.traj[t],
+                (val, grad) = self.model.eval_logp_y_val_grad(self.straj.straj[t],
                                                               self.straj.y[t],
                                                               self.straj.t[t])
                 logp_y += val
@@ -132,11 +132,11 @@ class ParamEstimation(Simulator):
     def eval_logp_xnext_val_grad(self, ind=None, traj_ind=None):
         logp_xnext_grad = numpy.zeros((len(self.model.params)))
         logp_xnext = 0.0
-        M = self.straj.traj.shape[1]
+        M = self.straj.straj.shape[1]
         T = len(self.straj)
         for t in xrange(T-1):
-            (val, grad) = self.model.eval_logp_xnext_val_grad(self.straj.traj[t],
-                                                              self.straj.traj[t+1],
+            (val, grad) = self.model.eval_logp_xnext_val_grad(self.straj.straj[t],
+                                                              self.straj.straj[t+1],
                                                               self.straj.u[t],
                                                               self.straj.t[t])
             logp_xnext += val

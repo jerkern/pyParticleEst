@@ -761,10 +761,10 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
             respect to the corresponding parameter"""    
             
         N = len(xil)
-        res = numpy.empty(N)
+        res = 0.0
         Pchol = scipy.linalg.cho_factor(self.Pxi0, check_finite=False)
         for i in xrange(N):
-            res[i] = kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
+            res += kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
         return res
     
     def get_xi_intitial_grad(self, N):
