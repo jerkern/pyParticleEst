@@ -1,120 +1,12 @@
 """ Parameter estimation methods"""
-import abc
-import pyparticleest.pf as pf
+from pyparticleest.pyparticleest import Simulator
 import numpy
 import scipy.optimize
 import matplotlib.pyplot as plt
 
-class ParamEstInterface(object):
-    """ Interface s for particles to be used with the parameter estimation
-        algorithm presented in [1]
-        [1] - 'System identification of nonlinear state-space models' by 
-              Schon, Wills and Ninness """
-    __metaclass__ = abc.ABCMeta
 
-    @abc.abstractmethod
-    def set_params(self, params):
-        """ New set of parameters for which the integral approximation terms will be evaluated"""
-        pass
-
-    @abc.abstractmethod
-    def eval_logp_x0(self, particles, t):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pass
+class ParamEstimation(Simulator):
     
-    @abc.abstractmethod
-    def eval_logp_xnext(self, particles, particles_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pass
-    
-    @abc.abstractmethod    
-    def eval_logp_y(self, particles, y, t):
-        """ Calculate gradient of a term of the I3 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pass
-    
-
-    
-class ParamEstInterface_GradientSearch(ParamEstInterface):
-    """ Interface s for particles to be used with the parameter estimation
-        algorithm presented in [1]
-        [1] - 'System identification of nonlinear state-space models' by 
-              Schon, Wills and Ninness """
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
-    def eval_logp_x0_val_grad(self, particles):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pass
-
-    @abc.abstractmethod
-    def eval_logp_xnext_val_grad(self, particles, particles_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pass
-    
-    @abc.abstractmethod    
-    def eval_logp_y_val_grad(self, particles, y, t):
-        """ Calculate gradient of a term of the I3 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pass
-    
-
-class ParamEstimation(object):
-    __metaclass__ = abc.ABCMeta
-    
-    def __init__(self, model, u, y):
-        
-        if (u != None):
-            self.u = u
-        else:
-            self.u = [None] * len(y)
-        self.y = y
-        self.pt = None
-        self.straj = None
-        self.params = None
-        self.model = model
-    
-    def set_params(self, params):
-        self.params = numpy.copy(params)
-        self.model.set_params(self.params)
-    
-    def simulate(self, num_part, num_traj, filter='PF', smoother='full', smoother_options=None, res=0.67, meas_first=False):
-        resamplings=0
-    
-        # Initialise a particle filter with our particle approximation of the initial state,
-        # set the resampling threshold to 0.67 (effective particles / total particles )
-        self.pt = pf.ParticleTrajectory(self.model, num_part, res,filter=filter)
-        
-        offset = 0
-        # Run particle filter
-        if (meas_first):
-            self.pt.measure(self.y[0])
-            offset = 1
-        for i in range(offset,len(self.y)):
-            # Run PF using noise corrupted input signal
-            if (self.pt.forward(self.u[i-offset], self.y[i])):
-                resamplings = resamplings + 1
-            
-        # Use the filtered estimates above to created smoothed estimates
-        self.straj = self.pt.perform_smoothing(num_traj, method=smoother, smoother_options=smoother_options)
-        return resamplings
-            
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001, 
                  callback=None, callback_sim=None, bounds=None, meas_first=False,
                  smoother='full', smoother_options=None, analytic_gradient=False):

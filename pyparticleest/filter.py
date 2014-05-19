@@ -194,7 +194,7 @@ class ParticleTrajectory(object):
     def perform_smoothing(self, M, method="full", smoother_options=None):
         """ return an array of smoothed trajectories 
             M - number of smoothed trajectories """
-        from pyparticleest.ps import SmoothTrajectory
+        from smoother import SmoothTrajectory
         
         # Calculate coefficients needed for rejection sampling in the backward smoothing
 #        if (rej_sampling):

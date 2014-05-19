@@ -1,16 +1,13 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
-import pyparticleest.part_utils as part_utils
+import pyparticleest.interfaces as interfaces
 import scipy.linalg
 import numpy.random
 import math
 import abc
-import pyximport
-pyximport.install(inplace=True)
-import pyparticleest.models.mlnlg_compute as mlnlg_compute
-import pyparticleest.kalman as kalman
+import pyparticleest.utils.kalman as kalman
 from exceptions import ValueError
 
-class NonlinearGaussian(part_utils.FFBSiRSInterface):
+class NonlinearGaussian(interfaces.FFBSiRS):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
         Implement this type of system by extending this class and provide the methods for returning 
@@ -103,7 +100,6 @@ class NonlinearGaussian(part_utils.FFBSiRSInterface):
     def next_pdf_max(self, particles, u, t):
         Q = self.get_Q(particles, u, t)
         dim=self.lxi
-        zeros = numpy.zeros((dim,1))
         l2pi = math.log(2*math.pi)
         if (Q == None):
             return self.logpdfmax

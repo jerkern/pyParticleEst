@@ -3,7 +3,7 @@
 import numpy
 import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.paramest as param_est
 
 gradient_test = True
 
@@ -48,7 +48,7 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianInitialGaussian):
         self.params = numpy.copy(params)
         
         xi0 = numpy.asarray(((params[0],),))
-        z0 = numpy.asarray(((-params[0],),))
+        z0 = 0.0*numpy.asarray(((-params[0],),))
         Pxi0 = P0[0,0].reshape((1,1))
         Pz0 = P0[1,1].reshape((1,1))
         Qxi = Q[0,0].reshape((1,1))
@@ -84,19 +84,19 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianInitialGaussian):
         """ New set of parameters """
         self.params = numpy.copy(params)
         self.xi0 = numpy.asarray(((params[0],),))
-        self.z0 = numpy.asarray(((-params[0],),))
+        self.z0 = 0.0*numpy.asarray(((-params[0],),))
         
     def get_rb_initial_grad(self, xi0):
         """ Default implementation has no dependence on xi, override if needed """
         N = len(xi0)
-        z0_grad = numpy.asarray(((-1.0,),))
-        Pz0_grad = numpy.zeros((len(self.params), self.lxi, self.lxi))
+        z0_grad = 0.0*numpy.asarray(((-1.0,),))
+        Pz0_grad = numpy.zeros((len(self.params), self.kf.lz, self.kf.lz))
 
         return (numpy.repeat(z0_grad[numpy.newaxis], N, 0),
                 numpy.repeat(Pz0_grad[numpy.newaxis], N, 0))
         
     def get_xi_intitial_grad(self, N):
-        xi0_grad = numpy.asarray(((-1.0,),))
+        xi0_grad = numpy.asarray(((1.0,),))
         Pxi0_grad = numpy.zeros((len(self.params), self.lxi, self.lxi))
 
         return (numpy.repeat(xi0_grad[numpy.newaxis], N, 0),
@@ -137,8 +137,8 @@ if __name__ == '__main__':
     
         plt.draw()
         plt.ioff()
-        gt.plot_y.plot(2)
-        gt.plot_xn.plot(3)
+        #gt.plot_y.plot(2)
+        #gt.plot_xn.plot(3)
         gt.plot_x0.plot(4)
         plt.show()
         

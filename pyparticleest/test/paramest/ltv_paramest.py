@@ -1,6 +1,6 @@
 import numpy
 import pyparticleest.models.ltv
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.param_est as param_est
 import matplotlib.pyplot as plt
 
 ka1_ind = 0

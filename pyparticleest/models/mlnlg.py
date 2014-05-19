@@ -1,12 +1,12 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
-from pyparticleest.part_utils import RBPSBase
+from pyparticleest.models.rbpf import RBPSBase
 import scipy.linalg
 import numpy.random
 import math
 import pyximport
 pyximport.install(inplace=True)
 import pyparticleest.models.mlnlg_compute as mlnlg_compute
-import pyparticleest.kalman as kalman
+import pyparticleest.utils.kalman as kalman
 
 
 

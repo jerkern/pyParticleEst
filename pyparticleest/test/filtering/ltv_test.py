@@ -1,7 +1,6 @@
 import numpy
 import math
-import pyparticleest.part_utils
-import pyparticleest.pf as pf
+import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
 from pyparticleest.models.ltv import LTV
 

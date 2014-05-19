@@ -3,7 +3,7 @@
 import numpy
 import math
 import copy
-import pyparticleest.pf as pf
+import filter as pf
 
 def bsi_full(pa, model, next, u, t):
     M = len(next)

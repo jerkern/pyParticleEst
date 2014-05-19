@@ -1,7 +1,6 @@
 import numpy
-import math
 import pyparticleest.models.mlnlg as mlnlg
-import pyparticleest.pf as pf
+import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
 
 def generate_dataset(steps, P0_xi, P0_z, Qxi, Qz, Qxiz, R):
@@ -49,7 +48,6 @@ class Model(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
                                     Qz=Q_z, R=R)
         
     def get_nonlin_pred_dynamics(self, particles, u, t):
-            N = len(particles)
             tmp = numpy.vstack(particles)
             fxi = tmp[:,0].tolist()
             return (None, fxi, None)

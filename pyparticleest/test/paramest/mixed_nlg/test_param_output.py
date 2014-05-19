@@ -3,9 +3,9 @@
 import numpy
 import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.paramest as param_est
 
-gradient_test = False
+gradient_test = True
 
 x0 = numpy.array([[1.0,], [1.0,]])
 P0 = numpy.eye(2)
@@ -158,8 +158,8 @@ if __name__ == '__main__':
             pe = param_est.ParamEstimation(model, u=u, y=y)
             pe.set_params(numpy.array((theta_guess,)).reshape((-1,1)))
             
-            params_it = numpy.zeros((max_iter))
-            Q_it = numpy.zeros((max_iter))
+            params_it = numpy.zeros((max_iter+1))
+            Q_it = numpy.zeros((max_iter+1))
             it = 0
             def callback(params, Q):
                 global it

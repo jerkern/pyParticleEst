@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import numpy
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.param_est as param_est
 
 import matplotlib.pyplot as plt
 from pyparticleest.models.ltv import LTV

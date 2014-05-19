@@ -1,15 +1,9 @@
 import numpy
 import math
-import pyximport
-pyximport.install(inplace=True)
-import pyparticleest.kalman as kalman
 from  pyparticleest.models.nlg import NonlinearGaussianInitialGaussian as NonlinearGaussianInitialGaussian
-import pyparticleest.pf as pf
-import pyparticleest.param_est as param_est
-import matplotlib.pyplot as plt
-import scipy.stats
+import pyparticleest.filter as pf
+#import matplotlib.pyplot as plt
 import scipy.io
-import pyparticleest.part_utils
 
 
 def generate_dataset(steps, P0, Q, R):
@@ -49,7 +43,7 @@ if __name__ == '__main__':
     data = scipy.io.loadmat("data/standard_nonlin_data0.mat")
     N = 20
     M = 4
-    iter = 1000
+    iterations = 1000
     x = data['x'].T
     y = data['y'].T
     T = len(y)
@@ -69,7 +63,7 @@ if __name__ == '__main__':
     rmse_smooth = 0.0
     rmse2_filt = 0.0
     rmse2_smooth = 0.0
-    for it in xrange(iter):
+    for it in xrange(iterations):
         
 #        plt.clf()    
 #        plt.plot(range(T), x, 'r-')
@@ -111,9 +105,9 @@ if __name__ == '__main__':
 #        
 #        plt.draw()
 #        plt.show()
-    print "rmse filter = %f" % (rmse_filt / iter)
-    print "rmse smooth = %f" % (rmse_smooth / iter)
-    print "rmse2 filter = %f" % (rmse2_filt / iter)
-    print "rmse2 smooth = %f" % (rmse2_smooth / iter)
+    print "rmse filter = %f" % (rmse_filt / iterations)
+    print "rmse smooth = %f" % (rmse_smooth / iterations)
+    print "rmse2 filter = %f" % (rmse2_filt / iterations)
+    print "rmse2 smooth = %f" % (rmse2_smooth / iterations)
     
     

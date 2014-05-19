@@ -1,8 +1,8 @@
 import numpy
 import math
 from pyparticleest.models.hierarchial import HierarchicalRSBase
-import pyparticleest.pf as pf
-import pyparticleest.kalman as kalman
+import pyparticleest.filter as pf
+import pyparticleest.utils.kalman as kalman
 import matplotlib.pyplot as plt
 import scipy.stats
 

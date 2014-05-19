@@ -2,9 +2,9 @@ import numpy
 import math
 import pyximport
 pyximport.install(inplace=True)
-import pyparticleest.kalman as kalman
-import pyparticleest.part_utils
-import pyparticleest.pf as pf
+import pyparticleest.utils.kalman as kalman
+import pyparticleest.interfaces as interfaces
+import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
 
 def generate_dataset(steps, P0, Q, R):
@@ -22,7 +22,7 @@ def wmean(logw, val):
     w = w / sum(w)
     return numpy.sum(w*val.ravel())
 
-class Model(pyparticleest.part_utils.ParticleFilteringInterface):
+class Model(interfaces.ParticleFiltering):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import numpy
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.paramest as param_est
 from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 import matplotlib.pyplot as plt
 

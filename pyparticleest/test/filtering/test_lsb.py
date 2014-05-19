@@ -8,7 +8,7 @@ import numpy
 import math
 import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.paramest as param_est
 import scipy.io
 import scipy.linalg
 import sys

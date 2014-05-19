@@ -1,13 +1,13 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
-from pyparticleest.part_utils import FFBSiInterface
+from pyparticleest.interfaces import FFBSi
 import pyximport
 pyximport.install(inplace=True)
 import pyparticleest.models.mlnlg_compute as mlnlg_compute
-import pyparticleest.kalman as kalman
+import pyparticleest.utils.kalman as kalman
 import numpy
 import scipy.linalg
 
-class LTV(FFBSiInterface):
+class LTV(FFBSi):
     """ Base class for particles of the type linear time varying with additive gaussian noise.
 
         Implement this type of system by extending this class and provide the methods for returning 

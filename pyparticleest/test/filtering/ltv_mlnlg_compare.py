@@ -1,8 +1,8 @@
 import numpy
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.paramest as param_est
 from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 from pyparticleest.models.ltv import LTV
-import pyparticleest.pf as pf
+import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
 
 #R = numpy.array([[0.01]])

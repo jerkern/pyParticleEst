@@ -4,7 +4,7 @@ Created on Nov 11, 2013
 @author: ajn
 '''
 
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.param_est as param_est
 import numpy
 import math
 import pyparticleest.test.paramest.mixed_nlg.lindstenschon2.particle_ls2 as particle_ls2

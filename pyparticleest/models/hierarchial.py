@@ -1,7 +1,8 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
 import abc
-import pyparticleest.kalman as kalman
-from pyparticleest.part_utils import RBPSBase, FFBSiRSInterface
+import pyparticleest.utils.kalman as kalman
+from pyparticleest.interfaces import FFBSiRS
+from pyparticleest.models.rbpf import RBPSBase
 import numpy
 import copy
 import math
@@ -179,7 +180,7 @@ class HierarchicalBase(RBPSBase):
                 
         return straj
     
-class HierarchicalRSBase(HierarchicalBase,FFBSiRSInterface):
+class HierarchicalRSBase(HierarchicalBase,FFBSiRS):
     def __init__(self, **kwargs):
         super(HierarchicalRSBase, self).__init__(**kwargs)
         

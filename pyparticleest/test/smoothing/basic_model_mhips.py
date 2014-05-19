@@ -1,11 +1,6 @@
 import numpy
-import math
-import pyximport
-pyximport.install(inplace=True)
-import pyparticleest.kalman as kalman
-import pyparticleest.part_utils
 import pyparticleest.models.nlg
-import pyparticleest.pf as pf
+import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
 import time
 

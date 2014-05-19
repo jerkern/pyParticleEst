@@ -1,10 +1,8 @@
 import numpy
 import math
-import pyparticleest.kalman as kalman
 import pyparticleest.models.nlg
-import pyparticleest.pf as pf
+import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
-import scipy.linalg
 
 def generate_dataset(steps, P0, Q, R):
     x = numpy.zeros((steps+1,))

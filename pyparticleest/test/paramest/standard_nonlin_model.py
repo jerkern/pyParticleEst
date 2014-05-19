@@ -5,7 +5,7 @@ pyximport.install(inplace=True)
 import pyparticleest.kalman as kalman
 import pyparticleest.part_utils
 import pyparticleest.pf as pf
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.param_est as param_est
 import matplotlib.pyplot as plt
 import scipy.stats
 

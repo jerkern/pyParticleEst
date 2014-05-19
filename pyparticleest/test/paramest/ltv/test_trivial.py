@@ -4,7 +4,7 @@ Created on Nov 29, 2013
 @author: ajn
 '''
 
-import pyparticleest.param_est as param_est
+import pyparticleest.paramest.param_est as param_est
 import numpy
 import math
 import matplotlib.pyplot as plt
