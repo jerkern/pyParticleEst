@@ -449,12 +449,6 @@ class MixedNLGaussian(RBPSBase):
             if another behavior is desired """
         return numpy.zeros(self.params.shape)
 
-
-    def calc_l1(self, z, P, z0, P0):
-        z0_diff = z - z0
-        l1 = z0_diff.dot(z0_diff.T) + P
-        return l1
-        
     def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
@@ -468,7 +462,8 @@ class MixedNLGaussian(RBPSBase):
         lpxi0 = self.eval_logp_xi0(xil)
         lpz0 = 0.0
         for i in xrange(N):
-            l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
+            z0_diff = zl[i]-z0[i]
+            l1 = z0_diff.dot(z0_diff.T) + Pl[i]
             P0cho = scipy.linalg.cho_factor(P0[i], check_finite=False)
             #(_tmp, ld) = numpy.linalg.slogdet(P0[i])
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0])))*2
@@ -488,7 +483,8 @@ class MixedNLGaussian(RBPSBase):
         lpxi0_grad = self.eval_logp_xi0_grad(xil)
         lpz0 = 0.0
         for i in xrange(N):
-            l1 = self.calc_l1(zl[i], Pl[i], z0[i], P0[i])
+            z0_diff = zl[i]-z0[i]
+            l1 = z0_diff.dot(z0_diff.T) + Pl[i]
             P0cho = scipy.linalg.cho_factor(P0[i], check_finite=False)
             #(_tmp, ld) = numpy.linalg.slogdet(P0[i])
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0])))*2
@@ -497,7 +493,7 @@ class MixedNLGaussian(RBPSBase):
         
             # Calculate gradient
             for j in range(len(self.params)):
-                tmp = z0_grad[i][j].dot((zl[i]-z0[i]).T)
+                tmp = z0_diff.dot(z0_grad[i][j].T)
                 dl1 = -tmp -tmp.T
                 lpz0_grad[j] -= 0.5*mlnlg_compute.compute_logprod_derivative(P0cho, P0_grad[i][j], l1, dl1)
                 
@@ -786,7 +782,7 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
             l0 = tmp.dot(tmp.T)
             for j in range(len(self.params)):
                 tmp2 = tmp.dot(xi0_grad[i][j].T)
-                l0_grad = tmp2 + tmp2.T
+                l0_grad = -tmp2 - tmp2.T
                 lpxi0_grad[j] -= 0.5*mlnlg_compute.compute_logprod_derivative(Pxi0cho, Pxi0_grad[i][j], l0, l0_grad)
                 
         return lpxi0_grad

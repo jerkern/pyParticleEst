@@ -47,8 +47,8 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianInitialGaussian):
         
         self.params = numpy.copy(params)
         
-        xi0 = numpy.asarray(((params[0],),))
-        z0 = 0.0*numpy.asarray(((-params[0],),))
+        xi0 = 0.0*numpy.asarray(((params[0],),))
+        z0 = 1.0*numpy.asarray(((-params[0],),))
         Pxi0 = P0[0,0].reshape((1,1))
         Pz0 = P0[1,1].reshape((1,1))
         Qxi = Q[0,0].reshape((1,1))
@@ -83,20 +83,20 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianInitialGaussian):
     def set_params(self, params):
         """ New set of parameters """
         self.params = numpy.copy(params)
-        self.xi0 = numpy.asarray(((params[0],),))
-        self.z0 = 0.0*numpy.asarray(((-params[0],),))
+        self.xi0 = 0.0*numpy.asarray(((params[0],),))
+        self.z0 = 1.0*numpy.asarray(((-params[0],),))
         
     def get_rb_initial_grad(self, xi0):
         """ Default implementation has no dependence on xi, override if needed """
         N = len(xi0)
-        z0_grad = 0.0*numpy.asarray(((-1.0,),))
+        z0_grad = 1.0*numpy.asarray(((-1.0,),))
         Pz0_grad = numpy.zeros((len(self.params), self.kf.lz, self.kf.lz))
 
         return (numpy.repeat(z0_grad[numpy.newaxis], N, 0),
                 numpy.repeat(Pz0_grad[numpy.newaxis], N, 0))
         
     def get_xi_intitial_grad(self, N):
-        xi0_grad = numpy.asarray(((1.0,),))
+        xi0_grad = 0.0*numpy.asarray(((1.0,),))
         Pxi0_grad = numpy.zeros((len(self.params), self.lxi, self.lxi))
 
         return (numpy.repeat(xi0_grad[numpy.newaxis], N, 0),
