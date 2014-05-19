@@ -46,7 +46,8 @@ if __name__ == '__main__':
         #ParamEstimator.simulate(num, nums, False)
 
         (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                             callback=None, analytic_gradient=True)
+                                             callback=None, smoother='rsas',
+                                             analytic_gradient=True, tol=0.0)
         
         print "%.4f %.4f %.4f %.4f %.4f" % tuple(param)
         
