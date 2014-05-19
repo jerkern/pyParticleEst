@@ -1,6 +1,6 @@
 import numpy
 import math
-import pyparticleest.models.mlnlg2 as mlnlg
+import pyparticleest.models.mlnlg as mlnlg
 import pyparticleest.pf as pf
 import matplotlib.pyplot as plt
 
@@ -27,7 +27,8 @@ def wmean(logw, val):
     w.reshape((1,-1))
     return w.dot(val)
 
-class Model(mlnlg.MixedNLGaussianInitialGaussian):
+#class Model(mlnlg.MixedNLGaussianInitialGaussian):
+class Model(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
     """ xi_{k+1} = xi_k + z_k + v_xi_k, v_xi ~ N(0,Q_xi)
         z_{k+1} = z_{k} + v_z, v_z_k ~ N(0, Q_z) 
         y_k = xi_k + +z_k + e_k, e_k ~ N(0,R_z),

@@ -7,7 +7,7 @@ Created on Nov 11, 2013
 import numpy
 import math
 import matplotlib.pyplot as plt
-from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
+import pyparticleest.models.mlnlg as mlnlg
 import pyparticleest.param_est as param_est
 import scipy.io
 import scipy.linalg
@@ -65,7 +65,7 @@ def generate_dataset(length):
     
     return (y.T.tolist(), e_vec, z_vec)    
 
-class ParticleLSB(MixedNLGaussianInitialGaussian):
+class ParticleLSB(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self):
         """ Define all model variables """
