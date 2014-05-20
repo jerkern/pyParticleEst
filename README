@@ -1,13 +1,30 @@
-This is a library to assist with calculations for estimation problems using particle based methods, 
-especially Rao-Blackwellized Particle Filter and Smoothing.
+This is a library to assist with calculations for estimation problems using 
+particle based methods, it contains a number of algorithms such as the 
+Particle Filter, Auxiliary Particle Filter and support several variants of
+Particle Smoothing through the use of Backwars Simulation techniques but
+also methods such as Metropolis-Hastings Backward Proposer and Metropolis-
+Hastings Improved Particle Smoother.
 
-It is currently under development being broken out from an existing application.
+It also provides a framework for doing parameter estimation in nonlinear
+models using Expectation Maximization combined with the particle smoothing
+algorithms presented above.
 
-Currently there is no documentation other than the fairly well commented "test/simple_test.py" example.
+The structure is based on presenting a number of interfaces that a problem
+specific class must implement in order to use the algorithms. To assisst the
+end user base classes for common model structures, such as 
+Mixed Linear/Nonlinear Gaussian models are provided to keep the implementation
+effor to a minimum.
+
+The idea is to provide an easy prototyping enviroment for testing different
+algorithms and models formulations when solving a problem and act as a stepping
+stone for a later more performance oriented problem specific implementation by
+the end user.
+
+At the moment the main source of documentation are the examples/testcases which
+are found under the test/ directory
 
 Structure:
 models/ - This subdirectory contains helper classes for common models, e.g Mixed Linear/Non-linear Gaussian models.
-
 test/ - This subdirectory contains test cases/examples 
 
 Project homepage:
