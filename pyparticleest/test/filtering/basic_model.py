@@ -1,5 +1,4 @@
 import numpy
-import math
 import pyximport
 pyximport.install(inplace=True)
 import pyparticleest.utils.kalman as kalman

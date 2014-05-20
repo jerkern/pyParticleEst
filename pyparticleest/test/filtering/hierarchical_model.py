@@ -94,7 +94,6 @@ class Model(HierarchicalRSBase):
     def measure_nonlin(self, particles, y, t):
         N = len(particles)
         lpy = numpy.empty((N,))
-        m = numpy.zeros((1,1))
         for i in xrange(N):
             lpy[i] = kalman.lognormpdf(y[0]-particles[i][0], self.R_xi)
         return lpy
@@ -147,15 +146,7 @@ class Model(HierarchicalRSBase):
             Must return two variables, the first a list containing all the
             expected values, the second a list of the corresponding covariance
             matrices"""
-        N = len(particles)
-        # This seems to create a bug!!!
-#        xil = numpy.empty((N,1,1))
-#        zl = numpy.empty((N,2,1))
-#        Pl = numpy.empty((N,2,2))
-#        for i in xrange(N):
-#            xil[i] = particles[i][0:1].reshape(-1,1)
-#            zl[i] = particles[i][1:3].reshape(-1,1)
-#            Pl[i] = particles[i][3:].reshape(2,2)
+
         xil = list()
         zl = list()
         Pl = list()

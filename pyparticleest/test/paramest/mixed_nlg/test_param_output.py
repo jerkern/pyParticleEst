@@ -82,7 +82,6 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianInitialGaussian):
         self.params = numpy.copy(params)
         
     def get_meas_dynamics_grad(self, particles, y, t):
-        xil = particles[:,0]
         h_grad = particles[:,numpy.newaxis,0:1]
         return (None, h_grad, None)
     

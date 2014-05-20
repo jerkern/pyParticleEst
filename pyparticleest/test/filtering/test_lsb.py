@@ -92,7 +92,6 @@ class ParticleLSB(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
                                          Qxi=Qxi, Qz=Qz,)
    
     def get_nonlin_pred_dynamics(self, particles, u, t):
-        N = len(particles)
         C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
         tmp = numpy.vstack(particles)[:,numpy.newaxis,:]
         xi = tmp[:,:,0]
@@ -116,8 +115,8 @@ class ParticleLSB_EKF(ParticleLSB):
 
     def calc_Sigma_xi(self, particles, u, t): 
         """ Return sampled process noise for the non-linear states """
-        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
-        (_xil, zl, Pl) = self.get_states(particles)
+        (Axi, _fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        (_xil, _zl, Pl) = self.get_states(particles)
         N = len(particles)
                     
         Sigma = numpy.zeros((N, self.lxi, self.lxi))
@@ -152,11 +151,9 @@ class ParticleLSB_UKF(ParticleLSB):
 
     def eval_1st_stage_weights(self, particles, u, y, t):
         N = len(particles)
-        part = numpy.copy(particles)
         #xin = self.pred_xi(part, u, t)
 
         (Axi, fxi, _, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
-        (Az, fz, _, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u, t=t)
         (_xil, zl, Pl) = self.get_states(particles)
 
         Rext = numpy.empty(N)
@@ -166,7 +163,7 @@ class ParticleLSB_UKF(ParticleLSB):
             m = numpy.vstack((zl[i], numpy.zeros((6,1))))
             K = scipy.linalg.block_diag(Pl[i], self.Qxi, self.kf.Q, self.kf.R)
             Na = len(K)
-            (U,s,V) = numpy.linalg.svd(Na*K)
+            (U,s,_V) = numpy.linalg.svd(Na*K)
             Kroot = U.dot(numpy.diag(numpy.sqrt(s)))
 
             ypred = numpy.empty(2*Na)
@@ -277,16 +274,16 @@ if __name__ == '__main__':
             part_count = (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
-            filter = 'PF'
+            filt = 'PF'
             model=ParticleLSB()
             if (mode.lower() == 'epf'):
                 model = ParticleLSB_EKF()
-                filter = 'APF'
+                filt = 'APF'
             elif (mode.lower() == 'upf'):
                 model = ParticleLSB_UKF()
-                filter = 'APF'
+                filt = 'APF'
             elif (mode.lower() == 'apf'):
-                filter = 'APF'
+                filt = 'APF'
             else:
                 pass
             
@@ -299,7 +296,7 @@ if __name__ == '__main__':
                     
                 for ind, pc in enumerate(part_count):
                 
-                    pe.simulate(pc, num_traj=1, res=0.67, filter=filter, smoother='ancestor')
+                    pe.simulate(pc, num_traj=1, res=0.67, filter=filt, smoother='ancestor')
                     avg = numpy.zeros((2, steps+1))
 
                     for i in range(steps+1):

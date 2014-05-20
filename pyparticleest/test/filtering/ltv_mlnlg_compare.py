@@ -1,5 +1,4 @@
 import numpy
-import pyparticleest.paramest.paramest as param_est
 from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
 from pyparticleest.models.ltv import LTV
 import pyparticleest.filter as pf

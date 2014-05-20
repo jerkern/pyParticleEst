@@ -2,12 +2,11 @@ import numpy
 import math
 import pyximport
 pyximport.install(inplace=True)
-import pyparticleest.kalman as kalman
-import pyparticleest.part_utils
-import pyparticleest.pf as pf
-import pyparticleest.paramest.param_est as param_est
+import pyparticleest.utils.kalman as kalman
+import pyparticleest.interfaces as interfaces
+import pyparticleest.paramest.paramest as param_est
+import pyparticleest.paramest.interfaces as pestint
 import matplotlib.pyplot as plt
-import scipy.stats
 
 
 def generate_dataset(steps, P0, Q, R):
@@ -25,19 +24,8 @@ def wmean(logw, val):
     w = numpy.exp(logw)
     w = w / sum(w)
     return numpy.sum(w*val.ravel())
-
-def lognormpdf(err, var):
-    coeff = 0.5*math.log(2*math.pi*var[0,0])
-    exp = -0.5/var[0,0]*(err)**2
-    return exp - coeff
     
-
-#def calc_stuff(out, y, particles, N, R):
-#    for k in xrange(N):
-#        out[k] = kalman.lognormpdf(particles[k].reshape(-1,1), y, R)
-#    return out
-
-class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterface):
+class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """
@@ -46,7 +34,6 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterfa
         self.P0 = numpy.copy(P0)
         self.Q= numpy.copy(Q)
         self.R=numpy.copy(R)
-        self.t = 0
     
     def create_initial_estimate(self, N):
         return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)) 
@@ -58,30 +45,20 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterfa
     
     def update(self, particles, u, noise, t):
         """ Update estimate using 'data' as input """
-        particles[:] = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*self.t)  + noise
-        self.t = self.t + 1
+        particles[:] = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)  + noise
    
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
-        
-        #logyprob = numpy.empty(len(particles), dtype=float)
-        N = len(particles)
-        #return calc_stuff(logyprob, y, 0.05*particles**2, N, self.R)
-        #return scipy.stats.norm.logpdf(0.05*particles**2, y, numpy.sqrt(self.R)).ravel()
-        return lognormpdf(0.05*particles**2-y, self.R)
+        return kalman.lognormpdf_scalar(0.05*particles**2-y, self.R)
     
     def next_pdf(self, particles, next_cpart, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
-        #N = len(particles)
-        #logpn = numpy.empty(N, dtype=float)
-        pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*self.t)
-        #return calc_stuff(logpn, next_cpart, pn, N, self.Q)
-        #return scipy.stats.norm.logpdf(pn, next_cpart, numpy.sqrt(self.Q)).ravel()
-        return lognormpdf(pn-next_cpart.ravel(), self.Q)
+        pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)
+        return kalman.lognormpdf_scalar(pn-next_cpart.ravel(), self.Q)
     
     def next_pdf_max(self, particles, u, t):
         #return scipy.stats.norm.logpdf(0.0, 0.0, numpy.sqrt(self.Q))
-        return lognormpdf(0.0, self.Q)
+        return kalman.lognormpdf_scalar(numpy.zeros((1,)), self.Q)
     
     def sample_smooth(self, particles, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
@@ -98,7 +75,7 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterfa
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
         #return scipy.stats.norm.logpdf(particles, 0.0, numpy.sqrt(self.P0))
-        return lognormpdf(particles, self.P0)
+        return kalman.lognormpdf_scalar(particles, self.P0)
     
     def eval_logp_xnext(self, particles, particles_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
@@ -107,7 +84,7 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterfa
             respect to the corresponding parameter"""
         pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)
         #return scipy.stats.norm.logpdf(particles_next - pn, 0.0, numpy.sqrt(self.Q)).ravel()
-        return lognormpdf(particles_next - pn, self.Q)
+        return kalman.lognormpdf_scalar(particles_next - pn, self.Q)
 
     
     def eval_logp_y(self, particles, y, t):
@@ -119,7 +96,7 @@ class Model(pyparticleest.part_utils.FFBSiRSInterface, param_est.ParamEstInterfa
         #N = len(particles)
         #return calc_stuff(logyprob, y, 0.05*particles**2, N, self.R)
         #return scipy.stats.norm.logpdf(0.05*particles**2, y, numpy.sqrt(self.R)).ravel()
-        return lognormpdf(0.05*particles**2-y, self.R)
+        return kalman.lognormpdf_scalar(0.05*particles**2-y, self.R)
 
 
 

@@ -68,7 +68,7 @@ class HierarchicalBase(RBPSBase):
         lpz = numpy.empty(N)
 
         (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles, u, t)
-        (xil, zl, Pl) = self.get_states(particles)
+        (_xil, zl, Pl) = self.get_states(particles)
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
         
@@ -170,7 +170,7 @@ class HierarchicalBase(RBPSBase):
         
         # Backward smoothing
         for i in reversed(xrange(T-1)):
-            (xin, zn, Pn) = self.get_states(straj[i+1])
+            (_xin, zn, Pn) = self.get_states(straj[i+1])
             (xi, z, P) = self.get_states(straj[i])
             (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(straj[i], u=st.u[i], t=st.t[i])
             for j in xrange(M):
