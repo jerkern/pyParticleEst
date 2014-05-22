@@ -31,5 +31,5 @@ models/ - This subdirectory contains helper classes for common models
 test/ - This subdirectory contains test cases/examples 
 
 Project homepage:
-http://www.control.lth.se/Staff/JerkerNordh/pyparticle.html
+http://www.control.lth.se/Staff/JerkerNordh/pyparticleest.html
 https://github.com/jerkern/pyParticleEst
