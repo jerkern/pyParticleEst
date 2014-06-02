@@ -165,7 +165,7 @@ class MixedNLGaussian(RBPSBase):
         part = numpy.copy(particles)
         xin = self.pred_xi(part, u, t)
         self.cond_predict(part, xin, u, t)
-        return self.measure(part, y, t)
+        return self.measure(part, y, t+1)
         
         
     def measure(self, particles, y, t):

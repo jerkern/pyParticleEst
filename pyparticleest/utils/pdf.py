@@ -35,7 +35,7 @@ class unifsum(object):
         self.w_diff = w1-w2 if w1 > w2 else w2-w1
         self.l = self.c-w
         self.h = self.c+w
-        self.t = 1.0 / (self.w_min + self.w_diff);
+        self.t = 1.0 / (self.w_min + self.w_diff)
     
     def __call__(self, p):
 

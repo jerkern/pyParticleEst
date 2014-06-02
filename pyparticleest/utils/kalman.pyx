@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/python
 """ A module for handling Kalman filtering.
     Uses scipy.sparse for handling sparse matrices, works with dense matrices aswell """
 import numpy as np

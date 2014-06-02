@@ -33,7 +33,7 @@ class ParticleFilter(object):
         pa = ParticleApproximation(self.model.copy_ind(pa.part), pa.w)
         
         resampled = False
-        if (self.res and pa.calc_Neff() < self.res*pa.num):
+        if (self.res > 0 and pa.calc_Neff() < self.res*pa.num):
             ancestors = pa.resample(self.model, pa.num)
             resampled = True
         else:
@@ -85,7 +85,7 @@ class ParticleFilter(object):
         
         pa.w = pa.w + new_weights
         # Keep the weights from going to -Inf
-        pa.w -= numpy.max(pa.w)
+        #pa.w -= numpy.max(pa.w)
         
         return pa
         
@@ -114,7 +114,7 @@ class AuxiliaryParticleFilter(ParticleFilter):
         pa = self.update(pa, u=u, t=t)
         
         if (y != None):
-            pa.w += self.model.measure(particles=pa.part, y=y, t=t)
+            pa.w += self.model.measure(particles=pa.part, y=y, t=t+1)
             pa.w -= l1w
             pa.w -= numpy.max(pa.w)
         
@@ -215,6 +215,7 @@ class ParticleTrajectory(object):
             
         return straj
 
+
 class ParticleApproximation(object):
     """ Contains collection of particles approximating a pdf
         particles - collection of particles
@@ -239,14 +240,14 @@ class ParticleApproximation(object):
             self.w = -math.log(num)*numpy.ones(num)
         
         self.num = num
-    
+
     def __len__(self):
         return len(self.part)
     
     def calc_Neff(self):
-        tmp = numpy.exp(self.w)
+        tmp = numpy.exp(self.w - numpy.max(self.w))
         tmp /= numpy.sum(tmp)
-        return 1.0 / sum(tmp ** 2)
+        return 1.0 / numpy.sum(numpy.square(tmp))
     
     def resample(self, model, N=None):
         """ Resample approximation so all particles have the same weight,
@@ -256,7 +257,8 @@ class ParticleApproximation(object):
         if (N  == None):
             N = self.num
         
-        new_ind = sample(numpy.exp(self.w), N)
+        tmp = self.w - numpy.max(self.w)
+        new_ind = sample(numpy.exp(tmp), N)
         new_part = model.copy_ind(self.part, new_ind)
         
         self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
