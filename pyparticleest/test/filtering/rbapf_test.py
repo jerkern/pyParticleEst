@@ -271,7 +271,7 @@ if __name__ == '__main__':
         # Store values for last time-step aswell    
     
         
-        x = numpy.asarray(range(steps+1))pyparticleest/test/filtering/rbapf_test.py
+        x = numpy.asarray(range(steps+1))
         model = ParticleAPF_EKF(Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
