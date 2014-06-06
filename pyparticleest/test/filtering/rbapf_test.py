@@ -88,7 +88,6 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         
         a = 1 if (t % 2 == 0) else 0
         C = a*numpy.ones((N, 1, 1))
-        
         return (numpy.asarray(y).reshape((-1,1)), C, h, None)
 
 class ParticleAPF_EKF(ParticleAPF):
@@ -187,9 +186,6 @@ def wmean(logw, val):
 
 if __name__ == '__main__':
     
-    num = 200
-    nums = 10
-        
     # How many steps forward in time should our simulation run
     steps = 100
     
@@ -207,7 +203,7 @@ if __name__ == '__main__':
             print "Running tests for %s" % mode
             
             sims = 1000
-            part_count = (25,50,75,100,150,200) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            part_count = (25, 50, 75, 100, 150, 200, 300) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
             filt = 'PF'
@@ -247,17 +243,34 @@ if __name__ == '__main__':
                         
                     sqr_err_eta = (avg[0,:] - e[0,:])**2
                     sqr_err_theta = (avg[1,:] - z[0,:])**2
-                            
+                    
                     rmse_eta[k, ind] = numpy.sqrt(numpy.mean(sqr_err_eta))
                     rmse_theta[k, ind] = numpy.sqrt(numpy.mean(sqr_err_theta))
                     
+#                     if (numpy.isinf(rmse_eta[k, ind]).any() or
+#                         numpy.isnan(rmse_eta[k, ind]).any()):
+#                         print "bad sim: %d" % k
+#                         nanind = numpy.argmax(numpy.isnan(sqr_err_eta))
+#                         print "nanind: %d" % nanind
+#                         ind = 45 #nanind-25
+#                         plt.plot(range(ind),avg[0,:ind],'--', markersize=1.0, color='#0000FF')
+#                         plt.plot(range(steps+1), e.T,'k--',markersize=1.0)
+#                         for j in range(pc):  
+#                             plt.plot(range(ind),vals[0,j,:ind],'.', markersize=1.0, color='#000000')
+#                             
+#                         plt.show()
+                        
+                    
             for ind, pc in enumerate(part_count):
-                print "%d: (%f, %f)" % (pc, numpy.mean(rmse_eta[:,ind]), numpy.mean(rmse_theta[:,ind]))
-                
-            
+                divind = numpy.isnan(rmse_eta[:,ind]) | numpy.isinf(rmse_eta[:,ind])
+                divcnt = numpy.count_nonzero(divind)
+                print "%d: (%f, %f) (%d diverged)" % (pc, numpy.mean(rmse_eta[~divind,ind]),
+                                                      numpy.mean(rmse_theta[~divind,ind]),
+                                                      divcnt)
     else:
     
-
+        num = 75
+        nums = 10
     
         # Create arrays for storing some values for later plotting    
         vals = numpy.zeros((2, num+1, steps+1))
@@ -265,8 +278,8 @@ if __name__ == '__main__':
         plt.ion()
 
         # Create reference
-        numpy.random.seed(1)
-        #numpy.random.seed(86)
+        #numpy.random.seed(3)
+        numpy.random.seed(2)
         (y, e, z) = generate_dataset(steps, Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Store values for last time-step aswell    
     
@@ -295,7 +308,7 @@ if __name__ == '__main__':
         plt.figure()
 
         for j in range(num):   
-            plt.plot(range(steps+1),vals[0,j,:],'.', markersize=1.0, color='#000000')
+            plt.plot(range(steps+1),vals[0,j,:],'.', markersize=steps+11.0, color='#000000')
         for j in range(nums):
             plt.plot(range(steps+1),svals[0,j,:],'--', markersize=2.0, color='#FF0000')
         plt.plot(range(steps+1),svals_mean[0,:],'--', markersize=1.0, color='#00FF00')

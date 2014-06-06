@@ -83,9 +83,16 @@ class ParticleFilter(object):
         #y = pa.part[k].prep_measure(r)
         new_weights = self.model.measure(particles=pa.part, y=y, t=t)
         
+        m = numpy.max(new_weights)
+        pa.w_offset += m
+        new_weights -= m
+
         pa.w = pa.w + new_weights
+
         # Keep the weights from going to -Inf
-        #pa.w -= numpy.max(pa.w)
+        m = numpy.max(pa.w)
+        pa.w_offset += m
+        pa.w -= m
         
         return pa
         
@@ -240,6 +247,7 @@ class ParticleApproximation(object):
             self.w = -math.log(num)*numpy.ones(num)
         
         self.num = num
+        self.w_offset = 0.0
 
     def __len__(self):
         return len(self.part)
@@ -264,6 +272,7 @@ class ParticleApproximation(object):
         self.w = numpy.log(numpy.ones(N, dtype=numpy.float) / N)
         self.part = new_part
         self.num = N
+        self.w_offset = 0.0
         return new_ind
         
     def sample(self):
