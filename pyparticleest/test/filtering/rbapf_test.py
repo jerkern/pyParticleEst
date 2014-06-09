@@ -30,14 +30,14 @@ def generate_dataset(length, Qz, R, Qes, Qeb):
     
     for i in range(1,length+1):
         a = 1 if (t % 2 == 0) else 0
-        e = 0.1*a*e + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)),a*Qes+(1-a)*Qeb)
+        e = 0.9*e + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)),a*Qes+(1-a)*Qeb)
         
         wz = numpy.random.multivariate_normal(numpy.zeros((1,)), Qz).ravel().reshape((-1,1))
         
-        z = z + wz
+        z = 0.9*z + wz
         t = t + 1
         a = 1 if (t % 2 == 0) else 0
-        y[:,i-1] = (e**2 + a*z + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
+        y[:,i-1] = (e**2 + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
         e_vec[:,i] = e.ravel()
         z_vec[:,i] = z.ravel()
     
@@ -53,7 +53,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         z0 =  numpy.array([[0.0],])
         P0 = 1.0*numpy.eye(1)
         
-        Az = numpy.eye(1)
+        Az = 0.9*numpy.eye(1)
         
         self.Qes = numpy.copy(Qes)
         self.Qeb = numpy.copy(Qeb)
@@ -64,9 +64,8 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         tmp = numpy.vstack(particles)[:,numpy.newaxis,:]
         a = 1 if (t % 2 == 0) else 0
         xi = tmp[:,:,0]
-        Axi = numpy.reshape((1.0-a,), (1,1,1))
-        Axi = numpy.repeat(Axi, len(particles), axis=0)
-        fxi = 0.1*a*xi[:,numpy.newaxis,:]
+        Axi = (1.0-a)*numpy.ones((len(particles), 1, 1))
+        fxi = 0.9*xi[:,numpy.newaxis,:]
         Qxi = numpy.repeat((a*self.Qes+(1-a)*self.Qeb)[numpy.newaxis], len(particles),axis=0)
         return (Axi, fxi, Qxi)
     
@@ -87,7 +86,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         h = h[:,numpy.newaxis,numpy.newaxis]
         
         a = 1 if (t % 2 == 0) else 0
-        C = a*numpy.ones((N, 1, 1))
+        C = (1-a)*numpy.ones((N, 1, 1))
         return (numpy.asarray(y).reshape((-1,1)), C, h, None)
 
 class ParticleAPF_EKF(ParticleAPF):
@@ -102,9 +101,8 @@ class ParticleAPF_EKF(ParticleAPF):
         # for current time
         a = 1 if (t % 2 == 0) else 0
         
-        Axi = numpy.reshape((1.0-a,), (1,1,1))
-        Axi = numpy.repeat(Axi, len(particles), axis=0)
-        Az = 1
+        Axi = (1.0-a)*numpy.ones((len(particles), 1, 1))
+        Az = 0.9
         
         Qxi = numpy.repeat((a*self.Qes+(1-a)*self.Qeb)[numpy.newaxis], len(particles),axis=0)
         
@@ -117,7 +115,7 @@ class ParticleAPF_EKF(ParticleAPF):
         h_grad = 2*tmp[:,0]
         h_grad = h_grad[:,numpy.newaxis,numpy.newaxis]
         
-        C = a
+        C = (1-a)
 
         tmp1 = C*Az+h_grad*Axi
         Pz = part[:,2].reshape((N,1,1))
@@ -147,7 +145,9 @@ class ParticleAPF_UKF(ParticleAPF):
  
         # for next time (at measurement)
         a = 1 if ((t+1) % 2 == 0) else 0
-        C = a
+        C = (1-a)
+
+        Az = 0.9
         
         for i in xrange(N):
             m = numpy.vstack((zl[i], numpy.zeros((3,1))))
@@ -161,11 +161,13 @@ class ParticleAPF_UKF(ParticleAPF):
             for j in xrange(Na):
                 val = m + Kroot[:,j:j+1]
                 xin = fxi[i]+Axi[i].dot(val[:1])+val[1]
-                ypred[j] = (xin)**2+C*(val[0]+val[2]) + val[3]
+                zn = Az*val[0]+val[2]
+                ypred[j] = (xin)**2+C*(zn) + val[3]
  
                 val = m - Kroot[:,j:j+1]
                 xin = fxi[i]+Axi[i].dot(val[:1])+val[1]
-                ypred[j] = (xin)**2+C*(val[0]+val[2]) + val[3]
+                zn = Az*val[0]+val[2]
+                ypred[j+Na] = (xin)**2+C*(zn) + val[3]
  
             # Construct estimate of covariance for predicted measurement
             Rext[i] = numpy.cov(ypred)
@@ -190,7 +192,7 @@ if __name__ == '__main__':
     steps = 100
     
     Qes = 0.1*numpy.eye(1)
-    Qeb = 0.1*numpy.eye(1)
+    Qeb = 0.5*numpy.eye(1)
     R = 0.1*numpy.eye(1)
     Qz = 0.1*numpy.eye(1)
     
@@ -262,7 +264,8 @@ if __name__ == '__main__':
                         
                     
             for ind, pc in enumerate(part_count):
-                divind = numpy.isnan(rmse_eta[:,ind]) | numpy.isinf(rmse_eta[:,ind])
+                divind = (numpy.isnan(rmse_eta[:,ind]) | numpy.isinf(rmse_eta[:,ind]) |
+                          numpy.isnan(rmse_theta[:,ind]) | numpy.isinf(rmse_theta[:,ind])) 
                 divcnt = numpy.count_nonzero(divind)
                 print "%d: (%f, %f) (%d diverged)" % (pc, numpy.mean(rmse_eta[~divind,ind]),
                                                       numpy.mean(rmse_theta[~divind,ind]),
@@ -279,7 +282,7 @@ if __name__ == '__main__':
 
         # Create reference
         #numpy.random.seed(3)
-        numpy.random.seed(2)
+        numpy.random.seed(0)
         (y, e, z) = generate_dataset(steps, Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Store values for last time-step aswell    
     
@@ -308,10 +311,10 @@ if __name__ == '__main__':
         plt.figure()
 
         for j in range(num):   
-            plt.plot(range(steps+1),vals[0,j,:],'.', markersize=steps+11.0, color='#000000')
-        for j in range(nums):
-            plt.plot(range(steps+1),svals[0,j,:],'--', markersize=2.0, color='#FF0000')
-        plt.plot(range(steps+1),svals_mean[0,:],'--', markersize=1.0, color='#00FF00')
+            plt.plot(range(steps+1),vals[0,j,:],'.', markersize=1.0, color='#000000')
+#         for j in range(nums):
+#             plt.plot(range(steps+1),svals[0,j,:],'--', markersize=2.0, color='#FF0000')
+#         plt.plot(range(steps+1),svals_mean[0,:],'--', markersize=1.0, color='#00FF00')
         plt.plot(range(steps+1),vals_mean[0,:],'--', markersize=1.0, color='#0000FF')
         plt.plot(x, e.T,'k--',markersize=1.0)
         plt.show()
