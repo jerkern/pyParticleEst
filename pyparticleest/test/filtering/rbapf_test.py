@@ -204,7 +204,7 @@ if __name__ == '__main__':
             
             print "Running tests for %s" % mode
             
-            sims = 1000
+            sims = 10000
             part_count = (40, 80, 120, 160, 200, 300, 500) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
