@@ -205,7 +205,7 @@ if __name__ == '__main__':
             print "Running tests for %s" % mode
             
             sims = 1000
-            part_count = (25, 50, 75, 100, 150, 200, 300) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            part_count = (40, 80, 120, 160, 200, 300, 500) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
             filt = 'PF'
@@ -265,14 +265,15 @@ if __name__ == '__main__':
                     
             for ind, pc in enumerate(part_count):
                 divind = (numpy.isnan(rmse_eta[:,ind]) | numpy.isinf(rmse_eta[:,ind]) |
-                          numpy.isnan(rmse_theta[:,ind]) | numpy.isinf(rmse_theta[:,ind])) 
+                          numpy.isnan(rmse_theta[:,ind]) | numpy.isinf(rmse_theta[:,ind]) |
+                          rmse_eta[:,ind] > 10000.0 | rmse_theta[:,ind] > 10000.0) 
                 divcnt = numpy.count_nonzero(divind)
                 print "%d: (%f, %f) (%d diverged)" % (pc, numpy.mean(rmse_eta[~divind,ind]),
                                                       numpy.mean(rmse_theta[~divind,ind]),
                                                       divcnt)
     else:
     
-        num = 75
+        num = 750
         nums = 10
     
         # Create arrays for storing some values for later plotting    
@@ -288,7 +289,7 @@ if __name__ == '__main__':
     
         
         x = numpy.asarray(range(steps+1))
-        model = ParticleAPF_EKF(Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
+        model = ParticleAPF_UKF(Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
         ParamEstimator.simulate(num, nums, res=0.67, filter='APF', smoother='ancestor')
