@@ -245,7 +245,7 @@ if __name__ == '__main__':
 
                 # Create an array for our particles 
                 ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-                ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='rsas')
+                ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='mcmc')
         
                 svals = numpy.zeros((2, nums, steps+1))
                 
@@ -326,7 +326,7 @@ if __name__ == '__main__':
         plt.ion()
 
         # Create reference
-        numpy.random.seed(1)
+        numpy.random.seed(14)
         #numpy.random.seed(86)
         (y, e, z) = generate_dataset(steps)
         # Store values for last time-step aswell    
