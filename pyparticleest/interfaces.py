@@ -69,3 +69,14 @@ class FFBSiRS(FFBSi):
     def next_pdf_max(self, particles, u=None):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
+    
+class SampleProposer(object):
+    __metaclass__ = abc.ABCMeta
+    @abc.abstractmethod
+    def propose_smooth(self, partp, up, tp, u, y, t, partn):
+        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
+        pass
+    @abc.abstractmethod
+    def logp_smooth(self, prop_part, partp, up, tp, u, y, t, partn):
+        """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
+        pass
