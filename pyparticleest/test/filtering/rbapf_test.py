@@ -29,11 +29,11 @@ def generate_dataset(length, Qz, R, Qes, Qeb):
     
     for i in range(1,length+1):
         a = 1 if (t % 2 == 0) else 0
-        e = 0.85*e + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)),a*Qes+(1-a)*Qeb)
+        e = 0.8*e + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)),a*Qes+(1-a)*Qeb)
         
         wz = numpy.random.multivariate_normal(numpy.zeros((1,)), Qz).ravel().reshape((-1,1))
         
-        z = 0.9*z + wz
+        z = 0.8*z + wz
         t = t + 1
         a = 1 if (t % 2 == 0) else 0
         y[:,i-1] = (e**2 + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
@@ -52,7 +52,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         z0 =  numpy.array([[0.0],])
         P0 = 1.0*numpy.eye(1)
         
-        Az = 0.9*numpy.eye(1)
+        Az = 0.8*numpy.eye(1)
         
         self.Qes = numpy.copy(Qes)
         self.Qeb = numpy.copy(Qeb)
@@ -64,7 +64,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         a = 1 if (t % 2 == 0) else 0
         xi = tmp[:,:,0]
         Axi = (1.0-a)*numpy.ones((len(particles), 1, 1))
-        fxi = 0.85*xi[:,numpy.newaxis,:]
+        fxi = 0.8*xi[:,numpy.newaxis,:]
         Qxi = numpy.repeat((a*self.Qes+(1-a)*self.Qeb)[numpy.newaxis], len(particles),axis=0)
         return (Axi, fxi, Qxi)
     
@@ -101,7 +101,7 @@ class ParticleAPF_EKF(ParticleAPF):
         a = 1 if (t % 2 == 0) else 0
         
         Axi = (1.0-a)*numpy.ones((len(particles), 1, 1))
-        Az = 0.9
+        Az = 0.8
         
         Qxi = numpy.repeat((a*self.Qes+(1-a)*self.Qeb)[numpy.newaxis], len(particles),axis=0)
         
@@ -146,7 +146,7 @@ class ParticleAPF_UKF(ParticleAPF):
         a = 1 if ((t+1) % 2 == 0) else 0
         C = (1-a)
 
-        Az = 0.9
+        Az = 0.8
         
         for i in xrange(N):
             m = numpy.vstack((zl[i], numpy.zeros((3,1))))
@@ -203,8 +203,8 @@ if __name__ == '__main__':
             
             print "Running tests for %s" % mode
             
-            sims = 5000
-            part_count = (50, 100, 150, 200, 300) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            sims = 1000
+            part_count = (25, 50, 75, 100, 125, 150, 200) #(5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
             filt = 'PF'
