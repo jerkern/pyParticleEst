@@ -98,7 +98,11 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
         #return scipy.stats.norm.logpdf(0.05*particles**2, y, numpy.sqrt(self.R)).ravel()
         return kalman.lognormpdf_scalar(0.05*particles**2-y, self.R)
 
-
+    def copy_ind(self, particles, new_ind=None):
+        if (new_ind != None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
 
 def callback(params, Q):
     print "params = %s" % numpy.exp(params)
@@ -126,8 +130,9 @@ def callback_sim(estimator):
     plt.show()
 
 if __name__ == '__main__':
+    numpy.random.seed(1)
     steps = 1499
-    iterations = numpy.asarray(range(2000))
+    iterations = numpy.asarray(range(200))
     num = numpy.ceil(500 + 4500.0/(iterations[-1]**3)*iterations**3).astype(int)
     M = numpy.ceil(50 + 450.0/(iterations[-1]**3)*iterations**3).astype(int)
     P0 = 5.0*numpy.eye(1)
@@ -138,10 +143,12 @@ if __name__ == '__main__':
     model = Model(P0, Q, R)
     estimator = param_est.ParamEstimation(model, u=None, y=y)
     callback(theta0, None)
-    plt.ion()
     estimator.maximize(theta0, num, M, smoother='rsas',meas_first=True, max_iter=len(iterations),
-                       callback_sim=callback_sim, callback=callback)
-    plt.ioff()
+                       callback=callback)
+#     plt.ion()
+#     estimator.maximize(theta0, num, M, smoother='full',meas_first=True, max_iter=len(iterations),
+#                        callback_sim=callback_sim, callback=callback)
+#     plt.ioff()
 #    traj = pf.ParticleTrajectory(model, num)
 #    traj.measure(y[0])
 #    for k in range(1,len(y)):

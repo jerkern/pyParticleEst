@@ -13,6 +13,9 @@ import scipy.linalg
 import sys
 
 
+pxi = 0.85
+pz = 0.9
+
 def generate_dataset(length, Qz, R, Qes, Qeb):
     
     e_vec = numpy.zeros((1, length+1))
@@ -29,11 +32,11 @@ def generate_dataset(length, Qz, R, Qes, Qeb):
     
     for i in range(1,length+1):
         a = 1 if (t % 2 == 0) else 0
-        e = 0.8*e + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)),a*Qes+(1-a)*Qeb)
+        e = pxi*e + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)),a*Qes+(1-a)*Qeb)
         
         wz = numpy.random.multivariate_normal(numpy.zeros((1,)), Qz).ravel().reshape((-1,1))
         
-        z = 0.8*z + wz
+        z = pz*z + wz
         t = t + 1
         a = 1 if (t % 2 == 0) else 0
         y[:,i-1] = (e**2 + (1-a)*z + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
@@ -52,7 +55,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         z0 =  numpy.array([[0.0],])
         P0 = 1.0*numpy.eye(1)
         
-        Az = 0.8*numpy.eye(1)
+        Az = pz*numpy.eye(1)
         
         self.Qes = numpy.copy(Qes)
         self.Qeb = numpy.copy(Qeb)
@@ -64,7 +67,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
         a = 1 if (t % 2 == 0) else 0
         xi = tmp[:,:,0]
         Axi = (1.0-a)*numpy.ones((len(particles), 1, 1))
-        fxi = 0.8*xi[:,numpy.newaxis,:]
+        fxi = pxi*xi[:,numpy.newaxis,:]
         Qxi = numpy.repeat((a*self.Qes+(1-a)*self.Qeb)[numpy.newaxis], len(particles),axis=0)
         return (Axi, fxi, Qxi)
     
@@ -101,7 +104,7 @@ class ParticleAPF_EKF(ParticleAPF):
         a = 1 if (t % 2 == 0) else 0
         
         Axi = (1.0-a)*numpy.ones((len(particles), 1, 1))
-        Az = 0.8
+        Az = pz
         
         Qxi = numpy.repeat((a*self.Qes+(1-a)*self.Qeb)[numpy.newaxis], len(particles),axis=0)
         
@@ -146,7 +149,7 @@ class ParticleAPF_UKF(ParticleAPF):
         a = 1 if ((t+1) % 2 == 0) else 0
         C = (1-a)
 
-        Az = 0.8
+        Az = pz
         
         for i in xrange(N):
             m = numpy.vstack((zl[i], numpy.zeros((3,1))))
@@ -253,12 +256,38 @@ if __name__ == '__main__':
 #                         print "bad sim: %d" % k
 #                         nanind = numpy.argmax(numpy.isnan(sqr_err_eta))
 #                         print "nanind: %d" % nanind
-#                         ind = 45 #nanind-25
-#                         plt.plot(range(ind),avg[0,:ind],'--', markersize=1.0, color='#0000FF')
-#                         plt.plot(range(steps+1), e.T,'k--',markersize=1.0)
-#                         for j in range(pc):  
-#                             plt.plot(range(ind),vals[0,j,:ind],'.', markersize=1.0, color='#000000')
-#                             
+#                         #nanind = 57
+#                         ind = nanind-14
+#                         sind = ind - 14
+#                         #ind = nanind#-16
+#                         #sind = ind -40 #- 12
+#                         plt.figure(1)
+#                         #plt.plot(range(ind),avg[0,:ind],'--', markersize=1.0, color='#0000FF')
+#                         
+#                         for j in range(sind,ind):
+#                             tvec = numpy.asarray((j,)*pc).ravel()
+#                             zvec = vals[0,:,j].ravel()
+#                             xivec = vals[1,:,j].ravel()
+#                             a = (j % 2) == 0
+#                             plt.plot(tvec,xivec,'.', markersize=2.0, color='#00EE00')
+#                             plt.plot(tvec,zvec,'.', markersize=2.0, color='#0000EE')
+#                             yhat = xivec**2+a*zvec
+#                             plt.plot(tvec,yhat,'.', markersize=1.0, color='#EE0000')
+#                         #plt.figure(2)
+#                         #plt.plot(range(ind),avg[1,:ind],'--', markersize=1.0, color='#0000FF')
+#                         plt.plot(range(sind,ind), e.T[sind:ind],'g--',markersize=1.0)
+#                         plt.plot(range(sind,ind), numpy.asarray(y)[sind-1:ind-1],'rx')
+#                         plt.plot(range(sind,ind), z.T[sind:ind],'b--',markersize=1.0)
+#                                
+#                         plt.figure(2)
+#                         sind = 1
+#                         ind = 100
+#                         tvec = numpy.arange(sind,ind)
+#                         avec = (tvec % 2) == 0
+#                         avec = avec.ravel()
+#                         e = e.ravel()
+#                         z = z.ravel()
+#                         plt.plot(range(sind,ind), numpy.asarray(y)[sind-1:ind-1].ravel()-e[sind:ind]**2-avec*z[sind:ind])
 #                         plt.show()
                         
                     
@@ -272,7 +301,7 @@ if __name__ == '__main__':
                                                       divcnt)
     else:
     
-        num = 750
+        num = 50
         nums = 10
     
         # Create arrays for storing some values for later plotting    
@@ -291,7 +320,7 @@ if __name__ == '__main__':
         model = ParticleAPF_UKF(Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Create an array for our particles 
         ParamEstimator = param_est.ParamEstimation(model=model, u=None, y=y)
-        ParamEstimator.simulate(num, nums, res=0.67, filter='APF', smoother='ancestor')
+        ParamEstimator.simulate(num, nums, res=0.67, filter='PF', smoother='ancestor')
 
         
         svals = numpy.zeros((2, nums, steps+1))
