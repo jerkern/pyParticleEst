@@ -13,7 +13,7 @@ import scipy.io
 import scipy.linalg
 import sys
 
-C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
+C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.008],])
 def calc_Ae_fe(eta, t):
     Ae = eta/(1+eta**2)*C_theta
     fe = 0.5*eta+25*eta/(1+eta**2)+8*math.cos(1.2*t)
@@ -92,7 +92,6 @@ class ParticleLSB(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
                                          Qxi=Qxi, Qz=Qz,)
    
     def get_nonlin_pred_dynamics(self, particles, u, t):
-        C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.08],])
         tmp = numpy.vstack(particles)[:,numpy.newaxis,:]
         xi = tmp[:,:,0]
         Axi = (xi/(1+xi**2)).dot(C_theta)
