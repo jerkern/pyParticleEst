@@ -269,8 +269,8 @@ if __name__ == '__main__':
             
             print "Running tests for %s" % mode
             
-            sims = 50000
-            part_count = (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            sims = 25000
+            part_count = (10, 15, 20, 25, 30, 40, 50, 75, 100)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
             filt = 'PF'
