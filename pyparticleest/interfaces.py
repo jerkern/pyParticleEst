@@ -54,7 +54,7 @@ class FFBSi(ParticleFiltering):
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
-    def next_pdf(self, particles, next_cpart, u, t):
+    def next_pdf(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
     
@@ -66,7 +66,7 @@ class FFBSi(ParticleFiltering):
 class FFBSiRS(FFBSi):
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def next_pdf_max(self, particles, u=None):
+    def next_pdf_max(self, particles, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pass
     

@@ -51,10 +51,10 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
         """ Return the log-pdf value of the measurement """
         return kalman.lognormpdf_scalar(0.05*particles**2-y, self.R)
     
-    def next_pdf(self, particles, next_cpart, u, t):
+    def next_pdf(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)
-        return kalman.lognormpdf_scalar(pn-next_cpart.ravel(), self.Q)
+        return kalman.lognormpdf_scalar(pn-next_part.ravel(), self.Q)
     
     def next_pdf_max(self, particles, u, t):
         #return scipy.stats.norm.logpdf(0.0, 0.0, numpy.sqrt(self.Q))

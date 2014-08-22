@@ -57,12 +57,12 @@ class HierarchicalBase(RBPSBase):
         self.set_states(particles, xil, zl, Pl)
         return lyxi + lyz
     
-    def next_pdf(self, particles, next_cpart, u, t):
+    def next_pdf(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         N = len(particles)
-        Nn = len(next_cpart)
+        Nn = len(next_part)
         if (N > 1 and Nn == 1):
-            next_cpart = numpy.repeat(next_cpart, N, 0)
+            next_part = numpy.repeat(next_part, N, 0)
         
         #lpxi = numpy.empty(N)
         lpz = numpy.empty(N)
@@ -72,17 +72,17 @@ class HierarchicalBase(RBPSBase):
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
         
-        lpxi = self.next_pdf_xi(particles, next_cpart[:,:self.len_xi], u, t).ravel()
+        lpxi = self.next_pdf_xi(particles, next_part[:,:self.len_xi], u, t).ravel()
         
         for i in xrange(N):
             
             # Predict z_{t+1}
             (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
             
-            lpz[i] = kalman.lognormpdf(next_cpart[i][self.len_xi:].reshape((-1,1))-zln[i], Pln[i])
+            lpz[i] = kalman.lognormpdf(next_part[i][self.len_xi:].reshape((-1,1))-zln[i], Pln[i])
             
-        #mul = numpy.repeat(next_cpart[1].reshape((-1,1)),N,axis=0)
-        #mul = N*(next_cpart[:self.len_xi].reshape((-1,1)),)
+        #mul = numpy.repeat(next_part[1].reshape((-1,1)),N,axis=0)
+        #mul = N*(next_part[:self.len_xi].reshape((-1,1)),)
         #lpz = kalman.lognormpdf_vec(zln, mul, Pln)
         #lpz = kalman.lognormpdf_jit(zl, mul, Pl)
         return lpxi + lpz

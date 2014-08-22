@@ -4,7 +4,7 @@ import  pyparticleest.models.nlg as nlg
 import pyparticleest.filter as pf
 import matplotlib.pyplot as plt
 import scipy.io
-
+from pyparticleest.utils.intrument import Instrumenter as Instrumenter
 
 def generate_dataset(steps, P0, Q, R):
     x = numpy.zeros((steps+1,))
@@ -62,7 +62,7 @@ if __name__ == '__main__':
 #     plt.plot(range(T), -numpy.sqrt(numpy.abs(y)/0.05), 'b--')
 #     plt.plot(range(T), numpy.sqrt(numpy.abs(y)/0.05), 'b--')
     
-    model = Model(P0, Q, R)
+    model = Instrumenter(Model(P0, Q, R))
     rmse_filt = 0.0
     rmse_smooth = 0.0
     rmse2_filt = 0.0
@@ -95,7 +95,7 @@ if __name__ == '__main__':
         rmse2_filt += numpy.sqrt(tmp/T)
         
         if (M > 0):
-            straj = traj.perform_smoothing(M, method='rsas', smoother_options={'R': 20})
+            straj = traj.perform_smoothing(M, method='rs', smoother_options={'R': 20})
             est_smooth = numpy.mean(straj.traj,1)
         
             err = est_smooth -x
@@ -112,6 +112,7 @@ if __name__ == '__main__':
         plt.legend(loc=4, fontsize=24)
         plt.draw()
         plt.show()
+    model.print_statistics()
     print "rmse filter = %f" % (rmse_filt / iterations)
     print "rmse smooth = %f" % (rmse_smooth / iterations)
     print "rmse2 filter = %f" % (rmse2_filt / iterations)

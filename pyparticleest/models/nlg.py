@@ -402,9 +402,11 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
                                                                **kwargs)
 
     def create_initial_estimate(self, N):
-        Pchol = scipy.linalg.cho_factor(self.Px0)[0]
-        noise = numpy.random.normal(size=(self.lxi,N))
-        particles = (Pchol.dot(noise)).T+self.x0  
+        particles = numpy.repeat(self.x0, N, 1).T
+        if (numpy.any(self.Px0)):
+            Pchol = scipy.linalg.cho_factor(self.Px0)[0]
+            noise = numpy.random.normal(size=(self.lxi,N))
+            particles += (Pchol.dot(noise)).T
         return particles     
 
     def eval_logp_x0(self, particles, t):

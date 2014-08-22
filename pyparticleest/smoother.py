@@ -38,7 +38,7 @@ def bsi_rs(pa, model, next, u, t, maxpdf, max_iter):
         if (len(todo) == 0):
             return res
     
-    res[todo] = bsi_full(pa, model, next[todo], u)        
+    res[todo] = bsi_full(pa, model, next[todo], u, t)
     return res
 
 def bsi_mcmc(pa, model, next, u, t, R, ancestors):
