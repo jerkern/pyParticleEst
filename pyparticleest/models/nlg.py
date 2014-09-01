@@ -93,9 +93,9 @@ class NonlinearGaussian(interfaces.FFBSiRS):
     
     def eval_1st_stage_weights(self, particles, u, y, t):
         part = numpy.copy(particles)
-        xin = self.pred_xi(part, u, t)
-        self.cond_predict(part, xin, u, t)
-        return self.measure(part, y, t)
+        noise = numpy.zeros_like(part)
+        partn = self.update(part, u, t, noise)
+        return self.measure(partn, y, t+1)
         
     def next_pdf_max(self, particles, u, t):
         Q = self.get_Q(particles, u, t)
@@ -417,9 +417,19 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
             
         N = len(particles)
         res = numpy.empty(N)
-        Pchol = scipy.linalg.cho_factor(self.Px0, check_finite=False)
-        for i in xrange(N):
-            res[i] = kalman.lognormpdf_cho(particles[i] - self.x0, Pchol)
+        # Assumes Px0 is either full rang or zero
+        if ((self.Px0 == 0.0).all()):
+            x0 = self.x0.ravel()
+            for i in xrange(N):
+                if (numpy.array_equiv(particles[i],x0)):
+                    res[i] = 0.0
+                else:
+                    res[i] = -numpy.Inf 
+        else:
+            Pchol = scipy.linalg.cho_factor(self.Px0, check_finite=False)
+            for i in xrange(N):
+                res[i] = kalman.lognormpdf_cho(particles[i] - self.x0, Pchol)
+
         return res
     
 #    def eval_logp_xi0_grad(self, xil):

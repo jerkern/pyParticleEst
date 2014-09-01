@@ -19,6 +19,7 @@ class Instrumenter(object):
         self.cnt_pdfxnmax = 0
         self.cnt_propsmooth = 0
         self.cnt_pdfsmooth = 0
+        self.cnt_eval1st = 0
     
     def print_statistics(self):
         print "Modelclass : %s" % type(self.model)
@@ -86,3 +87,7 @@ class Instrumenter(object):
         """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
         self.cnt_pdfsmooth += len(prop_part)
         return self.model.logp_smooth(prop_part, partp, up, tp, u, y, t, partn)
+
+    def eval_1st_stage_weights(self, particles, u, y, t):
+        self.cnt_eval1st += len(particles)
+        return self.model.eval_1st_stage_weights(particles, u, y, t)
