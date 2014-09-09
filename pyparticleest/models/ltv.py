@@ -99,7 +99,7 @@ class LTV(FFBSi):
         self.set_states(particles, zl, Pl)
         return lyz
     
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         N = len(particles)
         return numpy.zeros((N,))

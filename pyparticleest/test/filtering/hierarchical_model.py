@@ -76,7 +76,7 @@ class Model(HierarchicalRSBase):
             xi_next[i] =  particles[i][0] + noise[i]
         return xi_next
     
-    def next_pdf_xi(self, particles, next_xi, u, t):
+    def logp_xnext_xi(self, particles, next_xi, u, t):
         self.pn_count = self.pn_count + len(particles)
         tmp = numpy.vstack(particles)
         xi = tmp[:,0:1,numpy.newaxis]
@@ -88,7 +88,7 @@ class Model(HierarchicalRSBase):
 #            lpxi[i] = kalman.lognormpdf(next_xi, particles[i][0:1], numpy.asarray(((self.Q_xi,),)))
 #        return lpxi
     
-    def next_pdf_xi_max(self, particles, u, t):
+    def logp_xnext_xi_max(self, particles, u, t):
         return numpy.asarray((scipy.stats.norm.logpdf(0.0, 0.0, math.sqrt(self.Q_xi)),)*len(particles))
     
     def measure_nonlin(self, particles, y, t):

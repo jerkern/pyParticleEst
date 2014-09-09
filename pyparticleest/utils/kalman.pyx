@@ -2,7 +2,6 @@
 """ A module for handling Kalman filtering.
     Uses scipy.sparse for handling sparse matrices, works with dense matrices aswell """
 import numpy as np
-#cimport numpy as np
 import math
 import scipy.linalg
 
@@ -159,7 +158,7 @@ class KalmanFilter(object):
 
         # Return the probability of the received measurement
         return lognormpdf_scalar(err, S)
-        #return -0.5*(l2pi + math.log(S[0,0]) + (err.ravel()**2)/S[0,0])
+
 
 class KalmanSmoother(KalmanFilter):
     """ Forward/backward Kalman smoother
@@ -167,10 +166,6 @@ class KalmanSmoother(KalmanFilter):
         Extends the KalmanFilter class and provides an additional method for smoothing
         backwards in time """
     
-#    def __init__(self, z0, P0, **kwargs):
-#        super(KalmanSmoother, self).__init__(z0=z0, P0=P0, **kwargs)
-#        self.M = None
-        
     def smooth(self, z, P, z_next, P_next, A, f, Q):
         """ Create smoothed estimate using knowledge about x_{k+1} and P_{k+1} and
             the relation x_{k+1} = A*x_k + f_k +v_k

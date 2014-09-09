@@ -24,16 +24,20 @@ class ParticleFilter(object):
     
     def __init__(self, model, res = 0):
         """ Create particle filter.
-        res - 0 or 1 if resampling on or off """
+            res - 0 .. 1 , the ratio of effektiv number of particles that triggers resampling.
+            0 disables resampling """
         
         self.res = res
         self.model = model
     
     def forward(self, pa, u, y, t):
+        """ Forward the estimate stored in pa from t to t+1 using the motion model
+            with input u at time time and measurement y at time t+1 """
         pa = ParticleApproximation(self.model.copy_ind(pa.part), pa.w)
         
         resampled = False
         if (self.res > 0 and pa.calc_Neff() < self.res*pa.num):
+            # Store the ancestor of each resampled particle
             ancestors = pa.resample(self.model, pa.num)
             resampled = True
         else:
@@ -45,9 +49,9 @@ class ParticleFilter(object):
         return (pa, resampled, ancestors)
     
     def update(self, pa, u, t, inplace=True):
-        """ Update particle approximation using u as kinematic input.
+        """ Update particle approximation of x_t to x_{t+1} using u as input.
             
-            If inplace=True the particles are update then returned,
+            If inplace=True the particles are updated then returned,
             otherwise a new ParticleApproximation is first created
             leaving the original one intact """
         
@@ -70,7 +74,7 @@ class ParticleFilter(object):
     
     
     def measure(self, pa, y, t, inplace=True):
-        """ Evaluate and update particle approximation using new measurement r
+        """ Evaluate and update particle approximation using new measurement y
             
             If inplace=True the particles are update then returned,
             otherwise a new ParticleApproximation is first created
@@ -80,9 +84,9 @@ class ParticleFilter(object):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
 
-        #y = pa.part[k].prep_measure(r)
         new_weights = self.model.measure(particles=pa.part, y=y, t=t)
         
+        # Try to keep weights from going to -Inf
         m = numpy.max(new_weights)
         pa.w_offset += m
         new_weights -= m
@@ -103,6 +107,10 @@ class AuxiliaryParticleFilter(ParticleFilter):
         a specified threshold is reach """
     
     def forward(self, pa, u, y, t):
+        """ Use the first stage weights to try to predict which particles will be in
+            regions of high likely hood at time t+1, use this information to resample
+            the particles before propating them forward in time """
+
         pa = copy.deepcopy(pa)
         resampled = False
         
@@ -137,7 +145,6 @@ class TrajectoryStep(object):
         self.pa = pa
         self.u = u
         self.y = y
-        # t is time
         self.t = t
         self.ancestors = ancestors
 
@@ -146,7 +153,12 @@ class ParticleTrajectory(object):
         as a TrajectoryStep object """
         
     def __init__(self, model, N, resample=2.0/3.0, t0=0, filter='PF'):
-        """ Initialize the trajectory with a ParticleApproximation """
+        """ model - object of the type represeting the estimation problem to be solved
+            N - number of particles used in the filter
+            resample - 0..1, ratio of number of efficient particles used to trigger resample
+                        0 = no resampling
+            t0 - time value at first time index
+            filter - which type of filter to use, currently support 'PF' and 'APF' """
         particles = model.create_initial_estimate(N)
         pa = ParticleApproximation(particles=particles)
         self.traj = [TrajectoryStep(pa, t=t0, ancestors=numpy.arange(N)),]
@@ -157,15 +169,12 @@ class ParticleTrajectory(object):
             self.pf = AuxiliaryParticleFilter(model=model, res=resample)
         else:
             raise ValueError('Bad filter type')
-        self.len = 1
         return
     
     def forward(self, u, y):
         self.traj[-1].u = u
         (pa_nxt, resampled, ancestors) = self.pf.forward(self.traj[-1].pa, u=u, y=y, t=self.traj[-1].t)
         self.traj.append(TrajectoryStep(pa_nxt, t=self.traj[-1].t+1, y=y, ancestors=ancestors))
-        #self.traj[-1].y = y
-        self.len = len(self.traj)
         return resampled
     
     def measure(self, y):
@@ -175,7 +184,7 @@ class ParticleTrajectory(object):
     def prep_rejection_sampling(self):
         """ Find the maximum over all inputs of the pdf for the next timestep,
             used for rejection sampling in the particle smoother """
-        for k in range(self.len-1):
+        for k in range(len(self.traj)-1):
             self.traj[k].peak_fwd_density = self.traj[k].pa.calc_fwd_peak_density(self.traj[k].u)
     
     def __len__(self):
@@ -193,7 +202,7 @@ class ParticleTrajectory(object):
         """ Throw away the particle approxmation and return a list contaning just
             inputs, output and timestamps """
         signals = []
-        for k in range(self.len):
+        for k in range(len(self.traj)):
             signals.append(TrajectoryStep(pa=None, u=self.traj[k].u, y=self.traj[k].y, t=self.traj[k].t))
             
         return signals
@@ -202,25 +211,34 @@ class ParticleTrajectory(object):
         """ return an array of smoothed trajectories 
             M - number of smoothed trajectories """
         from smoother import SmoothTrajectory
-        
-        # Calculate coefficients needed for rejection sampling in the backward smoothing
-#        if (rej_sampling):
-#            self.prep_rejection_sampling()
+
         options={}
         if (method == 'rs' or method == 'rsas'):
-            coeffs = numpy.empty(self.len, dtype=float)
-            for k in range(self.len):
-                coeffs[k] = self.pf.model.next_pdf_max(particles=self.traj[k].pa.part,
-                                                       u=self.traj[k].u, t=self.traj[k].t)
+            # Calculate coefficients needed for rejection sampling in the backward smoothing
+            coeffs = numpy.empty(len(self.traj), dtype=float)
+            for k in range(len(self.traj)):
+                coeffs[k] = self.pf.model.logp_xnext_max(particles=self.traj[k].pa.part,
+                                                         u=self.traj[k].u, t=self.traj[k].t)
             options['maxpdf'] = coeffs
-        if (method == 'mcmc'):
-                options['R'] = 30
+            if (method == 'rs'):
+                # Default for max number of attempts before resoriting to evaluate all weights
+                N = len(self.traj[0].pa.w)
+                options['R'] = 0.1*N
+            if (method == 'rsas'):
+                # Default settings for rsas
+                options['x1'] = 1.0
+                options['P1'] = 1.0
+                options['sv'] = 1.0
+                options['sw'] = 1.0
+                options['ratio'] = 1.0
+
+        if (method == 'mcmc' or method == 'mhips' or method == 'mhbp'):
+            # Default value for number of iterations to run the sampler for
+            options['R'] = 30
         if (smoother_options != None):
             options.update(smoother_options)
-            
-        straj = SmoothTrajectory(self, M=M, method=method, options=options)
-            
-        return straj
+
+        return SmoothTrajectory(self, M=M, method=method, options=options)
 
 
 class ParticleApproximation(object):
@@ -230,7 +248,7 @@ class ParticleApproximation(object):
         seed - value to initialize all particles with
         num - number of particles
         
-        Use either seed and num or particles (and optionally weights
+        Use either seed and num or particles (and optionally weights,
         if not uniform) """
     def __init__(self, particles=None, logw=None, seed=None, num=None):
         if (particles != None):
@@ -247,12 +265,17 @@ class ParticleApproximation(object):
             self.w = -math.log(num)*numpy.ones(num)
         
         self.num = num
+
+        # Used to keep track of the offest on all weights, this is continually updated
+        # when the weights are rescaled to avoid going to -Inf
         self.w_offset = 0.0
 
     def __len__(self):
         return len(self.part)
     
     def calc_Neff(self):
+        """" Calculate number of effective particles, common metric used to determine
+            when to resample """
         tmp = numpy.exp(self.w - numpy.max(self.w))
         tmp /= numpy.sum(tmp)
         return 1.0 / numpy.sum(numpy.square(tmp))
@@ -265,6 +288,7 @@ class ParticleApproximation(object):
         if (N  == None):
             N = self.num
         
+        # Alwyays keep the largest weight at 0 in logaritmic representation
         tmp = self.w - numpy.max(self.w)
         new_ind = sample(numpy.exp(tmp), N)
         new_part = model.copy_ind(self.part, new_ind)

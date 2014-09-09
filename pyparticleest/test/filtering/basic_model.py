@@ -87,7 +87,7 @@ if __name__ == '__main__':
     plt.plot(range(steps+1), vals.T, 'g-')
         
     straj = traj.perform_smoothing(num, method='ancestor')
-    plt.plot(range(steps+1), straj.straj, 'b-.')
+    plt.plot(range(steps+1), straj.traj, 'b-.')
 #    for k in xrange(num):
 #        ind = k
 #        for j in reversed(xrange(len(traj.traj)-1)):

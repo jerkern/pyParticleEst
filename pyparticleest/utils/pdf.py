@@ -1,7 +1,7 @@
 """ Utilities for evalutating probability density functions """
 
 class unifsum(object):
-    
+    """ pdf for sum of two uniform variables """
     def __init__(self, a,b):
         #a1 = numpy.min(a)
         #b1 = numpy.max(a)

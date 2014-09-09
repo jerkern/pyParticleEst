@@ -1,15 +1,16 @@
 """ Rao-Blackwellized Particle smoother implementation """
 
 import numpy
-import math
-import copy
 import filter as pf
 
 def bsi_full(pa, model, next, u, t):
+    # Perform backward simulation by evaluating all transitation densities
+    # and then randomly sample a index from the catagorical distribution
+
     M = len(next)
     res = numpy.empty(M, dtype=int)
     for j in xrange(M):
-        p_next = model.next_pdf(pa.part, next[j:j+1], u, t)
+        p_next = model.logp_xnext(pa.part, next[j:j+1], u, t)
             
         w = pa.w + p_next
         w = w - numpy.max(w)
@@ -20,6 +21,10 @@ def bsi_full(pa, model, next, u, t):
 
 
 def bsi_rs(pa, model, next, u, t, maxpdf, max_iter):
+    # Perform backward simulation using rejection sampling, after
+    # max_iter attemps to find a suitable particle fall back
+    # to evaluating all the weights
+
     M = len(next)
     todo = numpy.asarray(range(M))
     res = numpy.empty(M, dtype=int)
@@ -30,7 +35,7 @@ def bsi_rs(pa, model, next, u, t, maxpdf, max_iter):
     for _i in xrange(max_iter):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
-        pn = model.next_pdf(pa.part[ind], next[todo], u, t)
+        pn = model.logp_xnext(pa.part[ind], next[todo], u, t)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         res[todo[accept]] = ind[accept]
@@ -38,30 +43,17 @@ def bsi_rs(pa, model, next, u, t, maxpdf, max_iter):
         if (len(todo) == 0):
             return res
     
+    # TODO, is there an efficient way to store those weights
+    # already calculated to avoid double work, or will that
+    # take more time than simply evaulating them all again?
     res[todo] = bsi_full(pa, model, next[todo], u, t)
     return res
 
-def bsi_mcmc(pa, model, next, u, t, R, ancestors):
-    M = len(next)
-    ind = ancestors
-    weights = numpy.copy(pa.w)
-    weights -= numpy.max(weights)
-    weights = numpy.exp(weights)
-    weights /= numpy.sum(weights)
-    pind = model.next_pdf(pa.part[ind], next, u, t)                     
-    for _j in xrange(R):
-        propind = numpy.random.permutation(pf.sample(weights, M))
-        pprop = model.next_pdf(pa.part[propind], next, u, t)
-        diff = pprop - pind
-        diff[diff > 0.0] = 0.0
-        test = numpy.log(numpy.random.uniform(size=M))
-        accept = test < diff
-        ind[accept] = propind[accept]
-        pind[accept] = pprop[accept] 
-    
-    return ind
-        
 def bsi_rsas(pa, model, next, u, t, maxpdf, x1, P1, sv, sw, ratio):
+    # Perform backward simulation using rejection sampling, adaptively
+    # decide when to switch over to the full evaluation of weights by
+    # using a Kalman filter to estimate the predicted acceptance rate
+
     M = len(next)
     todo = numpy.asarray(range(M))
     res = numpy.empty(M, dtype=int)
@@ -75,7 +67,7 @@ def bsi_rsas(pa, model, next, u, t, maxpdf, x1, P1, sv, sw, ratio):
     while (True):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
-        pn = model.next_pdf(pa.part[ind], next[todo], u, t)
+        pn = model.logp_xnext(pa.part[ind], next[todo], u, t)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         ak = numpy.sum(accept)
@@ -94,9 +86,32 @@ def bsi_rsas(pa, model, next, u, t, maxpdf, x1, P1, sv, sw, ratio):
         Pk = (1 - ak/mk)**2*Pk+sv*sv
         if (pk < stop_criteria):
             break
-    
+
     res[todo] = bsi_full(pa, model, next[todo], u, t)        
     return res
+
+def bsi_mcmc(pa, model, next, u, t, R, ancestors):
+    # Perform backward simulation using an MCMC sampler proposing new
+    # backward particles, initialized with the filtered trajectory
+
+    M = len(next)
+    ind = ancestors
+    weights = numpy.copy(pa.w)
+    weights -= numpy.max(weights)
+    weights = numpy.exp(weights)
+    weights /= numpy.sum(weights)
+    pind = model.logp_xnext(pa.part[ind], next, u, t)             
+    for _j in xrange(R):
+        propind = numpy.random.permutation(pf.sample(weights, M))
+        pprop = model.logp_xnext(pa.part[propind], next, u, t)
+        diff = pprop - pind
+        diff[diff > 0.0] = 0.0
+        test = numpy.log(numpy.random.uniform(size=M))
+        accept = test < diff
+        ind[accept] = propind[accept]
+        pind[accept] = pprop[accept]
+
+    return ind
 
 class SmoothTrajectory(object):
     """ Store smoothed trajectory """
@@ -121,6 +136,7 @@ class SmoothTrajectory(object):
         elif (method=='ancestor'):
             self.perform_ancestors(pt=pt, M=M)
         elif (method=='mhips'):
+            # Initialize using forward trajectories
             self.perform_ancestors(pt=pt, M=M)
             if 'R' in options:
                 R = options['R']
@@ -128,15 +144,13 @@ class SmoothTrajectory(object):
                 R = 10
             for _i in xrange(R):
                 self.perform_mhips_pass(options=options)
-                if hasattr(self.model, 'post_smoothing'):
-                    self.traj = self.model.post_smoothing(self)
 
-        elif (method=='bp'):
+        elif (method=='mhbp'):
             if 'R' in options:
                 R = options['R']
             else:
                 R = 10
-            self.perform_bp(pt, M, R)
+            self.perform_mhbp(pt=pt, M=M, R=R)
         else:
             raise ValueError('Unknown smoother: %s' % method)
         
@@ -144,7 +158,7 @@ class SmoothTrajectory(object):
         return len(self.traj)
     
     def perform_ancestors(self, pt, M):
-        
+        """ Create M smoothed trajectories by just using the filtered forward trajectories """
         self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
         
         tmp = numpy.copy(pt[-1].pa.w)
@@ -179,11 +193,11 @@ class SmoothTrajectory(object):
             # Do e.g. constrained smoothing for RBPS models
             self.traj = self.model.post_smoothing(self)
 
-    
+
     def perform_bsi(self, pt, M, method, options):
         self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
-        # Initialise from end time estimates
 
+        # Sample from end time estimates
         tmp = numpy.copy(pt[-1].pa.w)
         tmp -= numpy.max(tmp)
         tmp = numpy.exp(tmp)
@@ -195,20 +209,18 @@ class SmoothTrajectory(object):
                                                  y=pt[-1].y,
                                                  t=pt[-1].t)[numpy.newaxis,]
         
-        opt = dict()
         if (method=='full'):
             pass
         elif (method=='mcmc' or method=='ancestor' or method=='mhips'):
             ancestors = pt[-1].ancestors[ind]
         elif (method=='rs'):
-            N = len(pt[-1].pa.part)
-            max_iter = int(0.1*N)
+            max_iter = options['R']
         elif (method=='rsas'):
-            x1 = 1.0
-            P1 = 1.0
-            sv = 1.0
-            sw = 1.0
-            ratio = 1.0
+            x1 = options['x1']
+            P1 = options['P1']
+            sv = options['sv']
+            sw = options['sw']
+            ratio = options['ratio']
         else:
             raise ValueError('Unknown sampler: %s' % method)
         
@@ -231,7 +243,7 @@ class SmoothTrajectory(object):
                 ancestors = step.ancestors[ind]
             elif (method=='full'):
                 ind = bsi_full(pa, self.model, self.traj[cur_ind+1][0], step.u, step.t)
-            elif (method=='ancestor' or method=='bp'):
+            elif (method=='ancestor'):
                 ind = ancestors
                 ancestors = step.ancestors[ind]
             # Select 'previous' particle
@@ -248,7 +260,7 @@ class SmoothTrajectory(object):
             self.traj = self.model.post_smoothing(self)
 
     
-    def perform_bp(self, pt, M, R):
+    def perform_mhbp(self, pt, M, R):
         
         T = len(pt)
         self.traj = numpy.zeros((T,), dtype=numpy.ndarray)
@@ -317,9 +329,9 @@ class SmoothTrajectory(object):
                 # Update with accepted proposals
                 self.traj[t][:1,acc] = pprop[acc][numpy.newaxis,]
                 anc[acc] = panc[acc]
-                                                                                                
+
         self.traj = numpy.vstack(self.traj)
-         
+
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
             self.traj = self.model.post_smoothing(self)
@@ -359,6 +371,9 @@ class SmoothTrajectory(object):
             self.traj[i][acc] = prop[acc]
             if (i > 0):
                 self.traj[i-1] = self.model.sample_smooth(self.traj[i-1], self.traj[i], up, self.y[i-1], tp)
+        
+        if hasattr(self.model, 'post_smoothing'):
+                    self.traj = self.model.post_smoothing(self)
             
     def perform_mhips_pass_reduced(self, pt, M, options):
         """ Runs MHIPS with the proposal density q and p(x_{t+1}|x_t) """
@@ -408,6 +423,7 @@ class SmoothTrajectory(object):
 
 
 def mc_step(model, partp_prop, partp_curr, up, tp, curpart, y, u, t, partn):
+    " Perform a single iteration of the MCMC sampler used for MHIPS and MHBP"
     M = len(curpart)
 
     xprop = model.propose_smooth(partp=partp_prop, 

@@ -249,7 +249,7 @@ class MixedNLGaussian(RBPSBase):
                 
         return (A, f, Q, A_identical, f_identical, Q_identical)
     
-    def next_pdf_max(self, particles, u, t):
+    def logp_xnext_max(self, particles, u, t):
         """ Implements the fwd_peak_density function for MixedNLGaussian models """
         N = len(particles)
         pmax = numpy.empty(N)
@@ -267,7 +267,7 @@ class MixedNLGaussian(RBPSBase):
         
         return numpy.max(pmax)
         
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Implements the next_pdf function for MixedNLGaussian models """
         
         N = len(particles)
@@ -853,7 +853,7 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
         return (eta, L)
                         
     
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Implements the next_pdf function for MixedNLGaussian models """
         
         N = len(particles)

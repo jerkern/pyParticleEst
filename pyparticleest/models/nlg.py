@@ -97,7 +97,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         partn = self.update(part, u, t, noise)
         return self.measure(partn, y, t+1)
         
-    def next_pdf_max(self, particles, u, t):
+    def logp_xnext_max(self, particles, u, t):
         Q = self.get_Q(particles, u, t)
         dim=self.lxi
         l2pi = math.log(2*math.pi)
@@ -112,7 +112,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
                 pmax[i] = -0.5*(dim*l2pi+ld)
             return numpy.max(pmax)
         
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Implements the next_pdf function for NonlinearGaussian models """
 #        N = len(particles)
 #        Nn = len(next_part)

@@ -60,15 +60,15 @@ class Instrumenter(object):
     def copy_ind(self, particles, new_ind=None):
         return self.model.copy_ind(particles, new_ind)
     
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         self.cnt_pdfxn  += max(len(particles), len(next_part))
-        return self.model.next_pdf(particles, next_part, u, t)
+        return self.model.logp_xnext(particles, next_part, u, t)
     
-    def next_pdf_max(self, particles, u, t):
+    def logp_xnext_max(self, particles, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         self.cnt_pdfxnmax += len(particles)
-        return self.model.next_pdf_max(particles, u, t)
+        return self.model.logp_xnext_max(particles, u, t)
     
     def sample_smooth(self, particles, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
@@ -88,8 +88,8 @@ class Instrumenter(object):
         self.cnt_pdfsmooth += len(prop_part)
         return self.model.logp_smooth(prop_part, partp, up, tp, u, y, t, partn)
 
-    def next_pdf_onestep(self, particles, next_part, u, t):
-        return self.model.next_pdf_onestep(particles, next_part, u, t)
+    def logp_xnext_full(self, particles, next_part, u, t):
+        return self.model.logp_xnext_full(particles, next_part, u, t)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.cnt_eval1st += len(particles)

@@ -57,7 +57,7 @@ class HierarchicalBase(RBPSBase):
         self.set_states(particles, xil, zl, Pl)
         return lyxi + lyz
     
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         N = len(particles)
         Nn = len(next_part)
@@ -72,7 +72,7 @@ class HierarchicalBase(RBPSBase):
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
         
-        lpxi = self.next_pdf_xi(particles, next_part[:,:self.len_xi], u, t).ravel()
+        lpxi = self.logp_xnext_xi(particles, next_part[:,:self.len_xi], u, t).ravel()
         
         for i in xrange(N):
             
@@ -105,7 +105,7 @@ class HierarchicalBase(RBPSBase):
         return res
 
     @abc.abstractmethod
-    def next_pdf_xi(self, particles, next_xi, u, t):
+    def logp_xnext_xi(self, particles, next_xi, u, t):
         pass
     
     @abc.abstractmethod
@@ -184,9 +184,9 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRS):
     def __init__(self, **kwargs):
         super(HierarchicalRSBase, self).__init__(**kwargs)
         
-    def next_pdf_max(self, particles, u, t):
+    def logp_xnext_max(self, particles, u, t):
         N = len(particles)
-        lpxi = self.next_pdf_xi_max(particles, u, t)
+        lpxi = self.logp_xnext_xi_max(particles, u, t)
         (Az, _fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles, u, t)
         lpz = numpy.empty_like(lpxi)
         (_xil, _zl, Pl) = self.get_states(particles)
@@ -199,5 +199,5 @@ class HierarchicalRSBase(HierarchicalBase,FFBSiRS):
         return lpmax
     
     @abc.abstractmethod
-    def next_pdf_xi_max(self, particles, u, t):
+    def logp_xnext_xi_max(self, particles, u, t):
         pass
