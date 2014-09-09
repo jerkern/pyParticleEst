@@ -88,6 +88,9 @@ class Instrumenter(object):
         self.cnt_pdfsmooth += len(prop_part)
         return self.model.logp_smooth(prop_part, partp, up, tp, u, y, t, partn)
 
+    def next_pdf_onestep(self, particles, next_part, u, t):
+        return self.model.next_pdf_onestep(particles, next_part, u, t)
+
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.cnt_eval1st += len(particles)
         return self.model.eval_1st_stage_weights(particles, u, y, t)

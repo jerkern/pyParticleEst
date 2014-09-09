@@ -105,7 +105,7 @@ class SmoothTrajectory(object):
             pt - particle trajectory to be smoothed  """
         
         self.traj = None
-        self.straj = None
+
         T = len(pt)
         self.u = numpy.empty(T, dtype=object)
         self.y = numpy.empty(T, dtype=object)
@@ -127,7 +127,10 @@ class SmoothTrajectory(object):
             else:
                 R = 10
             for _i in xrange(R):
-                self.perform_mhips_pass(pt=pt, M=M, options=options)
+                self.perform_mhips_pass(options=options)
+                if hasattr(self.model, 'post_smoothing'):
+                    self.traj = self.model.post_smoothing(self)
+
         elif (method=='bp'):
             if 'R' in options:
                 R = options['R']
@@ -174,10 +177,8 @@ class SmoothTrajectory(object):
 
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
-            self.straj = self.model.post_smoothing(self)
-        else:
-            self.straj = self.traj
-        
+            self.traj = self.model.post_smoothing(self)
+
     
     def perform_bsi(self, pt, M, method, options):
         self.traj = numpy.zeros((len(pt),), dtype=numpy.ndarray)
@@ -244,9 +245,8 @@ class SmoothTrajectory(object):
         
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
-            self.straj = self.model.post_smoothing(self)
-        else:
-            self.straj = self.traj
+            self.traj = self.model.post_smoothing(self)
+
     
     def perform_bp(self, pt, M, R):
         
@@ -322,11 +322,10 @@ class SmoothTrajectory(object):
          
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
-            self.straj = self.model.post_smoothing(self)
-        else:
-            self.straj = self.traj
+            self.traj = self.model.post_smoothing(self)
+
     
-    def perform_mhips_pass(self, pt, M, options):
+    def perform_mhips_pass(self, options):
         T = len(self.traj)
         for i in reversed(xrange((T))):
             if (i == T-1):
@@ -358,6 +357,8 @@ class SmoothTrajectory(object):
                                   curpart=self.traj[i], y=y, u=u, t=t,
                                   partn=partn)
             self.traj[i][acc] = prop[acc]
+            if (i > 0):
+                self.traj[i-1] = self.model.sample_smooth(self.traj[i-1], self.traj[i], up, self.y[i-1], tp)
             
     def perform_mhips_pass_reduced(self, pt, M, options):
         """ Runs MHIPS with the proposal density q and p(x_{t+1}|x_t) """
@@ -408,6 +409,7 @@ class SmoothTrajectory(object):
 
 def mc_step(model, partp_prop, partp_curr, up, tp, curpart, y, u, t, partn):
     M = len(curpart)
+
     xprop = model.propose_smooth(partp=partp_prop, 
                                  up=up,
                                  tp=tp,
@@ -436,11 +438,11 @@ def mc_step(model, partp_prop, partp_curr, up, tp, curpart, y, u, t, partn):
 
     
     if (partp_prop != None and partp_curr != None):
-        logp_prev_prop = model.next_pdf(particles=partp_prop,
+        logp_prev_prop = model.next_pdf_onestep(particles=partp_prop,
                                         next_part=xprop,
                                         u=up,
                                         t=tp)
-        logp_prev_curr = model.next_pdf(particles=partp_curr,
+        logp_prev_curr = model.next_pdf_onestep(particles=partp_curr,
                                         next_part=curpart,
                                         u=up,
                                         t=tp)
