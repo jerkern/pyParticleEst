@@ -146,21 +146,6 @@ class MixedNLGaussian(RBPSBase):
         
         return (Acond, fcond, Qcond)
         
-        
-    
-    def cond_predict(self, particles, xi_next, u, t):
-        # Calc (z_t | xi_{t+1}, y_t)
-        self.meas_xi_next(particles=particles, xi_next=xi_next, u=u, t=t)
-        #Compensate for noise correlation
-        (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
-        (_, zl, Pl) = self.get_states(particles)
-        # Predict next states conditioned on xi_next
-        for i in xrange(len(zl)):
-            # Predict z_{t+1}
-            (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
-        
-        self.set_states(particles, xi_next, zl, Pl)
-
     def eval_1st_stage_weights(self, particles, u, y, t):
         part = numpy.copy(particles)
         xin = self.pred_xi(part, u, t)
@@ -313,119 +298,7 @@ class MixedNLGaussian(RBPSBase):
                                                  Pl[j]).ravel()
             res[j,:self.lxi+self.kf.lz] = numpy.hstack((xi, z))
         return res
-#    def post_smoothing(self, st):
-#        return
-#    
-#    def next_pdf(self, particles, next_part, u, t):
-#        """ Implements the next_pdf function for MixedNLGaussian models """
-#        
-#        N = len(particles)
-#        Nn = len(next_part)
-#        if (N > 1 and Nn == 1):
-#            next_part = numpy.repeat(next_part, N, 0)
-#        lpx = numpy.empty(N)
-#        (_, zl, Pl) = self.get_states(particles)
-#        (A, f, Q, _, _, _) = self.calc_A_f_Q(particles, u=u, t=t)
-#        
-#        for i in xrange(N):
-#            x_next = numpy.vstack((next_part[i,:self.lxi].reshape((self.lxi,1)),
-#                                   next_part[i,-self.kf.lz:].reshape((self.kf.lz,1))))
-#            xp = f[i] + A[i].dot(zl[i])
-#            Sigma = A[i].dot(Pl[i]).dot(A[i].T) + Q[i]
-#            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
-#            lpx[i] = kalman.lognormpdf_cho(x_next-xp,Schol)
-#        
-#        return lpx
-#
-#    def sample_smooth(self, particles, next_part, u, t):
-#        """ Implements the sample_smooth function for MixedNLGaussian models """
-#        M = len(particles)
-#        res = numpy.zeros((M,self.lxi+self.kf.lz + 2*self.kf.lz**2+self.kf.lz))
-#        part = numpy.copy(particles)
-#        (xil, zl, Pl) = self.get_states(part)
-#        
-#        Mz = numpy.zeros((M, self.kf.lz, self.kf.lz))
-#        
-#        if (next_part != None):
-#            (xinl, znl, Pnl) = self.get_states(next_part)
-#            (A, f, Q, _, _, _) = self.calc_A_f_Q(part, u=u, t=t)
-#            (xil, zl, Pl) = self.get_states(part)
-#            for j in range(M):
-#                W = A[j].T.dot(numpy.linalg.inv(Q[j]))
-#                Wa = W[:,:self.lxi]
-#                Wz = W[:,self.lxi:]
-#                fa = f[j][:self.lxi]
-#                fz = f[j][self.lxi:]
-#                Sigma = Pl[j] - Pl[j].dot(A[j].T).dot(
-#                                   numpy.linalg.inv(Q[j]+A[j].dot(Pl[j].dot(A[j].T)))
-#                                   ).dot(A[j]).dot(Pl[j])
-#                c = Sigma.dot(Wa.dot(xinl[j]-fa)-Wz.dot(fz)+numpy.linalg.solve(Pl[j],zl[j]))
-#                zl[j] = Sigma.dot(Wz).dot(znl[j])+c
-#                Mz[j] = Sigma.dot(Wz).dot(Pnl[j])
-#                Pl[j] = Sigma + Mz[j].dot(Wz.T).dot(Sigma)
-#               
-#               
-#        self.set_states(res, xil, zl, Pl)
-#        self.set_Mz(res, Mz)
-#
-#        for j in range(M):
-#            z = numpy.random.multivariate_normal(zl[j].ravel(), 
-#                                                 Pl[j]).ravel()
-#            res[j,-self.kf.lz:] = z
-#        return res
 
-    def copy_ind(self, particles, new_ind=None):
-        if (new_ind != None):
-            return numpy.copy(particles[new_ind])
-        else:
-            return numpy.copy(particles)
-    
-    def set_states(self, particles, xi_list, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
-        N = len(particles)
-        zend = self.lxi+self.kf.lz
-        Pend = zend+self.kf.lz**2
-
-        particles[:,:self.lxi] = xi_list.reshape((N, self.lxi))
-        particles[:,self.lxi:zend] = z_list.reshape((N, self.kf.lz))
-        particles[:,zend:Pend] = P_list.reshape((N, self.kf.lz**2))
- 
-    def get_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
-        N = len(particles)
-        zend = self.lxi+self.kf.lz
-        Pend = zend+self.kf.lz**2
-        
-        xil = particles[:,:self.lxi, numpy.newaxis]
-        zl = particles[:,self.lxi:zend, numpy.newaxis]
-        Pl = particles[:,zend:Pend].reshape((N, self.kf.lz, self.kf.lz))
-        
-        return (xil, zl, Pl)
-    
-    def get_Mz(self, smooth_particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
-        N = len(smooth_particles)
-        zend = self.lxi+self.kf.lz
-        Pend = zend+self.kf.lz**2
-        Mend = Pend + self.kf.lz**2
-
-        Mz = smooth_particles[:,Pend:Mend].reshape((N, self.kf.lz, self.kf.lz))
-        return Mz
-    
-    def set_Mz(self, smooth_particles, Mz):
-        N = len(smooth_particles)
-        zend = self.lxi+self.kf.lz
-        Pend = zend+self.kf.lz**2
-        Mend = Pend + self.kf.lz**2
-            
-        smooth_particles[:,Pend:Mend] = Mz.reshape((N, self.kf.lz**2))
-    
     def set_params(self, params):
         self.params = numpy.copy(params).reshape((-1,1))
 

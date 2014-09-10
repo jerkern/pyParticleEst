@@ -51,18 +51,20 @@ class Model(HierarchicalRSBase):
         super(Model, self).__init__(len_xi=1, len_z=2, fz=fz, Qz=Q_z, hz=hz, R=R_z)
         
     def create_initial_estimate(self, N):
-        particles = numpy.empty((N,), dtype=numpy.ndarray)
+        particles = numpy.zeros((N,self.lxi+self.kf.lz+2*self.kf.lz**2))
                
         for i in xrange(N):
-            particles[i] = numpy.empty(7)
-            particles[i][0] = numpy.random.normal(0.0, math.sqrt(self.P0_xi))
-            particles[i][1:3] = numpy.zeros((1, 2))
-            particles[i][3:] = numpy.copy(self.P0_z).ravel()  
+            particles[i,0] = numpy.random.normal(0.0, math.sqrt(self.P0_xi))
+            particles[i,1:3] = numpy.zeros((1, 2))
+            particles[i,3:7] = numpy.copy(self.P0_z).ravel()
         return particles
     
     def get_rb_initial(self, xi0):
-        return (numpy.zeros((self.kf.lz,1)),
-                numpy.copy(self.P0_z))
+        N = len(xi0)
+        z0 = numpy.zeros((self.kf.lz,1))
+        z_list = numpy.repeat(z0.reshape((1,self.kf.lz,1)), N, 0)
+        P_list =  numpy.repeat(self.P0_z.reshape((1,self.kf.lz,self.kf.lz)), N, 0)
+        return (z_list, P_list)
         
     def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
@@ -78,8 +80,7 @@ class Model(HierarchicalRSBase):
     
     def logp_xnext_xi(self, particles, next_xi, u, t):
         self.pn_count = self.pn_count + len(particles)
-        tmp = numpy.vstack(particles)
-        xi = tmp[:,0:1,numpy.newaxis]
+        xi = particles[:,:self.lxi]
         return scipy.stats.norm.logpdf((next_xi-xi).ravel(), 0.0, math.sqrt(self.Q_xi))
 #        N = len(particles)
 #        lpxi = numpy.empty(N, dtype=float)
@@ -133,30 +134,7 @@ class Model(HierarchicalRSBase):
 #            Cz.append(numpy.asarray(((math.cos(particles[i][0]), math.sin(particles[i][0])),)))
         return (y[1], Cz, None, None)
     
-    def set_states(self, particles, xi_list, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
-        N = len(particles)
-        for i in xrange(N):
-            particles[i][0] = xi_list[i].ravel()
-            particles[i][1:3] = z_list[i].ravel()
-            particles[i][3:] = P_list[i].ravel()
- 
-    def get_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
 
-        xil = list()
-        zl = list()
-        Pl = list()
-        N = len(particles)
-        for i in xrange(N):
-            xil.append(particles[i][0:1].reshape(-1,1))
-            zl.append(particles[i][1:3].reshape(-1,1))
-            Pl.append(particles[i][3:].reshape(2,2))
-        
-        return (xil, zl, Pl)
     
 if __name__ == '__main__':
     steps = 100
@@ -192,12 +170,9 @@ if __name__ == '__main__':
             plt.plot((k,)*num, xi_vals[:,k], 'r.', markersize=1.0)
             
         for j in xrange(nums):
-            tmp = straj.traj[:,j]
-            xi = tmp[:,0]
-            z = tmp[:,1:]
-            plt.plot(range(steps+1), xi[:,0],'r--')
-            plt.plot(range(steps+1), z[:,0],'g--')
-            plt.plot(range(steps+1), z[:,1],'b--')
+            plt.plot(range(steps+1), straj.traj[:,j,0],'r--')
+            plt.plot(range(steps+1), straj.traj[:,j,1],'g--')
+            plt.plot(range(steps+1), straj.traj[:,j,2],'b--')
             
     #    plt.plot(range(steps+1), mvals[:,0], 'r.')
     #    plt.plot(range(steps+1), mvals[:,1], 'g.')

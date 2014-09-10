@@ -121,6 +121,24 @@ class RBPFBase(interfaces.ParticleFiltering):
         # Calc (z_{t+1} | xi_{t+1}, y_t)
         self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
 
+    def cond_predict(self, particles, xi_next, u, t):
+        # Calc (z_t | xi_{t+1}, y_t)
+        self.meas_xi_next(particles=particles, xi_next=xi_next, u=u, t=t)
+        #Compensate for noise correlation
+        (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
+        (_, zl, Pl) = self.get_states(particles)
+        # Predict next states conditioned on xi_next
+        for i in xrange(len(zl)):
+            # Predict z_{t+1}
+            (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
+
+        self.set_states(particles, xi_next, zl, Pl)
+
+    def copy_ind(self, particles, new_ind=None):
+        if (new_ind != None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
 
     
 class RBPSBase(RBPFBase, interfaces.FFBSi):
@@ -172,3 +190,49 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
                 self.set_Mz(straj[i,j:j+1,:], Ms[numpy.newaxis])
 
         return straj
+
+    def set_states(self, particles, xi_list, z_list, P_list):
+        """ Set the estimate of the Rao-Blackwellized states """
+        N = len(particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+
+        particles[:,:self.lxi] = xi_list.reshape((N, self.lxi))
+        particles[:,self.lxi:zend] = z_list.reshape((N, self.kf.lz))
+        particles[:,zend:Pend] = P_list.reshape((N, self.kf.lz**2))
+
+    def get_states(self, particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        N = len(particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+
+        xil = particles[:,:self.lxi, numpy.newaxis]
+        zl = particles[:,self.lxi:zend, numpy.newaxis]
+        Pl = particles[:,zend:Pend].reshape((N, self.kf.lz, self.kf.lz))
+
+        return (xil, zl, Pl)
+
+    def get_Mz(self, smooth_particles):
+        """ Return the estimate of the Rao-Blackwellized states.
+            Must return two variables, the first a list containing all the
+            expected values, the second a list of the corresponding covariance
+            matrices"""
+        N = len(smooth_particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+        Mend = Pend + self.kf.lz**2
+
+        Mz = smooth_particles[:,Pend:Mend].reshape((N, self.kf.lz, self.kf.lz))
+        return Mz
+
+    def set_Mz(self, smooth_particles, Mz):
+        N = len(smooth_particles)
+        zend = self.lxi+self.kf.lz
+        Pend = zend+self.kf.lz**2
+        Mend = Pend + self.kf.lz**2
+
+        smooth_particles[:,Pend:Mend] = Mz.reshape((N, self.kf.lz**2))

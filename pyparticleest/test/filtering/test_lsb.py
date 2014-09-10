@@ -342,7 +342,7 @@ if __name__ == '__main__':
         vals = numpy.zeros((2, num, steps+1))
  
         for i in range(steps+1):
-            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.straj[i])
+            (xil, zl, Pl) = model.get_states(ParamEstimator.straj.traj[i])
             svals[0,:,i] = numpy.vstack(xil).ravel()
             svals[1,:,i] = 25.0+C_theta.dot(numpy.hstack(zl)).ravel()
             (xil, zl, Pl) = model.get_states(ParamEstimator.pt.traj[i].pa.part)
