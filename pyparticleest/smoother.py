@@ -454,11 +454,11 @@ def mc_step(model, partp_prop, partp_curr, up, tp, curpart, y, u, t, partn):
 
     
     if (partp_prop != None and partp_curr != None):
-        logp_prev_prop = model.next_pdf_onestep(particles=partp_prop,
+        logp_prev_prop = model.logp_xnext(particles=partp_prop,
                                         next_part=xprop,
                                         u=up,
                                         t=tp)
-        logp_prev_curr = model.next_pdf_onestep(particles=partp_curr,
+        logp_prev_curr = model.logp_xnext(particles=partp_curr,
                                         next_part=curpart,
                                         u=up,
                                         t=tp)
@@ -477,14 +477,15 @@ def mc_step(model, partp_prop, partp_curr, up, tp, curpart, y, u, t, partn):
         logp_y_curr = numpy.zeros(M)
         
     if (partn != None):
-        logp_next_prop = model.next_pdf(particles=xprop,
-                                        next_part=partn,
-                                        u=u,
-                                        t=t)
-        logp_next_curr = model.next_pdf(particles=curpart,
-                                        next_part=partn,
-                                        u=u,
-                                        t=t)
+        # Temp hack, TODO input true future trajs
+        logp_next_prop = model.logp_xnext_full(particles=xprop,
+                                               future_trajs=partn[:,numpy.newaxis],
+                                               u=(u,),
+                                               t=(t,))
+        logp_next_curr = model.logp_xnext_full(particles=curpart,
+                                               future_trajs=partn[:,numpy.newaxis],
+                                               u=(u,),
+                                               t=(t,))
     else:
         logp_next_prop = numpy.zeros(M)
         logp_next_curr = numpy.zeros(M)                                  

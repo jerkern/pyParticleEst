@@ -1,6 +1,6 @@
 import numpy
-import pyparticleest.models.nlg
-import pyparticleest.filter as pf
+import pyparticleest.models.nlg as nlg
+import pyparticleest.pyparticleest as pyparticleest
 import matplotlib.pyplot as plt
 
 def generate_dataset(steps, P0, Q, R):
@@ -13,12 +13,7 @@ def generate_dataset(steps, P0, Q, R):
         
     return (x,y)
 
-def wmean(logw, val):
-    w = numpy.exp(logw)
-    w = w / sum(w)
-    return numpy.sum(w*val.ravel())
-
-class Model(pyparticleest.models.nlg.NonlinearGaussianInitialGaussian):
+class Model(nlg.NonlinearGaussianInitialGaussian):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """
@@ -48,11 +43,9 @@ if __name__ == '__main__':
     (x, y) = generate_dataset(steps, P0, Q, R)
     
     model = Model(P0, Q, R)
-    traj = pf.ParticleTrajectory(model, num)
-    for k in range(len(y)):
-        traj.forward(u=None, y=y[k])
+    sim = pyparticleest.Simulator(model, None, y)
+    sim.simulate(num, M, 'PF', 'mhbp', smoother_options={'R': 50}, meas_first=False)
     plt.plot(range(steps+1), x,'r-')
     plt.plot(range(1,steps+1), y, 'bx')
-    straj = traj.perform_smoothing(M, method='bp', smoother_options={'R': 50})
-    plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
+    plt.plot(range(steps+1), sim.straj.traj[:,:,0], 'g.')
     plt.show()

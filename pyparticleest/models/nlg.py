@@ -113,7 +113,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
             return numpy.max(pmax)
         
     def logp_xnext(self, particles, next_part, u, t):
-        """ Implements the next_pdf function for NonlinearGaussian models """
+        """ Implements the logp_xnext function for NonlinearGaussian models """
 #        N = len(particles)
 #        Nn = len(next_part)
 #        
@@ -156,7 +156,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
     def logp_smooth(self, prop_part, partp, up, tp, u, y, t, partn):
         """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
         if (partp != None):
-            return self.next_pdf(partp, prop_part, up, tp)
+            return self.logp_xnext(partp, prop_part, up, tp)
         else:
             return self.eval_logp_x0(prop_part, t=t)
     

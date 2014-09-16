@@ -34,6 +34,7 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
         self.P0 = numpy.copy(P0)
         self.Q= numpy.copy(Q)
         self.R=numpy.copy(R)
+        self.logxn_max = kalman.lognormpdf_scalar(numpy.zeros((1,)), self.Q)
     
     def create_initial_estimate(self, N):
         return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)) 
@@ -51,14 +52,13 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
         """ Return the log-pdf value of the measurement """
         return kalman.lognormpdf_scalar(0.05*particles**2-y, self.R)
     
-    def next_pdf(self, particles, next_part, u, t):
+    def logp_xnext(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)
         return kalman.lognormpdf_scalar(pn-next_part.ravel(), self.Q)
     
-    def next_pdf_max(self, particles, u, t):
-        #return scipy.stats.norm.logpdf(0.0, 0.0, numpy.sqrt(self.Q))
-        return kalman.lognormpdf_scalar(numpy.zeros((1,)), self.Q)
+    def logp_xnext_max(self, particles, u, t):
+        return self.logxn_max
     
     def sample_smooth(self, particles, next_part, u, y, t):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
@@ -74,30 +74,8 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-        #return scipy.stats.norm.logpdf(particles, 0.0, numpy.sqrt(self.P0))
         return kalman.lognormpdf_scalar(particles, self.P0)
     
-    def eval_logp_xnext(self, particles, particles_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        pn = 0.5*particles + 25.0*particles/(1+particles**2) + 8*math.cos(1.2*t)
-        #return scipy.stats.norm.logpdf(particles_next - pn, 0.0, numpy.sqrt(self.Q)).ravel()
-        return kalman.lognormpdf_scalar(particles_next - pn, self.Q)
-
-    
-    def eval_logp_y(self, particles, y, t):
-        """ Calculate gradient of a term of the I3 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
-        #logyprob = numpy.empty(len(particles), dtype=float)
-        #N = len(particles)
-        #return calc_stuff(logyprob, y, 0.05*particles**2, N, self.R)
-        #return scipy.stats.norm.logpdf(0.05*particles**2, y, numpy.sqrt(self.R)).ravel()
-        return kalman.lognormpdf_scalar(0.05*particles**2-y, self.R)
-
     def copy_ind(self, particles, new_ind=None):
         if (new_ind != None):
             return numpy.copy(particles[new_ind])

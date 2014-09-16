@@ -254,7 +254,11 @@ class MixedNLGaussian(RBPSBase):
         
     def logp_xnext(self, particles, next_part, u, t):
         """ Implements the next_pdf function for MixedNLGaussian models """
-        
+
+        # Next part is during the backward sample for the z-variables
+        # The full distrubition for the z_1:T conditioned on xi_1:T
+        # is recovered in the post_smooting step
+
         N = len(particles)
         Nn = len(next_part)
         if (N > 1 and Nn == 1):
@@ -409,6 +413,11 @@ class MixedNLGaussian(RBPSBase):
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
+
+        # This method differs from logp_xnext in that the x_next contains the
+        # Rao-Blackwellized estimates of z condiotioned on the nonlinear
+        # trajectory, whereas the other function uses sampled values for z
+
         # Calculate l2 according to (16)
         N = len(particles)
         lpxn = 0.0

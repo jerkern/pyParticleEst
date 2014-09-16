@@ -1,6 +1,6 @@
 import numpy
 import pyparticleest.models.mlnlg as mlnlg
-import pyparticleest.filter as pf
+import pyparticleest.pyparticleest as pyparticleest
 import matplotlib.pyplot as plt
 
 def generate_dataset(steps, P0_xi, P0_z, Qxi, Qz, Qxiz, R):
@@ -26,7 +26,6 @@ def wmean(logw, val):
     w.reshape((1,-1))
     return w.dot(val)
 
-#class Model(mlnlg.MixedNLGaussianInitialGaussian):
 class Model(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
     """ xi_{k+1} = xi_k + z_k + v_xi_k, v_xi ~ N(0,Q_xi)
         z_{k+1} = z_{k} + v_z, v_z_k ~ N(0, Q_z) 
@@ -72,13 +71,9 @@ if __name__ == '__main__':
     (x, y) = generate_dataset(steps, P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
     
     model = Model(P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
-    traj = pf.ParticleTrajectory(model, num, filter='PF')
+    sim = pyparticleest.Simulator(model, None, y)
+    sim.simulate(num, nums, 'PF', 'full', meas_first=False)
 
-    for k in range(len(y)):
-        traj.forward(u=None, y=y[k])
-    straj = traj.perform_smoothing(M=nums, method='full')
-        
-#    print("pn_count = %d", traj.pf.model.pn_count)
     if (True):
         plt.plot(range(steps+1), x[0,:],'r-')
         plt.plot(range(steps+1), x[1,:],'b-')
@@ -88,19 +83,19 @@ if __name__ == '__main__':
         z_vals = numpy.empty((num, steps+1))
         mvals = numpy.empty((steps+1, 2))
         for k in range(steps+1):
-            part_exp = numpy.vstack(traj.traj[k].pa.part)
+            part_exp = numpy.vstack(sim.pt.traj[k].pa.part)
             xi_vals[:,k] = part_exp[:,0]
             z_vals[:,k] = part_exp[:,1]
-            mvals[k,:] = wmean(traj.traj[k].pa.w, 
+            mvals[k,:] = wmean(sim.pt.traj[k].pa.w,
                                part_exp[:,:2])
             plt.plot((k,)*num, xi_vals[:,k], 'r.', markersize=1.0)
             plt.plot((k,)*num, z_vals[:,k], 'b.', markersize=1.0)
 
             
         for j in xrange(nums):
-            tmp = numpy.hstack(straj.traj[:,j])
-            xi = straj.straj[:,j,0]
-            z = straj.straj[:,j,1]
+            tmp = numpy.hstack(sim.straj.traj[:,j])
+            xi = sim.straj.traj[:,j,0]
+            z = sim.straj.traj[:,j,1]
             plt.plot(range(steps+1), xi,'r--')
             plt.plot(range(steps+1), z,'b--')
             

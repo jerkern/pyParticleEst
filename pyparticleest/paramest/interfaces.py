@@ -25,21 +25,23 @@ class ParamEstInterface(object):
             respect to the corresponding parameter"""
         pass
     
-    @abc.abstractmethod
     def eval_logp_xnext(self, particles, particles_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-        pass
+        # Here we can just reuse the method used in the particle smoothing as default
+        return self.logp_xnext(particles, particles_next, u, t)
     
-    @abc.abstractmethod    
     def eval_logp_y(self, particles, y, t):
         """ Calculate gradient of a term of the I3 integral approximation
             as specified in [1].
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
-        pass
+
+        # Default implementation, doesn't work for classes were the measure updates
+        # the internal state of the particle (e.g Rao-Blackwellized models)
+        return self.measure(particles, y, t)
     
 
     

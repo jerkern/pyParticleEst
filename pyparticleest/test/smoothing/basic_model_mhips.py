@@ -1,6 +1,6 @@
 import numpy
-import pyparticleest.models.nlg
-import pyparticleest.filter as pf
+import pyparticleest.models.nlg as nlg
+import pyparticleest.pyparticleest as pyparticleest
 import matplotlib.pyplot as plt
 import time
 
@@ -14,12 +14,7 @@ def generate_dataset(steps, P0, Q, R):
         
     return (x,y)
 
-def wmean(logw, val):
-    w = numpy.exp(logw)
-    w = w / sum(w)
-    return numpy.sum(w*val.ravel())
-
-class Model(pyparticleest.models.nlg.NonlinearGaussianInitialGaussian):
+class Model(nlg.NonlinearGaussianInitialGaussian):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """
@@ -49,13 +44,11 @@ if __name__ == '__main__':
     (x, y) = generate_dataset(steps, P0, Q, R)
     
     model = Model(P0, Q, R)
-    traj = pf.ParticleTrajectory(model, num)
-    for k in range(len(y)):
-        traj.forward(u=None, y=y[k])
+    sim = pyparticleest.Simulator(model, None, y)
+    sim.simulate(num, M, 'PF', 'ancestor', smoother_options={'R': 50}, meas_first=False)
     plt.plot(range(steps+1), x,'r-')
     plt.plot(range(1,steps+1), y, 'bx')
-    straj = traj.perform_smoothing(M, method='ancestor')
-    plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
+    plt.plot(range(steps+1), sim.straj.traj[:,:,0], 'g.')
     plt.ion()
     plt.show()
     time.sleep(5)
@@ -64,16 +57,16 @@ if __name__ == '__main__':
         plt.clf()
         plt.plot(range(steps+1), x,'r-')
         plt.plot(range(1,steps+1), y, 'bx')
-        plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
+        plt.plot(range(steps+1), sim.straj.traj[:,:,0], 'g.')
         plt.draw()
-        straj.perform_mhips_pass(straj.straj, M, None)
+        sim.straj.perform_mhips_pass(None)
         time.sleep(1)
         
     plt.ioff()
     plt.clf()
     plt.plot(range(steps+1), x,'r-')
     plt.plot(range(1,steps+1), y, 'bx')
-    plt.plot(range(steps+1), straj.straj[:,:,0], 'g.')
+    plt.plot(range(steps+1), sim.straj.traj[:,:,0], 'g.')
 #    for k in xrange(num):
 #        ind = k
 #        for j in reversed(xrange(len(traj.traj)-1)):
