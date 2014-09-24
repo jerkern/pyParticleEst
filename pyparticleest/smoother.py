@@ -3,7 +3,7 @@
 import numpy
 import filter as pf
 
-def bsi_full(pa, model, future_trajs, ut, tt):
+def bsi_full(pa, model, future_trajs, ut, yt, tt):
     # Perform backward simulation by evaluating all transitation densities
     # and then randomly sample a index from the catagorical distribution
 
@@ -11,7 +11,7 @@ def bsi_full(pa, model, future_trajs, ut, tt):
     res = numpy.empty(M, dtype=int)
     for j in xrange(M):
         p_next = model.logp_xnext_full(pa.part, future_trajs[:, j:(j + 1)],
-                                       ut, tt)
+                                       ut=ut, yt=yt, tt=tt)
 
         w = pa.w + p_next
         w = w - numpy.max(w)
@@ -21,7 +21,7 @@ def bsi_full(pa, model, future_trajs, ut, tt):
     return res
 
 
-def bsi_rs(pa, model, future_trajs, ut, tt, maxpdf, max_iter):
+def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
     # Perform backward simulation using rejection sampling, after
     # max_iter attemps to find a suitable particle fall back
     # to evaluating all the weights
@@ -37,7 +37,7 @@ def bsi_rs(pa, model, future_trajs, ut, tt, maxpdf, max_iter):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
         pn = model.logp_xnext_full(pa.part[ind], future_trajs[:, todo],
-                                   ut=ut, tt=tt)
+                                   ut=ut, yt=yt, tt=tt)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         res[todo[accept]] = ind[accept]
@@ -48,10 +48,10 @@ def bsi_rs(pa, model, future_trajs, ut, tt, maxpdf, max_iter):
     # TODO, is there an efficient way to store those weights
     # already calculated to avoid double work, or will that
     # take more time than simply evaulating them all again?
-    res[todo] = bsi_full(pa, model, future_trajs[:, todo], ut=ut, tt=tt)
+    res[todo] = bsi_full(pa, model, future_trajs[:, todo], ut=ut, yt=yt, tt=tt)
     return res
 
-def bsi_rsas(pa, model, future_trajs, ut, tt, maxpdf, x1, P1, sv, sw, ratio):
+def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio):
     # Perform backward simulation using rejection sampling, adaptively
     # decide when to switch over to the full evaluation of weights by
     # using a Kalman filter to estimate the predicted acceptance rate
@@ -70,7 +70,7 @@ def bsi_rsas(pa, model, future_trajs, ut, tt, maxpdf, x1, P1, sv, sw, ratio):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
         pn = model.logp_xnext_full(pa.part[ind], future_trajs[:, todo],
-                                   ut=ut, tt=tt)
+                                   ut=ut, yt=yt, tt=tt)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         ak = numpy.sum(accept)
@@ -90,10 +90,10 @@ def bsi_rsas(pa, model, future_trajs, ut, tt, maxpdf, x1, P1, sv, sw, ratio):
         if (pk < stop_criteria):
             break
 
-    res[todo] = bsi_full(pa, model, future_trajs[:, todo], ut=ut, tt=tt)
+    res[todo] = bsi_full(pa, model, future_trajs[:, todo], ut=ut, yt=yt, tt=tt)
     return res
 
-def bsi_mcmc(pa, model, future_trajs, ut, tt, R, ancestors):
+def bsi_mcmc(pa, model, future_trajs, ut, yt, tt, R, ancestors):
     # Perform backward simulation using an MCMC sampler proposing new
     # backward particles, initialized with the filtered trajectory
 
@@ -103,11 +103,12 @@ def bsi_mcmc(pa, model, future_trajs, ut, tt, R, ancestors):
     weights -= numpy.max(weights)
     weights = numpy.exp(weights)
     weights /= numpy.sum(weights)
-    pind = model.logp_xnext_full(pa.part[ind], future_trajs, ut=ut, tt=tt)
+    pind = model.logp_xnext_full(pa.part[ind], future_trajs,
+                                 ut=ut, yt=yt, tt=tt)
     for _j in xrange(R):
         propind = numpy.random.permutation(pf.sample(weights, M))
         pprop = model.logp_xnext_full(pa.part[propind], future_trajs,
-                                      ut=ut, tt=tt)
+                                      ut=ut, yt=yt, tt=tt)
         diff = pprop - pind
         diff[diff > 0.0] = 0.0
         test = numpy.log(numpy.random.uniform(size=M))
@@ -135,7 +136,8 @@ class SmoothTrajectory(object):
             self.t[i] = pt[i].t
 
         self.model = pt.pf.model
-        if (method == 'full' or method == 'mcmc' or method == 'rs' or method == 'rsas'):
+        if (method == 'full' or method == 'mcmc' or method == 'rs' or
+            method == 'rsas'):
             self.perform_bsi(pt=pt, M=M, method=method, options=options)
         elif (method == 'ancestor'):
             self.perform_ancestors(pt=pt, M=M)
@@ -240,26 +242,27 @@ class SmoothTrajectory(object):
             tt = self.t[cur_ind:]
 
             if (method == 'rs'):
-                ind = bsi_rs(pa, self.model, ft, ut, tt,
-                             options['maxpdf'][cur_ind],
-                             int(max_iter))
+                ind = bsi_rs(pa, self.model, ft, ut=ut, yt=yt, tt=tt,
+                             maxpdf=options['maxpdf'][cur_ind],
+                             max_iter=int(max_iter))
             elif (method == 'rsas'):
-                ind = bsi_rsas(pa, self.model, ft, ut, tt,
-                               options['maxpdf'][cur_ind], x1,
-                               P1, sv, sw, ratio)
+                ind = bsi_rsas(pa, self.model, ft, ut=ut, yt=yt, tt=tt,
+                               maxpdf=options['maxpdf'][cur_ind], x1=x1,
+                               P1=P1, sv=sv, sw=sw, ratio=ratio)
             elif (method == 'mcmc'):
-                ind = bsi_mcmc(pa, self.model, ft, ut, tt, options['R'],
-                               ancestors)
+                ind = bsi_mcmc(pa, self.model, ft, ut=ut, yt=yt, tt=tt,
+                               R=options['R'], ancestors=ancestors)
                 ancestors = step.ancestors[ind]
             elif (method == 'full'):
-                ind = bsi_full(pa, self.model, ft, ut, tt)
+                ind = bsi_full(pa, self.model, ft, ut=ut, yt=yt, tt=tt)
             elif (method == 'ancestor'):
                 ind = ancestors
                 ancestors = step.ancestors[ind]
             # Select 'previous' particle
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(pa.part[ind],
-                                                                     ft, ut,
-                                                                     yt, tt))
+                                                                     ft, ut=ut,
+                                                                     yt=yt,
+                                                                     tt=tt))
 
         if hasattr(self.model, 'post_smoothing'):
             # Do e.g. constrained smoothing for RBPS models
@@ -409,10 +412,12 @@ class SmoothTrajectory(object):
                 logp_next_prop = self.model.logp_xnext_full(particles=xprop,
                                                             future_trajs=ft,
                                                             ut=self.u[i:],
+                                                            yt=self.y[i:],
                                                             tt=self.t[i:])
                 logp_next_curr = self.model.logp_xnext_full(particles=self.traj[i],
                                                             future_trajs=ft,
                                                             ut=self.u[i:],
+                                                            yt=self.y[i:],
                                                             tt=self.t[i:])
             else:
                 ft = None
@@ -452,22 +457,22 @@ def mc_step(model, partp_prop, partp_curr, up, tp, curpart,
                                  future_trajs=future_trajs)
 
     # Accept/reject new sample
-    logp_q_prop = model.logp_smooth(xprop,
-                                    partp=partp_prop,
-                                    up=up,
-                                    tp=tp,
-                                    yt=yt,
-                                    ut=ut,
-                                    tt=tt,
-                                    future_trajs=future_trajs)
-    logp_q_curr = model.logp_smooth(curpart,
-                                    partp=partp_curr,
-                                    up=up,
-                                    tp=tp,
-                                    yt=yt,
-                                    ut=ut,
-                                    tt=tt,
-                                    future_trajs=future_trajs)
+    logp_q_prop = model.logp_proposal(xprop,
+                                      partp=partp_prop,
+                                      up=up,
+                                      tp=tp,
+                                      yt=yt,
+                                      ut=ut,
+                                      tt=tt,
+                                      future_trajs=future_trajs)
+    logp_q_curr = model.logp_proposal(curpart,
+                                      partp=partp_curr,
+                                      up=up,
+                                      tp=tp,
+                                      yt=yt,
+                                      ut=ut,
+                                      tt=tt,
+                                      future_trajs=future_trajs)
 
 
     if (partp_prop != None and partp_curr != None):
@@ -497,10 +502,12 @@ def mc_step(model, partp_prop, partp_curr, up, tp, curpart,
         logp_next_prop = model.logp_xnext_full(particles=xprop,
                                                future_trajs=future_trajs,
                                                ut=ut,
+                                               yt=yt,
                                                tt=tt)
         logp_next_curr = model.logp_xnext_full(particles=curpart,
                                                future_trajs=future_trajs,
                                                ut=ut,
+                                               yt=yt,
                                                tt=tt)
     else:
         logp_next_prop = numpy.zeros(M)

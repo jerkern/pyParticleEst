@@ -70,26 +70,27 @@ class Instrumenter(object):
         self.cnt_pdfxnmax += len(particles)
         return self.model.logp_xnext_max(particles, u, t)
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        return self.model.sample_smooth(particles, next_part, u, y, t)
+        return self.model.sample_smooth(particles, future_trajs, ut, yt, tt)
 
-    def propose_smooth(self, partp, up, tp, u, y, t, partn):
+    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
         """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
         if (partp != None):
             N = len(partp)
         else:
-            N = len(partn)
+            N = future_trajs.shape[1]
         self.cnt_propsmooth += N
-        return self.model.propose_smooth(partp, up, tp, u, y, t, partn)
+        return self.model.propose_smooth(partp, up, tp, ut, yt, tt, future_trajs)
 
-    def logp_smooth(self, prop_part, partp, up, tp, u, y, t, partn):
+    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
         """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
         self.cnt_pdfsmooth += len(prop_part)
-        return self.model.logp_smooth(prop_part, partp, up, tp, u, y, t, partn)
+        return self.model.logp_proposal(prop_part, partp, up, tp,
+                                        ut, yt, tt, future_trajs)
 
-    def logp_xnext_full(self, particles, future_trajs, u, t):
-        return self.model.logp_xnext_full(particles, future_trajs, u, t)
+    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+        return self.model.logp_xnext_full(particles, future_trajs, ut, yt, tt)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.cnt_eval1st += len(particles)

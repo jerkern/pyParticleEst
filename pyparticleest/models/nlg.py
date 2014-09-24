@@ -157,7 +157,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
             prop_part = self.create_initial_estimate(future_trajs.shape[1])
         return prop_part
 
-    def logp_smooth(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
         """ Eval log q(x_t | x_{t-1}, x_{t+1:T}, y_t) """
         if (partp != None):
             return self.logp_xnext(partp, prop_part, up, tp)

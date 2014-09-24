@@ -49,7 +49,7 @@ class FFBSi(ParticleFiltering):
     """ Base class for particles to be used with particle smoothing """
     __metaclass__ = abc.ABCMeta
 
-    def logp_xnext_full(self, particles, future_trajs, ut, tt):
+    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
         """ Return the log-pdf value for the entire future trajectory.
             Useful for non-markovian modeles, that result from e.g 
             marginalized state-space models """
@@ -86,6 +86,6 @@ class SampleProposer(object):
         pass
 
     @abc.abstractmethod
-    def logp_proposal(self, prop_part, partp, up, tp, u, y, t, future_trajs):
+    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
         """ Eval log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T) """
         pass

@@ -764,7 +764,7 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
         return (eta, L)
 
 
-    def logp_xnext_full(self, particles, future_trajs, ut, tt):
+    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
         """ Implements the next_pdf function for MixedNLGaussian models """
 
         N = len(particles)
