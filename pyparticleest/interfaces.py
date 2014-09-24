@@ -1,7 +1,6 @@
 """ Collection of functions and classes used for Particle Filtering/Smoothing """
 import abc
 import numpy
-import copy
 
 class ParticleFiltering(object):
     """ Base class for particles to be used with particle filtering.
@@ -50,21 +49,24 @@ class FFBSi(ParticleFiltering):
     """ Base class for particles to be used with particle smoothing """
     __metaclass__ = abc.ABCMeta
 
-    @abc.abstractmethod
-    def logp_xnext(self, particles, next_part, u, t):
-        """ Return the log-pdf value for the possible future state 'next' given input u """
-        pass
-
-    def logp_xnext_full(self, particles, future_trajs, u, t):
-        """ Return the log-pdf value for the entire future trajectory. Useful for non-markovian
-            modeles, that result e.g marginalised state-space models """
+    def logp_xnext_full(self, particles, future_trajs, ut, tt):
+        """ Return the log-pdf value for the entire future trajectory.
+            Useful for non-markovian modeles, that result from e.g 
+            marginalized state-space models """
 
         # Default implemenation for markovian models, just look at the next state
-        return self.logp_xnext(particles, future_trajs[:, 0], u[0], t[0])
+        return self.logp_xnext(particles, next_part=future_trajs[0],
+                               u=ut[0], t=tt[0])
 
-    def sample_smooth(self, particles, next_part, u, y, t):
-        """ Return representation of smoothed particle estimates, useful for calulating
-            e.g sufficient statistics backward in time """
+    @abc.abstractmethod
+    def logp_xnext(self, particles, next_part, u, t):
+        """ Return the log-pdf value for the possible future state 'next'
+            given input u """
+        pass
+
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+        """ Return representation of smoothed particle estimates, useful for
+            calulating e.g sufficient statistics backward in time """
         # default implementation uses the same format as forward in time
         return numpy.copy(particles)
 
@@ -72,16 +74,18 @@ class FFBSiRS(FFBSi):
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
     def logp_xnext_max(self, particles, u, t):
-        """ Return the log-pdf value for the possible future state 'next' given input u """
+        """ Return the log-pdf value for the possible future state 'next'
+            given input u """
         pass
 
 class SampleProposer(object):
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def propose_smooth(self, partp, up, tp, u, y, t, partn):
-        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
+    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
+        """ Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T) """
         pass
+
     @abc.abstractmethod
-    def logp_proposal(self, prop_part, partp, up, tp, u, y, t, partn):
-        """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
+    def logp_proposal(self, prop_part, partp, up, tp, u, y, t, future_trajs):
+        """ Eval log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T) """
         pass

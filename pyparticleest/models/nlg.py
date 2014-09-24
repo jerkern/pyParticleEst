@@ -142,27 +142,27 @@ class NonlinearGaussian(interfaces.FFBSiRS):
 
         return lpx
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         return particles
 
-    def propose_smooth(self, partp, up, tp, u, y, t, partn):
-        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
+    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
+        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1:T}, y_t:T) """
         # Trivial choice of q, discard y_T and x_{t+1}
         if (partp != None):
             noise = self.sample_process_noise(partp, up, tp)
             prop_part = numpy.copy(partp)
             prop_part = self.update(prop_part, up, tp, noise)
         else:
-            prop_part = self.create_initial_estimate(len(partn))
+            prop_part = self.create_initial_estimate(future_trajs.shape[1])
         return prop_part
 
-    def logp_smooth(self, prop_part, partp, up, tp, u, y, t, partn):
-        """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
+    def logp_smooth(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+        """ Eval log q(x_t | x_{t-1}, x_{t+1:T}, y_t) """
         if (partp != None):
             return self.logp_xnext(partp, prop_part, up, tp)
         else:
-            return self.eval_logp_x0(prop_part, t=t)
+            return self.eval_logp_x0(prop_part, t=tt[0])
 
     def set_params(self, params):
         self.params = numpy.copy(params).reshape((-1, 1))

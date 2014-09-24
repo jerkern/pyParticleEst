@@ -104,7 +104,7 @@ class LTV(FFBSi):
     def sample_process_noise(self, particles, u, t):
         return None
 
-    def sample_smooth(self, particle, next_part, u, y, t):
+    def sample_smooth(self, particle, future_trajs, ut, yt, tt):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
 
         (zl, Pl) = self.get_states(particle)
@@ -113,12 +113,13 @@ class LTV(FFBSi):
         lzP = lz + lz * lz
         res = numpy.empty((M, lz + 2 * lz ** 2))
         for j in xrange(M):
-            if (next_part != None):
-                zn = next_part[j, :lz].reshape((lz, 1))
-                Pn = next_part[j, lz:lzP].reshape((lz, lz))
-                (A, f, Q) = self.get_pred_dynamics(u=u, t=t)
+            if (future_trajs != None):
+                zn = future_trajs[0, j, :lz].reshape((lz, 1))
+                Pn = future_trajs[0, j, lz:lzP].reshape((lz, lz))
+                (A, f, Q) = self.get_pred_dynamics(u=ut[0], t=tt[0])
                 self.kf.set_dynamics(A=A, Q=Q, f_k=f)
-                (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
+                (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A,
+                                              self.kf.f_k, self.kf.Q)
             else:
                 zs = zl[j]
                 Ps = Pl[j]

@@ -60,9 +60,9 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
     def logp_xnext_max(self, particles, u, t):
         return self.logxn_max
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        return particles
+        return particles.reshape((-1, 1))
 
     def set_params(self, params):
         """ New set of parameters for which the integral approximation terms will be evaluated"""

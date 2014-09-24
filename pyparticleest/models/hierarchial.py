@@ -74,17 +74,19 @@ class HierarchicalBase(RBPSBase):
 
         return lpxi + lpz
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         M = len(particles)
         res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
         for j in range(M):
             part = numpy.copy(particles[j:j + 1])
             (xil, zl, Pl) = self.get_states(part,)
-            if (next_part != None):
-                (A, f, Q, _, _, _) = self.get_lin_pred_dynamics_int(part, u, t)
+            if (future_trajs != None):
+                (A, f, Q, _, _, _) = self.get_lin_pred_dynamics_int(part,
+                                                                    ut[0],
+                                                                    tt[0])
                 # Measure the sampled next state,
-                self.kf.measure_full(next_part[j, self.lxi:(self.lxi + self.kf.lz)].reshape((-1, 1)),
+                self.kf.measure_full(future_trajs[0, j, self.lxi:(self.lxi + self.kf.lz)].reshape((-1, 1)),
                                      zl[0], Pl[0], C=A[0], h_k=f[0], R=Q[0])
 
             xi = copy.copy(xil[0]).ravel()

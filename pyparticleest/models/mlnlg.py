@@ -288,18 +288,19 @@ class MixedNLGaussian(RBPSBase):
 
         return lpx
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         M = len(particles)
         res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
         part = numpy.copy(particles)
         (xil, zl, Pl) = self.get_states(part)
 
-        if (next_part != None):
-            (xinl, znl, _unused) = self.get_states(next_part)
-            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=u, t=t)
+        if (future_trajs != None):
+            (xinl, znl, _unused) = self.get_states(future_trajs[0])
+            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=ut[0],
+                                                            t=tt[0])
 
-            self.meas_xi_next(part, xinl, u=u, t=t)
+            self.meas_xi_next(part, xinl, u=ut[0], t=tt[0])
 
             (xil, zl, Pl) = self.get_states(part)
 
@@ -717,8 +718,10 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
         Omega = numpy.zeros_like(OHnl)
         Lambda = numpy.zeros_like(LHnl)
 
-        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u, t=t)
-        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles,
+                                                               u=u, t=t)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles,
+                                                                     u=u, t=t)
 
         for j in xrange(M):
             F = factor_psd(Qz[j])
@@ -761,18 +764,19 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
         return (eta, L)
 
 
-    def logp_xnext(self, particles, next_part, u, t):
+    def logp_xnext_full(self, particles, future_trajs, ut, tt):
         """ Implements the next_pdf function for MixedNLGaussian models """
 
         N = len(particles)
-        Nn = len(next_part)
+        Nn = future_trajs.shape[1]
         if (N > 1 and Nn == 1):
-            next_part = numpy.repeat(next_part, N, 0)
+            future_trajs = numpy.repeat(future_trajs[0:1], N, 1)
         lpx = numpy.empty(N)
         # (_, zl, Pl) = self.get_states(particles)
 
-        (logZ, Omega, Lambda) = self.calc_prop1(particles, next_part, u, t)
-        (eta, L) = self.calc_prop3(particles, Omega, Lambda, u, t)
+        (logZ, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0],
+                                                ut[0], tt[0])
+        (eta, L) = self.calc_prop3(particles, Omega, Lambda, ut[0], tt[0])
 
         for i in xrange(N):
             lpx[i] = logZ[i] - 0.5 * (numpy.linalg.slogdet(L[i])[1] + eta[i])
@@ -780,19 +784,20 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
 
         return lpx
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """ Implements the sample_smooth function for MixedNLGaussian models """
         M = len(particles)
         lxi = self.lxi
         lz = self.kf.lz
 
-        if (next_part != None):
-            (_, Omega, Lambda) = self.calc_prop1(particles, next_part, u, t)
+        if (future_trajs != None):
+            (_, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0],
+                                                 ut[0], tt[0])
 
         OHind = lxi
         OHlen = lz * lz
-        if (y != None):
-            ly = len(y)
+        if (yt != None and yt[0] != None):
+            ly = len(yt[0])
             LHlen = lz * ly
         else:
             LHlen = lz * Lambda[0].shape[1]
@@ -800,11 +805,11 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
         LHind = lxi + OHlen
         res = numpy.zeros((M, lxi + OHlen + LHlen))
 
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=y, t=t)
+        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=yt[0], t=tt[0])
 
         res[:, :lxi] = particles[:, :lxi]
 
-        if (next_part != None):
+        if (future_trajs != None):
             for j in range(M):
                 res[j, OHind:OHind + OHlen] = Omega[j].ravel()
                 res[j, LHind:] = Lambda[j].ravel()
@@ -814,7 +819,7 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
                 tmp = numpy.linalg.solve(Rz[j], Cz[j])
                 res[j, OHind:OHind + OHlen] += (Cz[j].T.dot(tmp)).ravel()
             if (y != None):
-                res[j, LHind:] += (tmp.T.dot(y - hz[j])).ravel()
+                res[j, LHind:] += (tmp.T.dot(yt[0] - hz[j])).ravel()
 
         return res
 

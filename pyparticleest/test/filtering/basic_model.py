@@ -48,7 +48,7 @@ class Model(interfaces.ParticleFiltering):
             logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1, 1) - y, self.R)
         return logyprob
 
-    def sample_smooth(self, particles, next_part, u, y, t):
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         return particles
 
 if __name__ == '__main__':
