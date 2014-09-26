@@ -16,6 +16,7 @@ class Instrumenter(object):
         self.cnt_update = 0
         self.cnt_measure = 0
         self.cnt_pdfxn = 0
+        self.cnt_pdfxn_full = 0
         self.cnt_pdfxnmax = 0
         self.cnt_propsmooth = 0
         self.cnt_pdfsmooth = 0
@@ -26,7 +27,7 @@ class Instrumenter(object):
         print "cnt_sample: %d" % self.cnt_sample
         print "cnt_update: %d" % self.cnt_update
         print "cnt_measure: %d" % self.cnt_measure
-        print "cnt_pdfxn: %d" % self.cnt_pdfxn
+        print "cnt_pdfxn: %d" % self.cnt_pdfxn + self.cnt_pdfxn_full
         print "cnt_pdfxnmax: %d" % self.cnt_pdfxnmax
         print "cnt_propsmooth: %d" % self.cnt_propsmooth
         print "cnt_pdfsmooth: %d" % self.cnt_pdfsmooth
@@ -90,6 +91,7 @@ class Instrumenter(object):
                                         ut, yt, tt, future_trajs)
 
     def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+        self.cnt_pdfxn += max(len(particles), future_trajs.shape[1])
         return self.model.logp_xnext_full(particles, future_trajs, ut, yt, tt)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
