@@ -712,7 +712,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         xinl = next_part[:, :lxi]
         OHnl = next_part[:, OHind:OHind + OHlen].reshape((M, lz, lz))
-        LHnl = next_part[:, LHind:].reshape((M, lz, -1))
+        LHnl = next_part[:, LHind:].reshape((M, lz, 1))
 
         logZ = numpy.zeros(M)
         Omega = numpy.zeros_like(OHnl)
@@ -796,12 +796,8 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         OHind = lxi
         OHlen = lz * lz
-        if (yt != None and yt[0] != None):
-            ly = len(yt[0])
-            LHlen = lz * ly
-        else:
-            LHlen = lz * Lambda[0].shape[1]
 
+        LHlen = lz
         LHind = lxi + OHlen
         res = numpy.zeros((M, lxi + OHlen + LHlen))
 
@@ -818,8 +814,9 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
             if (Cz != None and Cz[j] != None):
                 tmp = numpy.linalg.solve(Rz[j], Cz[j])
                 res[j, OHind:OHind + OHlen] += (Cz[j].T.dot(tmp)).ravel()
-            if (y != None):
-                res[j, LHind:] += (tmp.T.dot(yt[0] - hz[j])).ravel()
+            if (yt != None and yt[0] != None):
+                res[j, LHind:] += (tmp.T.dot(numpy.asarray(yt[0]).reshape((-1, 1)) -
+                                             hz[j])).ravel()
 
         return res
 

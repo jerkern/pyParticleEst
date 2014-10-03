@@ -60,7 +60,7 @@ def generate_dataset(params, length):
 
     return (y.T.tolist(), e_vec, z_vec)
 
-class ParticleLS2(mlnlg.MixedNLGaussianInitialGaussian):
+class ParticleLS2(mlnlg.MixedNLGaussianSampledInitialGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """
