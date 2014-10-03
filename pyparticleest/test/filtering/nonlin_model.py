@@ -32,10 +32,10 @@ class Model(pyparticleest.models.nlg.NonlinearGaussianInitialGaussian):
                                     Q=numpy.asarray(Q).reshape((1, 1)),
                                     R=numpy.asarray(R).reshape((1, 1)))
 
-    def get_f(self, particles, u, t):
+    def calc_f(self, particles, u, t):
         return numpy.sin(particles)
 
-    def get_g(self, particles, t):
+    def calc_g(self, particles, t):
         return particles
 
 

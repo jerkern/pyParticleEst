@@ -28,10 +28,10 @@ class Model(nlg.NonlinearGaussianInitialGaussian):
     def __init__(self, P0, Q, R):
         super(Model, self).__init__(Px0=P0, Q=Q, R=R)
 
-    def get_g(self, particles, t):
+    def calc_g(self, particles, t):
         return 0.05 * particles ** 2
 
-    def get_f(self, particles, u, t):
+    def calc_f(self, particles, u, t):
         return 0.5 * particles + 25.0 * particles / (1 + particles ** 2) + 8 * math.cos(1.2 * t)
 
 

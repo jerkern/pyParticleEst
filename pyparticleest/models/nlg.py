@@ -20,16 +20,16 @@ class NonlinearGaussian(interfaces.FFBSiRS):
 
     __metaclass__ = abc.ABCMeta
 
-    def get_f(self, particles, u, t):
+    def calc_f(self, particles, u, t):
         return None
 
-    def get_Q(self, particles, u, t):
+    def calc_Q(self, particles, u, t):
         return None
 
-    def get_g(self, particles, t):
+    def calc_g(self, particles, t):
         return None
 
-    def get_R(self, particles, t):
+    def calc_R(self, particles, t):
         return None
 
     def __init__(self, lxi, f=None, g=None, Q=None, R=None):
@@ -55,7 +55,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
     def sample_process_noise(self, particles, u, t):
         """ Return sampled process noise for the non-linear states """
         N = len(particles)
-        Q = self.get_Q(particles=particles, u=u, t=t)
+        Q = self.calc_Q(particles=particles, u=u, t=t)
         noise = numpy.random.normal(size=(self.lxi, N))
         if (Q == None):
             noise = self.Qcholtri.dot(noise)
@@ -68,7 +68,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
 
     def update(self, particles, u, t, noise):
         """ Update estimate using 'data' as input """
-        f = self.get_f(particles=particles, u=u, t=t)
+        f = self.calc_f(particles=particles, u=u, t=t)
         if (f == None):
             f = self.f
         particles[:] = f + noise
@@ -76,8 +76,8 @@ class NonlinearGaussian(interfaces.FFBSiRS):
 
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
-        g = self.get_g(particles=particles, t=t)
-        R = self.get_R(particles=particles, t=t)
+        g = self.calc_g(particles=particles, t=t)
+        R = self.calc_R(particles=particles, t=t)
         N = len(particles)
         lpy = numpy.empty(N)
         if (g == None):
@@ -106,7 +106,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
 
     def logp_xnext_max(self, particles, u, t):
         """ For rejection sampling, maximum value of the logp_xnext function """
-        Q = self.get_Q(particles, u, t)
+        Q = self.calc_Q(particles, u, t)
         dim = self.lxi
         l2pi = math.log(2 * math.pi)
         if (Q == None):
@@ -123,11 +123,11 @@ class NonlinearGaussian(interfaces.FFBSiRS):
     def logp_xnext(self, particles, next_part, u, t):
         """ Implements the logp_xnext function for NonlinearGaussian models """
 
-        f = self.get_f(particles, u, t)
+        f = self.calc_f(particles, u, t)
         if (f == None):
             f = self.f
         diff = next_part - f
-        Q = self.get_Q(particles, u, t)
+        Q = self.calc_Q(particles, u, t)
         if (Q == None):
             if (self.Qcholtri.shape[0] == 1):
                 lpx = kalman.lognormpdf_scalar(diff, self.Qcholtri)

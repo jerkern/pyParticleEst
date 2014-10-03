@@ -52,11 +52,14 @@ class Model(interfaces.ParticleFiltering):
         return particles
 
 if __name__ == '__main__':
-    steps = 100
-    num = 100
+    steps = 50
+    num = 50
     P0 = 1.0
     Q = 1.0
     R = numpy.asarray(((1.0,),))
+
+    # Make realization deterministic
+    numpy.random.seed(1)
     (x, y) = generate_dataset(steps, P0, Q, R)
 
     model = Model(P0, Q, R)
@@ -75,5 +78,7 @@ if __name__ == '__main__':
     # Plot "smoothed" trajectories to illustrate that the particle filter
     # suffers from degeneracy when considering the full trajectories
     plt.plot(range(steps + 1), svals[:, :, 0], 'b--')
+    plt.xlabel('t')
+    plt.ylabel('x')
 
     plt.show()

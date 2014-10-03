@@ -28,6 +28,14 @@ class ParticleFiltering(object):
         """ Return the log-pdf value of the measurement """
         pass
 
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+        """ Return representation of smoothed particle estimates, useful for
+            calulating e.g sufficient statistics backward in time """
+        # default implementation uses the same format as forward in time
+        # Is part of the ParticleFiltering interface since it is used
+        # also when calculating "ancestor trajectories"
+        return numpy.copy(particles)
+
     def copy_ind(self, particles, new_ind=None):
         if (new_ind != None):
             return numpy.copy(particles[new_ind])
@@ -64,11 +72,6 @@ class FFBSi(ParticleFiltering):
             given input u """
         pass
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """ Return representation of smoothed particle estimates, useful for
-            calulating e.g sufficient statistics backward in time """
-        # default implementation uses the same format as forward in time
-        return numpy.copy(particles)
 
 class FFBSiRS(FFBSi):
     __metaclass__ = abc.ABCMeta

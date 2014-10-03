@@ -10,7 +10,7 @@ import pyparticleest.utils.kalman as kalman
 
 
 
-class MixedNLGaussian(RBPSBase):
+class MixedNLGaussianSampled(RBPSBase):
     """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
     
         Implement this type of system by extending this class and provide the methods for returning 
@@ -36,7 +36,7 @@ class MixedNLGaussian(RBPSBase):
 
         self.lxi = lxi
 
-        return super(MixedNLGaussian, self).__init__(lz=lz,
+        return super(MixedNLGaussianSampled, self).__init__(lz=lz,
                                                      Az=Az, C=C,
                                                      Qz=Qz, R=R,
                                                      hz=h, fz=fz)
@@ -46,7 +46,7 @@ class MixedNLGaussian(RBPSBase):
                      C=None, h=None):
         """ Update dynamics, typically used when changing the system dynamics
             due to a parameter change """
-        super(MixedNLGaussian, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, fz=fz, hz=h)
+        super(MixedNLGaussianSampled, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, fz=fz, hz=h)
 
         if (Axi != None):
             self.Axi = numpy.copy(Axi)
@@ -249,7 +249,7 @@ class MixedNLGaussian(RBPSBase):
         return (A, f, Q, A_identical, f_identical, Q_identical)
 
     def logp_xnext_max(self, particles, u, t):
-        """ Implements the fwd_peak_density function for MixedNLGaussian models """
+        """ Implements the fwd_peak_density function for MixedNLGaussianSampled models """
         N = len(particles)
         pmax = numpy.empty(N)
         (_, _, Pl) = self.get_states(particles)
@@ -265,7 +265,7 @@ class MixedNLGaussian(RBPSBase):
         return numpy.max(pmax)
 
     def logp_xnext(self, particles, next_part, u, t):
-        """ Implements the next_pdf function for MixedNLGaussian models """
+        """ Implements the next_pdf function for MixedNLGaussianSampled models """
 
         # During the backward smoothing the next_part contain sampled
         # z-variables, the full distrubition for the z_1:T conditioned on xi_1:T
@@ -289,7 +289,7 @@ class MixedNLGaussian(RBPSBase):
         return lpx
 
     def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """ Implements the sample_smooth function for MixedNLGaussian models """
+        """ Implements the sample_smooth function for MixedNLGaussianSampled models """
         M = len(particles)
         res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
         part = numpy.copy(particles)
@@ -614,7 +614,7 @@ class MixedNLGaussian(RBPSBase):
         return (logpy, lpy_grad)
 
 
-class MixedNLGaussianInitialGaussian(MixedNLGaussian):
+class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
     def __init__(self, xi0, z0, Pxi0=None, Pz0=None, **kwargs):
 
                 # No uncertainty in initial state
@@ -629,7 +629,7 @@ class MixedNLGaussianInitialGaussian(MixedNLGaussian):
             self.Pz0 = numpy.copy((Pz0))
         self.z0 = numpy.copy(z0).reshape((-1, 1))
         self.Pz0 = numpy.copy(Pz0)
-        super(MixedNLGaussianInitialGaussian, self).__init__(lxi=len(self.xi0),
+        super(MixedNLGaussianSampledInitialGaussian, self).__init__(lxi=len(self.xi0),
                                                              lz=len(self.z0),
                                                              **kwargs)
 
@@ -693,7 +693,7 @@ def factor_psd(A):
     (U, s, V) = numpy.linalg.svd(A)
     return U.dot(numpy.diag(numpy.sqrt(s)))
 
-class MixedNLGaussianProperBSi(MixedNLGaussian):
+class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
     """ This class implements a fully marginalized smoother for 
         mixed linear/nonlinear models, in contrast to the MixedNLGaussian class
         it never samples the linear states.
@@ -823,6 +823,6 @@ class MixedNLGaussianProperBSi(MixedNLGaussian):
 
         return res
 
-class MixedNLGaussianInitialGaussianProperBSi(MixedNLGaussianProperBSi,
-                                              MixedNLGaussianInitialGaussian):
+class MixedNLGaussianMarginalizedInitialGaussian(MixedNLGaussianMarginalized,
+                                                 MixedNLGaussianSampledInitialGaussian):
     pass

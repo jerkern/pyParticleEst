@@ -26,10 +26,10 @@ class Model(nlg.NonlinearGaussianInitialGaussian):
                                     R=numpy.asarray(R).reshape((1, 1)))
 
 
-    def get_f(self, particles, u, t):
+    def calc_f(self, particles, u, t):
         return particles
 
-    def get_g(self, particles, t):
+    def calc_g(self, particles, t):
         return particles
 
 if __name__ == '__main__':

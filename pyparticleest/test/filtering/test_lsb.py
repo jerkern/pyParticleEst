@@ -64,7 +64,7 @@ def generate_dataset(length):
 
     return (y.T.tolist(), e_vec, z_vec)
 
-class ParticleLSB(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
+class ParticleLSB(mlnlg.MixedNLGaussianMarginalizedInitialGaussian):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self):
         """ Define all model variables """
