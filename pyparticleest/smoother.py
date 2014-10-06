@@ -7,8 +7,19 @@ import numpy
 import filter as pf
 
 def bsi_full(pa, model, future_trajs, ut, yt, tt):
-    # Perform backward simulation by evaluating all transitation densities
-    # and then randomly sample a index from the catagorical distribution
+    """
+    Perform backward simulation by drawing particles from
+    the categorical distribution with weights given by
+    \omega_{t|T}^i = \omega_{t|t}^i*p(x_{t+1}|x^i)
+
+    Args:
+    - pa (ParticleApproximation): particles approximation from which to sample
+    - model (FFBSi): model defining probability density function
+    - future_trajs (array-like): trajectory estimate of {t+1:T}
+    - ut (array-like): inputs signal for {t:T}
+    - yt (array-like): measurements for {t:T}
+    - tt (array-like): time stamps for {t:T}
+    """
 
     M = future_trajs.shape[1]
     res = numpy.empty(M, dtype=int)
@@ -25,9 +36,21 @@ def bsi_full(pa, model, future_trajs, ut, yt, tt):
 
 
 def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
-    # Perform backward simulation using rejection sampling, after
-    # max_iter attemps to find a suitable particle fall back
-    # to evaluating all the weights
+    """
+    Perform backward simulation by using rejection sampling to draw particles
+    from the categorical distribution with weights given by
+    \omega_{t|T}^i = \omega_{t|t}^i*p(x_{t+1}|x^i)
+
+    Args:
+     - pa (ParticleApproximation): particles approximation from which to sample
+     - model (FFBSi): model defining probability density function
+     - future_trajs (array-like): trajectory estimate of {t+1:T}
+     - ut (array-like): inputs signal for {t:T}
+     - yt (array-like): measurements for {t:T}
+     - tt (array-like): time stamps for {t:T}
+     - maxpdf (float): argmax p(x_{t+1:T}|x_t)
+     - max_iter (int): number of attempts before falling back to bsi_full
+    """
 
     M = future_trajs.shape[1]
     todo = numpy.asarray(range(M))
@@ -55,9 +78,33 @@ def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
     return res
 
 def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio):
-    # Perform backward simulation using rejection sampling, adaptively
-    # decide when to switch over to the full evaluation of weights by
-    # using a Kalman filter to estimate the predicted acceptance rate
+    """
+    Perform backward simulation by using rejection sampling to draw particles
+    from the categorical distribution with weights given by
+    \omega_{t|T}^i = \omega_{t|t}^i*p(x_{t+1}|x^i)
+
+    Adaptively determine when to to fallback to bsi_full by using a Kalman
+    filter to track the prediceted acceptance rate of the rejection sampler
+
+    Based on "Adaptive Stopping for Fast Particle Smoothing" by
+    Taghavi, Lindsten, Svensson and Sch\"{o}n. See orignal article for details
+    about the meaning of the Kalman filter paramters
+
+    Args:
+     - pa (ParticleApproximation): particles approximation from which to sample
+     - model (FFBSi): model defining probability density function
+     - future_trajs (array-like): trajectory estimate of {t+1:T}
+     - ut (array-like): inputs signal for {t:T}
+     - yt (array-like): measurements for {t:T}
+     - tt (array-like): time stamps for {t:T}
+     - maxpdf (float): argmax p(x_{t+1:T}|x_t)
+     - x1 (float): initial state of Kalman filter
+     - P1 (float): initial covariance of Kalman filter estimate
+     - sv (float): process noise (for Kalman filter)
+     - sw (float): measurement noise (for Kalman filter)
+     - ratio (float): cost ration of running rejection sampling compared to
+       switching to the full bsi (D_0 / D_1)
+    """
 
     M = future_trajs.shape[1]
     todo = numpy.asarray(range(M))
@@ -97,6 +144,21 @@ def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio)
     return res
 
 def bsi_mcmc(pa, model, future_trajs, ut, yt, tt, R, ancestors):
+    """
+    Perform backward simulation by using Metropolis-Hastings to draw particles
+    from the categorical distribution with weights given by
+    \omega_{t|T}^i = \omega_{t|t}^i*p(x_{t+1}|x^i)
+
+    Args:
+     - pa (ParticleApproximation): particles approximation from which to sample
+     - model (FFBSi): model defining probability density function
+     - future_trajs (array-like): trajectory estimate of {t+1:T}
+     - ut (array-like): inputs signal for {t:T}
+     - yt (array-like): measurements for {t:T}
+     - tt (array-like): time stamps for {t:T}
+     - R (int): number of iterations to run the markov chain
+     - ancestor (array-like): ancestor of each particle from the particle filter
+    """
     # Perform backward simulation using an MCMC sampler proposing new
     # backward particles, initialized with the filtered trajectory
 
@@ -122,10 +184,18 @@ def bsi_mcmc(pa, model, future_trajs, ut, yt, tt, R, ancestors):
     return ind
 
 class SmoothTrajectory(object):
-    """ Store smoothed trajectory """
-    def __init__(self, pt, M=1, method='normal', options=None):
-        """ Create smoothed trajectory from filtered trajectory
-            pt - particle trajectory to be smoothed  """
+    """
+    Create smoothed trajectory from filtered trajectory
+
+    Args:
+     - pt (ParticleTrajectory): Forward estimates (typically
+       generated by a ParticleFilter), combined with inputs and measurements
+     - M (int): Number of smoothed trajectories to create
+     - method (string): Smoothing method to use
+     - options (dict): options to pass on to the smoothing algorithm
+    """
+
+    def __init__(self, pt, M=1, method='full', options=None):
 
         self.traj = None
 
@@ -167,7 +237,14 @@ class SmoothTrajectory(object):
         return len(self.traj)
 
     def perform_ancestors(self, pt, M):
-        """ Create M smoothed trajectories by just using the filtered forward trajectories """
+        """
+        Create smoothed trajectories by taking the forward trajectories
+
+        Args:
+         - pt (ParticleTrajectory): forward trajetories
+         - M (int): number of trajectories to createa
+        """
+
         T = len(pt)
 
         tmp = numpy.copy(pt[-1].pa.w)
@@ -204,7 +281,15 @@ class SmoothTrajectory(object):
 
 
     def perform_bsi(self, pt, M, method, options):
+        """
+        Create smoothed trajectories using Backward Simulation
 
+        Args:
+         - pt (ParticleTrajectory): forward trajetories
+         - M (int): number of trajectories to createa
+         - method (string): Type of backward simulation to use
+         - optiones (dict): Parameters to the backward simulator
+        """
 
         # Sample from end time estimates
         tmp = numpy.copy(pt[-1].pa.w)
@@ -273,7 +358,14 @@ class SmoothTrajectory(object):
 
 
     def perform_mhbp(self, pt, M, R):
+        """
+        Create smoothed trajectories using Metropolis-Hastings Backward Propeser
 
+        Args:
+         - pt (ParticleTrajectory): forward trajetories
+         - M (int): number of trajectories to createa
+         - R (int): Number of proposal for each time step
+        """
         T = len(pt)
 
         # Initialise from end time estimates
@@ -349,6 +441,12 @@ class SmoothTrajectory(object):
 
 
     def perform_mhips_pass(self, options):
+        """
+        Perform a single MHIPS pass
+
+        Args:
+         - Options (None): Unused
+        """
         T = len(self.traj)
         for i in reversed(xrange((T))):
             yt = self.y[i:]
@@ -387,7 +485,14 @@ class SmoothTrajectory(object):
                     self.traj = self.model.post_smoothing(self)
 
     def perform_mhips_pass_reduced(self, pt, M, options):
-        """ Runs MHIPS with the proposal density q as p(x_{t+1}|x_t) """
+        """
+        Runs MHIPS with the proposal density q as p(x_{t+1}|x_t)
+
+        Args:
+         - pt (ParticleTrajectory): Forward esimates
+         - M (int): Number of backward trajectories
+         - options (None): Unused
+        """
         T = len(self.traj)
         for i in reversed(xrange((T))):
 
@@ -448,7 +553,21 @@ class SmoothTrajectory(object):
 
 def mc_step(model, partp_prop, partp_curr, up, tp, curpart,
             yt, ut, tt, future_trajs):
-    " Perform a single iteration of the MCMC sampler used for MHIPS and MHBP"
+    """
+    Perform a single iteration of the MCMC sampler used for MHIPS and MHBP
+
+    Args:
+     - model: model definition
+     - partp_prop (array-like): proposed previous particle
+     - partp_prop (array-like): current previous particle
+     - up (array-like): input at time t-1
+     - tp (array-like): timestamp at time t-1
+     - curpart: current accepted paricle
+     - yt (array-like): measurement at time t
+     - ut (array-like): input at time t
+     - tt (array-like): timestamp at time t
+     - future_trajs (array-like): particle approximations of {x_{t+1:T|T}}
+    """
     M = len(curpart)
 
     xprop = model.propose_smooth(partp=partp_prop,
