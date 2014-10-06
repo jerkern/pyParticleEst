@@ -1,4 +1,7 @@
-""" Collection of functions and classes used for Particle Filtering/Smoothing """
+""" Model definition for base class for Nonlinear Gaussian systems
+
+@author: Jerker Nordh
+"""
 import pyparticleest.interfaces as interfaces
 import scipy.linalg
 import numpy.random

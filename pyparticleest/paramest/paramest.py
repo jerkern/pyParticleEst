@@ -1,4 +1,7 @@
-""" Parameter estimation methods"""
+""" Parameter estimation classes
+
+@author: Jerker Nordh
+"""
 from pyparticleest.simulator import Simulator
 import numpy
 import scipy.optimize

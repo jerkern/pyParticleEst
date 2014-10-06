@@ -1,7 +1,7 @@
 '''
-Created on May 19, 2014
+Interfaces required for using the parameter estimation methods
 
-@author: ajn
+@author: Jerker Nordh
 '''
 import abc
 
@@ -24,7 +24,7 @@ class ParamEstInterface(object):
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
         pass
-    
+
     def eval_logp_xnext(self, particles, particles_next, u, t):
         """ Calculate gradient of a term of the I2 integral approximation
             as specified in [1].
@@ -32,7 +32,7 @@ class ParamEstInterface(object):
             respect to the corresponding parameter"""
         # Here we can just reuse the method used in the particle smoothing as default
         return self.logp_xnext(particles, particles_next, u, t)
-    
+
     def eval_logp_y(self, particles, y, t):
         """ Calculate gradient of a term of the I3 integral approximation
             as specified in [1].
@@ -42,9 +42,9 @@ class ParamEstInterface(object):
         # Default implementation, doesn't work for classes were the measure updates
         # the internal state of the particle (e.g Rao-Blackwellized models)
         return self.measure(particles, y, t)
-    
 
-    
+
+
 class ParamEstInterface_GradientSearch(ParamEstInterface):
     """ Interface s for particles to be used with the parameter estimation
         algorithm presented in [1]
@@ -67,8 +67,8 @@ class ParamEstInterface_GradientSearch(ParamEstInterface):
             The gradient is an array where each element is the derivative with 
             respect to the corresponding parameter"""
         pass
-    
-    @abc.abstractmethod    
+
+    @abc.abstractmethod
     def eval_logp_y_val_grad(self, particles, y, t):
         """ Calculate gradient of a term of the I3 integral approximation
             as specified in [1].

@@ -1,4 +1,6 @@
-""" Collection of functions and classes used for Particle Filtering/Smoothing """
+"""Model definition for base class for Linear Time-varying systems
+@author: Jerker Nordh
+"""
 from pyparticleest.interfaces import FFBSi
 import pyximport
 pyximport.install(inplace=True)

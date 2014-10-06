@@ -1,3 +1,9 @@
+""" Model definition for base class for Rao-Blackwellized models
+
+
+@author: Jerker Nordh
+"""
+
 import abc
 import pyparticleest.interfaces as interfaces
 import pyximport

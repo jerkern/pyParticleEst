@@ -1,4 +1,7 @@
-""" Collection of functions and classes used for Particle Filtering/Smoothing """
+""" Model definition for base class for Mixed Linear/Nonlinear Gaussian systems
+
+@author: Jerker Nordh
+"""
 from pyparticleest.models.rbpf import RBPSBase
 import scipy.linalg
 import numpy.random

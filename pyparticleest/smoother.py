@@ -1,4 +1,7 @@
-""" Rao-Blackwellized Particle smoother implementation """
+""" Collection of smoothing algorithms and support classes for using them
+
+@author: Jerker Nordh
+"""
 
 import numpy
 import filter as pf

@@ -1,7 +1,8 @@
 '''
-Created on May 19, 2014
+Simulator class providing the top-level interface to all the methods in the
+framework.
 
-@author: ajn
+@author: Jerker Nordh
 '''
 
 import numpy

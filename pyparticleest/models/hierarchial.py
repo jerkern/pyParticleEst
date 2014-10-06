@@ -1,4 +1,7 @@
-""" Collection of functions and classes used for Particle Filtering/Smoothing """
+""" Model definition for base class for hierarchical systems 
+
+@author: Jerker Nordh
+"""
 import abc
 import pyparticleest.utils.kalman as kalman
 from pyparticleest.interfaces import FFBSiRS

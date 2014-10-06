@@ -1,4 +1,8 @@
-""" Collection of functions and classes used for Particle Filtering/Smoothing """
+""" Interface specification defining the methods needed for using the different
+classes of algorithms present in the framework
+
+@author: Jerker Nordh
+"""
 import abc
 import numpy
 
