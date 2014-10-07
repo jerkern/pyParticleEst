@@ -14,10 +14,33 @@ import pyparticleest.utils.kalman as kalman
 
 
 class MixedNLGaussianSampled(RBPSBase):
-    """ Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
-    
-        Implement this type of system by extending this class and provide the methods for returning 
-        the system matrices at each time instant  """
+    """
+    Base class for particles of the type mixed linear/non-linear with additive gaussian noise.
+
+    Implement this type of system by extending this class and provide the methods for returning
+    the system matrices at each time instant.
+
+        xi_{t+1} = f_xi + A_xi*z_t + v_xi,
+        z_{t+1} = f_z + A_z*z_t + v_z,
+        y_t = h + C*z_t + e,
+        (v_xi, v_z)^T ~ N(0, (Q_xi, Qxiz \\ Qxiz^T, Qz))
+        e ~ N (0, R)
+
+    Args:
+     - lxi (int): number of nonlinear states
+     - lz (int): number of linear states
+     - Az (arraylike): Az (if constant)
+     - C (arraylike): C (if constant)
+     - Qz (arraylike): Qz (if constant)
+     - R (arraylike): R (if constant)
+     - fz (arraylike): fz (if constant)
+     - Axi (arraylike): Axi (if constant)
+     - Qxi (arraylike): Qxi (if constant)
+     - Qxiz (arraylike): Qxiz (if constant)
+     - fxi (arraylike): fxi (if constant)
+     - h (arraylike): h (if constant)
+     - params (array-like): model parameters (if any)
+    """
     def __init__(self, lxi, lz, Az=None, C=None, Qz=None, R=None, fz=None,
                  Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None):
         if (Axi != None):
@@ -47,8 +70,24 @@ class MixedNLGaussianSampled(RBPSBase):
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Axi=None, fxi=None, Qxi=None, Qxiz=None,
                      C=None, h=None):
-        """ Update dynamics, typically used when changing the system dynamics
-            due to a parameter change """
+        """
+        Update dynamics, typically used when changing the system dynamics
+        due to a parameter change
+
+        Args:
+         - lxi (int): number of nonlinear states
+         - lz (int): number of linear states
+         - Az (arraylike): Az (if constant)
+         - C (arraylike): C (if constant)
+         - Qz (arraylike): Qz (if constant)
+         - R (arraylike): R (if constant)
+         - fz (arraylike): fz (if constant)
+         - Axi (arraylike): Axi (if constant)
+         - Qxi (arraylike): Qxi (if constant)
+         - Qxiz (arraylike): Qxiz (if constant)
+         - fxi (arraylike): fxi (if constant)
+         - h (arraylike): h (if constant)
+        """
         super(MixedNLGaussianSampled, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, fz=fz, hz=h)
 
         if (Axi != None):
@@ -67,7 +106,18 @@ class MixedNLGaussianSampled(RBPSBase):
             self.fxi = numpy.copy(fxi)
 
     def sample_process_noise(self, particles, u, t):
-        """ Return sampled process noise for the non-linear states """
+        """
+        Return sampled process noise for the non-linear states
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like):  input signal
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         (Axi, _, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
         (_xil, _, Pl) = self.get_states(particles)
         N = len(particles)
@@ -83,8 +133,21 @@ class MixedNLGaussianSampled(RBPSBase):
         return noise
 
     def calc_xi_next(self, particles, noise, u, t):
-        """ Update non-linear state using sampled noise,
-        # the noise term here includes the uncertainty from z """
+        """
+        Calculate the next nonlinear state given the input and noise
+        realization
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+         - noise (array-like): noise realization for each particle
+
+        Returns:
+         (array-like): xi values for future particles
+        """
+        # the noise term here includes the uncertainty from z
         xi_pred = self.pred_xi(particles=particles, u=u, t=t)
 
         # additive Gaussian noise
@@ -93,6 +156,19 @@ class MixedNLGaussianSampled(RBPSBase):
         return xi_next
 
     def pred_xi(self, particles, u, t):
+        """
+        Predict the next nonlinear state given the input
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (array-like): xi values for future particles
+        """
+
         N = len(particles)
         (Axi, fxi, _, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
         (xil, zl, _Pl) = self.get_states(particles)
@@ -105,7 +181,16 @@ class MixedNLGaussianSampled(RBPSBase):
         return xi_next
 
     def meas_xi_next(self, particles, xi_next, u, t):
-        """ Update estimate using observation of next state """
+        """
+        Update estimate using observation of next state
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - xi_next (array-like): future nonlinear states
+         - u (array-like): input signal
+         - t (float): time stamp
+        """
         # This is what is sometimes called "the second measurement update"
         # for Rao-Blackwellized particle filters
 
@@ -121,11 +206,39 @@ class MixedNLGaussianSampled(RBPSBase):
         self.set_states(particles, xil, zl, Pl)
 
     def get_cross_covariance(self, particles, u, t):
-        """ Return cross-covariance between noise for nonlinear 
-            and linear states"""
+        """
+        Return cross-covariance between noise for nonlinear
+        and linear states
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         - (array-like): Qxiz(xi_t, u_t, t) for each particle
+        """
         return None
 
     def calc_cond_dynamics(self, particles, xi_next, u, t):
+        """
+        Calculates the linear dynamics for each particle
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - xi_next (array-like): next non linear state
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (Az, fz, Qz):
+          - Az (array-like): Az matrix for each particle
+          - fz (array-like): fz vector for each particle
+          - Qz (array-lie): Noise covariance for each particle
+
+        """
         # Compensate for noise correlation
         N = len(particles)
         # (xil, zl, Pl) = self.get_states(particles)
@@ -154,8 +267,22 @@ class MixedNLGaussianSampled(RBPSBase):
         return (Acond, fcond, Qcond)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
-        """ For auxiliary particle filtering, predict likelihood of next
-            measurement """
+        """
+        Evaluate "first stage weights" for the auxiliary particle filter.
+        (log-probability of measurement using some propagated statistic, such
+        as the mean, for the future state)
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - y (array-like):  measurement
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N, logp(y_{t+1}|\hat{x}_{t+1|t}^i)
+        """
         part = numpy.copy(particles)
         xin = self.pred_xi(part, u, t)
         self.cond_predict(part, xin, u, t)
@@ -163,7 +290,20 @@ class MixedNLGaussianSampled(RBPSBase):
 
 
     def measure(self, particles, y, t):
-        """ Return the log-pdf value of the measurement """
+        """
+        Return the log-pdf value of the measurement and update the statistics
+        for the linear states
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like):  measurement
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N, logp(y|x^i)
+        """
 
         (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
@@ -206,6 +346,22 @@ class MixedNLGaussianSampled(RBPSBase):
         return lyz
 
     def calc_A_f_Q(self, particles, u, t):
+        """
+        Calculate the A, f and Q matrices for the particles. Where A, f and Q
+        are the stacked matrices of (A_xi, A_z) and so on
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - y (array-like):  measurement
+         - t (float): time-stamp
+
+        Returns:
+         (A, f, Q, A_identical f_identical, Q_identical). The last elements
+         indicate if the matrices are identical for all particles
+        """
         N = len(particles)
         (Az, fz, Qz, Az_identical, fz_identical, Qz_identical) = self.get_lin_pred_dynamics_int(particles=particles, u=u, t=t)
         (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
@@ -252,7 +408,21 @@ class MixedNLGaussianSampled(RBPSBase):
         return (A, f, Q, A_identical, f_identical, Q_identical)
 
     def logp_xnext_max(self, particles, u, t):
-        """ Implements the fwd_peak_density function for MixedNLGaussianSampled models """
+        """
+        Return the max log-pdf value for all possible future states'
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, argmax_{x_{t+1}} logp(x_{t+1}|x_t)
+        """
         N = len(particles)
         pmax = numpy.empty(N)
         (_, _, Pl) = self.get_states(particles)
@@ -268,7 +438,21 @@ class MixedNLGaussianSampled(RBPSBase):
         return numpy.max(pmax)
 
     def logp_xnext(self, particles, next_part, u, t):
-        """ Implements the next_pdf function for MixedNLGaussianSampled models """
+        """
+        Return the log-pdf value for the possible future state 'next'
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1}|x_t^i)
+        """
 
         # During the backward smoothing the next_part contain sampled
         # z-variables, the full distrubition for the z_1:T conditioned on xi_1:T
@@ -292,7 +476,28 @@ class MixedNLGaussianSampled(RBPSBase):
         return lpx
 
     def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """ Implements the sample_smooth function for MixedNLGaussianSampled models """
+        """
+        Create sampled estimates for the smoothed trajectory. Allows the update
+        representation of the particles used in the forward step to include
+        additional data in the backward step, can also for certain models be
+        used to update the points estimates based on the future information.
+
+        Default implementation uses the same format as forward in time it
+        ss part of the ParticleFiltering interface since it is used also when
+        calculating "ancestor" trajectories
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         M = len(particles)
         res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
         part = numpy.copy(particles)
@@ -324,36 +529,79 @@ class MixedNLGaussianSampled(RBPSBase):
         return res
 
     def set_params(self, params):
-        """ This methods should be overriden if the system dynamics depends
-             on any parameters, this method should however be called to store
-            the new parameter values correctly """
+        """
+        This methods should be overriden if the system dynamics depends
+        on any parameters, this method should however be called to store
+        the new parameter values correctly
+
+        Args:
+         - params (array-like): new parameter values
+        """
         self.params = numpy.copy(params).reshape((-1, 1))
 
     def get_pred_dynamics_grad(self, particles, u, t):
-        """ Override this method if (A, f, Q) depends on the parameters """
+        """
+        Override this method if (A, f, Q) depends on the parameters
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (A_grad, f_grad, Q_grad): Element-wise gradients with respect to all
+         the parameters for the system matrices
+        """
         return (None, None, None)
 
     def get_meas_dynamics_grad(self, particles, y, t):
-        """ Override this method if (C, h, R) depends on the parameters """
+        """
+        Override this method if (C, h, R) depends on the parameters
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurment
+         - t (float): time stamps
+
+        Returns:
+         (C_grad, h_grad, R_grad): Element-wise gradients with respect to all
+         the parameters for the system matrices
+        """
         return (None, None, None)
 
     def eval_logp_xi0(self, xil):
-        """ Evaluate logprob of the initial non-linear state eta,
-            default implementation assumes all are equal, override this
-            if another behavior is desired """
+        """
+        Evaluate logprob of the initial non-linear state eta,
+        default implementation assumes all are equal, override this
+        if another behavior is desired
+
+        Args:
+         - xil (list): Initial xi states
+        """
         return 0.0
 
     def eval_logp_xi0_grad(self, xil):
-        """ Evaluate logprob of the initial non-linear state eta,
-            default implementation assumes all are equal, override this
-            if another behavior is desired """
+        """
+        Evaluate logprob of the initial non-linear state eta,
+        default implementation assumes all are equal, override this
+        if another behavior is desired
+
+        Args:
+         - xil (list): Initial xi states
+        """
         return numpy.zeros(self.params.shape)
 
     def eval_logp_x0(self, particles, t):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate sum log p(x_0)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+        """
 
         # Calculate l1 according to (19a)
         N = len(particles)
@@ -372,6 +620,14 @@ class MixedNLGaussianSampled(RBPSBase):
         return lpxi0 + lpz0
 
     def eval_logp_x0_val_grad(self, particles, t):
+        """
+        Evaluate gradient of sum log p(x_0)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+        """
         lpz0_grad = numpy.zeros(self.params.shape)
 
         # Calculate l1 according to (19a)
@@ -402,6 +658,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
 
     def calc_l2(self, xin, zn, Pn, zl, Pl, A, f, M):
+        """ Internal helper function """
         N = len(xin)
         dim = self.lxi + self.kf.lz
         xn = numpy.hstack((xin, zn))
@@ -412,6 +669,7 @@ class MixedNLGaussianSampled(RBPSBase):
         return l2
 
     def calc_l2_grad(self, xin, zn, Pn, zl, Pl, A, f, M, f_grad, A_grad):
+        """ Internal helper function """
         N = len(xin)
         dim = self.lxi + self.kf.lz
         xn = numpy.hstack((xin, zn))
@@ -432,10 +690,17 @@ class MixedNLGaussianSampled(RBPSBase):
         return (l2, diff_l2)
 
     def eval_logp_xnext(self, particles, x_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate sum log p(x_{t+1}|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - x_next (array-like): future states
+         - t (float): time stamp
+
+        Returns: (float)
+        """
 
         # This method differs from logp_xnext in that the x_next contains the
         # Rao-Blackwellized estimates of z condiotioned on the nonlinear
@@ -469,10 +734,17 @@ class MixedNLGaussianSampled(RBPSBase):
         return lpxn
 
     def eval_logp_xnext_val_grad(self, particles, x_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate value and gradient sum log p(x_{t+1}|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - x_next (array-like): future states
+         - t (float): time stamp
+
+        Returns: ((float), (array-like))
+        """
         N = len(particles)
         lpxn = 0.0
         lpxn_grad = numpy.zeros(self.params.shape)
@@ -519,6 +791,7 @@ class MixedNLGaussianSampled(RBPSBase):
         return (lpxn, lpxn_grad)
 
     def calc_l3(self, y, zl, Pl, Cl, hl):
+        """ internal helper function """
         N = len(zl)
         l3 = numpy.zeros((N, len(y), len(y)))
         for i in xrange(N):
@@ -527,6 +800,7 @@ class MixedNLGaussianSampled(RBPSBase):
         return l3
 
     def calc_l3_grad(self, y, zl, Pl, Cl, hl, C_grad, h_grad):
+        """ internal helper function """
         N = len(zl)
         l3 = numpy.zeros((N, len(y), len(y)))
         diff_l3 = numpy.zeros((N, len(self.params), len(y), len(y)))
@@ -549,8 +823,17 @@ class MixedNLGaussianSampled(RBPSBase):
         return (l3, diff_l3)
 
     def eval_logp_y(self, particles, y, t):
-        """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
+        """
+        Evaluate value of sum log p(y_t|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns: (float)
+        """
         N = len(particles)
         (y, Cz, hz, Rz, _, _, Rz_identical) = self.get_meas_dynamics_int(particles, y, t)
         (_xil, zl, Pl) = self.get_states(particles)
@@ -575,8 +858,17 @@ class MixedNLGaussianSampled(RBPSBase):
         return logpy
 
     def eval_logp_y_val_grad(self, particles, y, t):
-        """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
+        """
+        Evaluate value and gradient of sum log p(y_t|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns: ((float), (array-like))
+        """
 
         N = len(particles)
         logpy = 0.0
@@ -637,6 +929,14 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
                                                              **kwargs)
 
     def create_initial_estimate(self, N):
+        """Sample particles from initial distribution
+
+        Args:
+         - N (int): Number of particles to sample
+
+        Returns:
+         (array-like) with first dimension = N, model specific representation
+         of all particles """
         dim = self.lxi + self.kf.lz + self.kf.lz ** 2
         particles = numpy.empty((N, dim))
 
@@ -647,24 +947,52 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
         return particles
 
     def get_rb_initial(self, xi0):
-        """ Default implementation has no dependence on xi, override if needed """
+        """
+        Default implementation has no dependence on xi, override if needed
+
+        Calculate estimate of initial state for linear state condition on the
+        nonlinear estimate
+
+        Args:
+         - xi0 (array-like): Initial xi states
+
+        Returns:
+         (z,P): z is a list of all inital mean values, P is a list of covariance
+         matrices
+        """
+
         N = len(xi0)
         z_list = numpy.repeat(self.z0.reshape((1, self.kf.lz, 1)), N, 0)
         P_list = numpy.repeat(self.Pz0.reshape((1, self.kf.lz, self.kf.lz)), N, 0)
         return (z_list, P_list)
 
     def get_rb_initial_grad(self, xi0):
-        """ Default implementation has no dependence on xi, override if needed """
+        """
+        Default implementation has no dependence on xi, override if needed
+
+        Calculate gradient estimate of initial state for linear state condition on the
+        nonlinear estimate
+
+        Args:
+         - xi0 (array-like): Initial xi states
+
+        Returns:
+         (z,P): z is a list of element-wise gradients for the inital mean values,
+         P is a list of element-wise gradients for the covariance matrices
+        """
         N = len(xi0)
         return (N * (numpy.zeros((N, len(self.params), self.kf.lz, 1)),),
                 N * (numpy.zeros((N, len(self.params), self.kf.lz, self.kf.lz)),))
 
     def eval_logp_xi0(self, xil):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate logprob of the initial non-linear state eta,
+        default implementation assumes all are equal, override this
+        if another behavior is desired
 
+        Args:
+         - xil (list): Initial xi states
+        """
         N = len(xil)
         res = 0.0
         Pchol = scipy.linalg.cho_factor(self.Pxi0, check_finite=False)
@@ -673,11 +1001,24 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
         return res
 
     def get_xi_intitial_grad(self, N):
+        """
+        Calculate gradient of initial xi values (mean and covariance)
+
+        Args:
+         - N (int): number of particles
+        """
         return (N * (numpy.zeros((len(self.params), self.lxi, 1)),),
                 N * (numpy.zeros((len(self.params), self.lxi, self.lxi)),))
 
     def eval_logp_xi0_grad(self, xil):
-        """ Evaluate probabilty of xi0 """
+        """
+        Evaluate logprob of the initial non-linear state eta,
+        default implementation assumes all are equal, override this
+        if another behavior is desired
+
+        Args:
+         - xil (list): Initial xi states
+        """
         N = len(xil)
         (xi0_grad, Pxi0_grad) = self.get_xi_intitial_grad(N)
         lpxi0_grad = numpy.zeros(self.params.shape)
@@ -693,19 +1034,21 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
         return lpxi0_grad
 
 def factor_psd(A):
+    """ internal helper function """
     (U, s, V) = numpy.linalg.svd(A)
     return U.dot(numpy.diag(numpy.sqrt(s)))
 
 class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
-    """ This class implements a fully marginalized smoother for 
+    """ This class implements a fully marginalized smoother for
         mixed linear/nonlinear models, in contrast to the MixedNLGaussian class
         it never samples the linear states.
-        
-        This is somewhat slower, and doesn't readily admit using 
+
+        This is somewhat slower, and doesn't readily admit using
         rejection sampling, it is up to the end user which method is best for
         their particular problem """
 
     def calc_prop1(self, particles, next_part, u, t):
+        """ internal helper function """
         M = len(particles)
         lxi = self.lxi
         lz = self.kf.lz
@@ -752,6 +1095,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
 
     def calc_prop3(self, particles, Omega, Lambda, u, t):
+        """ internal helper function """
         M = len(particles)
         eta = numpy.zeros(M)
         L = numpy.zeros((M, self.kf.lz, self.kf.lz))
@@ -768,7 +1112,26 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
 
     def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
-        """ Implements the next_pdf function for MixedNLGaussian models """
+        """
+        Return the log-pdf value for the entire future trajectory.
+        Useful for non-markovian modeles, that result from e.g
+        marginalized state-space models.
+
+        Default implemention just calls logp_xnext which is enough for
+        Markovian models
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
+        """
 
         N = len(particles)
         Nn = future_trajs.shape[1]
@@ -788,7 +1151,28 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         return lpx
 
     def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """ Implements the sample_smooth function for MixedNLGaussian models """
+        """
+        Create sampled estimates for the smoothed trajectory. Allows the update
+        representation of the particles used in the forward step to include
+        additional data in the backward step, can also for certain models be
+        used to update the points estimates based on the future information.
+
+        Default implementation uses the same format as forward in time it
+        ss part of the ParticleFiltering interface since it is used also when
+        calculating "ancestor" trajectories
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         M = len(particles)
         lxi = self.lxi
         lz = self.kf.lz

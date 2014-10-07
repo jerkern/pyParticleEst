@@ -11,28 +11,86 @@ import pyparticleest.utils.kalman as kalman
 from exceptions import ValueError
 
 class NonlinearGaussian(interfaces.FFBSiRS):
-    """ Base class for particles of the type mixed linear/non-linear with 
-        additive gaussian noise.
-    
-        Implement this type of system by extending this class and provide 
-        the methods for returning the system matrices at each time instant.
-        
-        This class currently doesn't support analytic gradients when
-        performing parameter estimation, however using numerical gradients
-        is typically fine """
+    """
+    Base class for particles of the type mixed linear/non-linear with
+    additive gaussian noise.
+
+    Implement this type of system by extending this class and provide
+    the methods for returning the system matrices at each time instant.
+
+    x_{t+1} = f(x_t, u_t) + v, v ~ N(0, Q(x_t, u_t))
+    y_t = g(x_t) + e, e ~ N(=, R(x_t))
+
+    This class currently doesn't support analytic gradients when
+    performing parameter estimation, however using numerical gradients
+    is typically fine
+
+    Args:
+     - lxi (int): number of states in model
+     - f (array-like): f (if constaint)
+     - g (array-like): g (if constaint)
+     - Q (array-like): Q (if constaint)
+     - R (array-like): R (if constaint)
+     """
 
     __metaclass__ = abc.ABCMeta
 
     def calc_f(self, particles, u, t):
+        """
+        Calucate f
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (array-like): f for all particles
+        """
         return None
 
     def calc_Q(self, particles, u, t):
+        """
+        Calucate Q
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (array-like): Q for all particles
+        """
         return None
 
     def calc_g(self, particles, t):
+        """
+        Calucate g
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+
+        Returns:
+         (array-like): g for all particles
+        """
         return None
 
     def calc_R(self, particles, t):
+        """
+        Calucate R
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+
+        Returns:
+         (array-like): R for all particles
+        """
         return None
 
     def __init__(self, lxi, f=None, g=None, Q=None, R=None):
@@ -56,7 +114,18 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         self.lxi = lxi
 
     def sample_process_noise(self, particles, u, t):
-        """ Return sampled process noise for the non-linear states """
+        """
+        Sample process noise
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like):  input signal
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         N = len(particles)
         Q = self.calc_Q(particles=particles, u=u, t=t)
         noise = numpy.random.normal(size=(self.lxi, N))
@@ -70,7 +139,20 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         return noise.T
 
     def update(self, particles, u, t, noise):
-        """ Update estimate using 'data' as input """
+        """ Propagate estimate forward in time
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like):  input signal
+         - t (float): time-stamp
+         - noise (array-like): noise realization used for the calucations
+           , with first dimension = N (number of particles)
+
+        Returns:
+         (array-like) with first dimension = N, particle estimate at time t+1
+        """
         f = self.calc_f(particles=particles, u=u, t=t)
         if (f == None):
             f = self.f
@@ -78,7 +160,19 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         return particles
 
     def measure(self, particles, y, t):
-        """ Return the log-pdf value of the measurement """
+        """
+        Return the log-pdf value of the measurement
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like):  measurement
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N, logp(y|x^i)
+        """
         g = self.calc_g(particles=particles, t=t)
         R = self.calc_R(particles=particles, t=t)
         N = len(particles)
@@ -100,15 +194,43 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         return lpy
 
     def eval_1st_stage_weights(self, particles, u, y, t):
-        """ For auxiliary particle filtering, predict likelihood of next
-            measurement """
+        """
+        Evaluate "first stage weights" for the auxiliary particle filter.
+        (log-probability of measurement using some propagated statistic, such
+        as the mean, for the future state)
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - y (array-like):  measurement
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N, logp(y_{t+1}|\hat{x}_{t+1|t}^i)
+        """
         part = numpy.copy(particles)
         noise = numpy.zeros_like(part)
         partn = self.update(part, u, t, noise)
         return self.measure(partn, y, t + 1)
 
     def logp_xnext_max(self, particles, u, t):
-        """ For rejection sampling, maximum value of the logp_xnext function """
+        """
+        Return the max log-pdf value for all possible future states'
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, argmax_{x_{t+1}} logp(x_{t+1}|x_t)
+        """
         Q = self.calc_Q(particles, u, t)
         dim = self.lxi
         l2pi = math.log(2 * math.pi)
@@ -124,7 +246,21 @@ class NonlinearGaussian(interfaces.FFBSiRS):
             return numpy.max(pmax)
 
     def logp_xnext(self, particles, next_part, u, t):
-        """ Implements the logp_xnext function for NonlinearGaussian models """
+        """
+        Return the log-pdf value for the possible future state 'next'
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1}|x_t^i)
+        """
 
         f = self.calc_f(particles, u, t)
         if (f == None):
@@ -146,11 +282,47 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         return lpx
 
     def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """ Implements the sample_smooth function for MixedNLGaussian models """
+        """
+        Create sampled estimates for the smoothed trajectory. Allows the update
+        representation of the particles used in the forward step to include
+        additional data in the backward step, can also for certain models be
+        used to update the points estimates based on the future information.
+
+        Default implementation uses the same format as forward in time it
+        ss part of the ParticleFiltering interface since it is used also when
+        calculating "ancestor" trajectories
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         return particles
 
     def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
-        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1:T}, y_t:T) """
+        """
+        Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
+
+        Args:
+         - partp (array-like): particle estimate of t-1
+         - up (array-like): input signal at time t-1
+         - tp (float): time stamp for time t-1
+         - ut (array-like): input signal at time t
+         - yt (array-like): measurement at time t
+         - tt (array-like): time stamps for {t+1:T}
+         - future_trajs (array-like): particle estimate for {t+1:T}
+
+        Returns:
+         (array-like) of dimension N, wher N is the dimension of partp and/or
+         future_trajs (one of which may be 'None' at the start/end of the dataset)
+        """
         # Trivial choice of q, discard y_T and x_{t+1}
         if (partp != None):
             noise = self.sample_process_noise(partp, up, tp)
@@ -161,18 +333,51 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         return prop_part
 
     def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
-        """ Eval log q(x_t | x_{t-1}, x_{t+1:T}, y_t) """
+        """
+        Eval the log-propability of the proposal distribution
+
+        Args:
+         - prop_part (array-like): Proposed particle estimate, first dimension
+           has length = N
+         - partp (array-like): particle estimate of t-1
+         - up (array-like): input signal at time t-1
+         - tp (float): time stamp for time t-1
+         - ut (array-like): input signal at time t
+         - yt (array-like): measurement at time t
+         - tt (array-like): time stamps for {t+1:T}
+         - future_trajs (array-like): particle estimate for {t+1:T}
+
+        Returns
+         (array-like) with first dimension = N,
+         log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
+        """
         if (partp != None):
             return self.logp_xnext(partp, prop_part, up, tp)
         else:
             return self.eval_logp_x0(prop_part, t=tt[0])
 
     def set_params(self, params):
+        """
+        This methods should be overriden if the system dynamics depends
+        on any parameters, this method should however be called to store
+        the new parameter values correctly
+
+        Args:
+         - params (array-like): new parameter values
+        """
         self.params = numpy.copy(params).reshape((-1, 1))
 
 
 
 class NonlinearGaussianInitialGaussian(NonlinearGaussian):
+    """
+    Nonlinear gaussian system with initial Gaussian distribution.
+
+    Args:
+     - x0 (array-like): mean value of initial state, defaults to 0
+     - Px0 (array-like): covariance of initial state, defaults to 0
+     - lxi (int): number of states, only needed if neither x0 or Px0 specified
+    """
     def __init__(self, x0=None, Px0=None, lxi=None, **kwargs):
 
         if (x0 != None):
@@ -193,6 +398,14 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
                                                                **kwargs)
 
     def create_initial_estimate(self, N):
+        """Sample particles from initial distribution
+
+        Args:
+         - N (int): Number of particles to sample
+
+        Returns:
+         (array-like) with first dimension = N, model specific representation
+         of all particles """
         particles = numpy.repeat(self.x0, N, 1).T
         if (numpy.any(self.Px0)):
             Pchol = scipy.linalg.cho_factor(self.Px0)[0]
@@ -201,10 +414,14 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
         return particles
 
     def eval_logp_x0(self, particles, t):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate log p(x_0)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+        """
 
         N = len(particles)
         res = numpy.empty(N)

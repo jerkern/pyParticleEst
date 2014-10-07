@@ -13,7 +13,18 @@ import numpy
 
 
 class RBPFBase(interfaces.ParticleFiltering):
-    """ Base class for Rao-Blackwellized particles """
+    """
+    Base class for Rao-Blackwellized models
+
+    Args:
+     - lz (int): Dimension of linear subsystem
+     - Az (array-like): Transition matrix for linear states (if constant)
+     - fz (array-like): affine term for linear states (if constant)
+     - Qz (array-like): Covariance of process noise for linear states
+       (if constant)
+     - C (array-like): Measurement dynamic for linear states (if constant)
+     - hz (array-like): Affine measurement term for linear states (if constant)
+    """
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, lz, Az=None, fz=None, Qz=None,
@@ -24,22 +35,59 @@ class RBPFBase(interfaces.ParticleFiltering):
                                         f_k=fz, h_k=hz)
 
     def set_dynamics(self, Az=None, C=None, Qz=None, R=None, fz=None, hz=None):
+        """
+        Change the dynamics for linear subsystem
+
+        Args:
+         - lz (int): Dimension of linear subsystem
+         - Az (array-like): Transition matrix for linear states (if constant)
+         - fz (array-like): affine term for linear states (if constant)
+         - Qz (array-like): Covariance of process noise for linear states
+           (if constant)
+         - C (array-like): Measurement dynamic for linear states (if constant)
+         - hz (array-like): Affine measurement term for linear states (if constant)
+        """
         return self.kf.set_dynamics(Az, C, Qz, R, fz, hz)
 
     def get_nonlin_pred_dynamics(self, particles, u, t):
-        """ Return matrices describing affine relation of next
-            nonlinear state conditioned on current linear state
-            
-            xi_{t+1]} = A_xi * z_t + f_xi + v_xi, v_xi ~ N(0,Q_xi)
-            
-            Return (A_xi, f_xi, Q_xi) where each element is a list
-            with the corresponding matrix for each particle. None indicates
-            that the matrix is identical for all particles and the value stored
-            in this class should be used instead
-            """
+        """
+        Return matrices describing affine relation of next
+        nonlinear state conditioned on current nonlinear state
+
+        xi_{t+1]} = A_xi(xi) * z_t + f_xi(xi) + v_xi, v_xi ~ N(0,Q_xi(xi))
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (A_xi, f_xi, Q_xi) where each element is a list
+         with the corresponding matrix for each particle. None indicates
+         that the matrix is identical for all particles and the value stored
+         in this class should be used instead
+        """
         return (None, None, None)
 
     def get_nonlin_pred_dynamics_int(self, particles, u, t):
+        """
+        Helper class for calculating dynamics for nonlinear state
+
+        xi_{t+1]} = A_xi(xi) * z_t + f_xi(xi) + v_xi, v_xi ~ N(0,Q_xi(xi))
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (A_xi, f_xi, Q_xi, Axi_identical, fxi_identical, Qxi_identical)
+         where the first three element is are lists with the corresponding
+         matrix for each particle. The last three are boolean to indicate if
+         all the matrices are identical to allow for more efficient computions
+        """
         (Axi, fxi, Qxi) = self.get_nonlin_pred_dynamics(particles, u=u, t=t)
         N = len(particles)
         Axi_identical = False
@@ -59,19 +107,44 @@ class RBPFBase(interfaces.ParticleFiltering):
         return (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical)
 
     def get_lin_pred_dynamics(self, particles, u, t):
-        """ Return matrices describing affine relation of next
-            nonlinear state conditioned on current linear state
-            
-            \z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
-            
-            conditioned on the value of xi_{t+1}. 
-            (Not the same as the dynamics unconditioned on xi_{t+1})
-            when for example there is a noise correlation between the 
-            linear and nonlinear state dynamics) 
-            """
+        """
+        Return matrices describing affine relation of next
+        nonlinear state conditioned on current nonlinear state
+
+        \z_{t+1]} = A_z(xi) * z_t + f_z(xi) + v_z, v_z ~ N(0,Q_z(xi))
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (A_z, f_z, Q_z) where each element is a list
+         with the corresponding matrix for each particle. None indicates
+         that the matrix is identical for all particles and the value stored
+         in this class should be used instead
+        """
         return (None, None, None)
 
     def get_lin_pred_dynamics_int(self, particles, u, t):
+        """
+        Helper class for calculating dynamics for linear state
+
+        \z_{t+1]} = A_z(xi) * z_t + f_z(xi) + v_z, v_z ~ N(0,Q_z(xi))
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (A_z, f_z, Q_z, Az_identical, fz_identical, Qz_identical)
+         where the first three element is are lists with the corresponding
+         matrix for each particle. The last three are boolean to indicate if
+         all the matrices are identical to allow for more efficient computations
+        """
         N = len(particles)
         (Az, fz, Qz) = self.get_lin_pred_dynamics(particles, u=u, t=t)
         Az_identical = False
@@ -93,9 +166,45 @@ class RBPFBase(interfaces.ParticleFiltering):
         return (Az, fz, Qz, Az_identical, fz_identical, Qz_identical)
 
     def get_meas_dynamics(self, particles, y, t):
+        """
+        Return matrices describing affine relation of measurement and current
+        state estimates
+
+        \y_t+1 = C(xi) * z_t + h_z(xi) + e_z, e_z ~ N(0,R(xi))
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns:
+         (y, A_z, f_z, Q_z): y is a preprocessed measurement, the rest are lists
+         with the corresponding matrix for each particle. None indicates
+         that the matrix is identical for all particles and the value stored
+         in this class should be used instead
+        """
         return (y, None, None, None)
 
     def get_meas_dynamics_int(self, particles, y, t):
+        """
+        Helper class for calculating measurement dynamics
+
+        \y_t+1 = C(xi) * z_t + h_z(xi) + e_z, e_z ~ N(0,R(xi))
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns:
+         (y, C, h_z, R_z, C_identical, hz_identical, Rz_identical)
+         y is a preprocessed measurement, the next three element are lists with
+         the corresponding matrix for each particle. The last three are boolean
+         to indicate if all the matrices are identical to allow for more
+         efficient computations
+        """
         N = len(particles)
         (y, Cz, hz, Rz) = self.get_meas_dynamics(particles=particles, y=y, t=t)
         Cz_identical = False
@@ -121,13 +230,36 @@ class RBPFBase(interfaces.ParticleFiltering):
 #        return (y, None, None, None)
 
     def update(self, particles, u, t, noise):
-        """ Update estimate using noise as input """
+        """ Propagate estimate forward in time
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like):  input signal
+         - t (float): time-stamp
+         - noise (array-like): noise realization used for the calucations
+           , with first dimension = N (number of particles)
+
+        Returns:
+         (array-like) with first dimension = N, particle estimate at time t+1
+        """
         # Calc (xi_{t+1} | xi_t, z_t, y_t)
         xin = self.calc_xi_next(particles=particles, u=u, t=t, noise=noise)
         # Calc (z_{t+1} | xi_{t+1}, y_t)
         self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
 
     def cond_predict(self, particles, xi_next, u, t):
+        """
+        Calculate estimate of z_{t+1} given iformation of xi_{t+1}
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - xi_next (array-like): next nonlinear state
+         - u (array-like): input signal
+         - t (float): time stamp
+        """
         # Calc (z_t | xi_{t+1}, y_t)
         self.meas_xi_next(particles=particles, xi_next=xi_next, u=u, t=t)
         # Compensate for noise correlation
@@ -146,11 +278,31 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
 
     @abc.abstractmethod
     def get_rb_initial(self, xi_initial):
+        """
+        Calculate estimate of initial state for linear state condition on the
+        nonlinear estimate
+
+        Args:
+         - xi_initial (array-like): Initial xi states
+
+        Returns:
+         (z,P): z is a list of all inital mean values, P is a list of covariance
+         matrices
+        """
         pass
 
     def post_smoothing(self, st):
-        """ Kalman smoothing of the linear states conditioned on the non-linear
-            trajetory """
+        """
+        Kalman smoothing of the linear states conditioned on the non-linear
+        trajetory
+
+        Args:
+         - st (SmoothTrajectory): Smoothed estimate (with post processing step)
+
+        Returns:
+         (array-like): Smoothed estimate with sufficent statistics for linear
+         states
+        """
         T = st.traj.shape[0]
         M = st.traj.shape[1]
 
@@ -191,7 +343,16 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
         return straj
 
     def set_states(self, particles, xi_list, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
+        """
+        Set the estimate of the states states
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - xi_list (list): list of xi values for each particle
+         - z_list (list): list of mean values for z for each particle
+         - P_list (list): list of covariance matrices for z for each particle
+        """
         N = len(particles)
         zend = self.lxi + self.kf.lz
         Pend = zend + self.kf.lz ** 2
@@ -201,10 +362,19 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
         particles[:, zend:Pend] = P_list.reshape((N, self.kf.lz ** 2))
 
     def get_states(self, particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
+        """
+        Return the estimates contained in the particles array
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+
+        Returns
+            (xil, zl, Pl):
+             - xil: list of xi values
+             - zl: list of mean values for z
+             - Pl: list of covariance matrices for z
+        """
         N = len(particles)
         zend = self.lxi + self.kf.lz
         Pend = zend + self.kf.lz ** 2
@@ -216,10 +386,16 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
         return (xil, zl, Pl)
 
     def get_Mz(self, smooth_particles):
-        """ Return the estimate of the Rao-Blackwellized states.
-            Must return two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
+        """
+        Return the cross covariance of z_t and z_t+1 at time t
+
+        Args:
+         - smooth_particles (array-like): smoothed particle estimates
+
+        Returns
+         (arrau-like): Array of covariance matrices, first dimenson indexs the
+         particles
+        """
         N = len(smooth_particles)
         zend = self.lxi + self.kf.lz
         Pend = zend + self.kf.lz ** 2
@@ -229,6 +405,14 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
         return Mz
 
     def set_Mz(self, smooth_particles, Mz):
+        """
+        Set the cross covariance estimate for z_t and z_t+1 at time t
+
+        Args:
+         - smooth_particles (array-like): smoothed particle estimates
+         - Mz (array-like): Array of covariance matrices, first dimenson indexs the
+           particles
+        """
         N = len(smooth_particles)
         zend = self.lxi + self.kf.lz
         Pend = zend + self.kf.lz ** 2

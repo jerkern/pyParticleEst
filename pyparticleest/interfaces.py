@@ -73,7 +73,8 @@ class ParticleFiltering(object):
          - t (float): time-stamp
 
         Returns:
-         (array-like) with first dimension = N, logp(y|x^i) """
+         (array-like) with first dimension = N, logp(y|x^i)
+        """
         pass
 
     def sample_smooth(self, particles, future_trajs, ut, yt, tt):
@@ -210,7 +211,7 @@ class FFBSiRS(FFBSi):
     @abc.abstractmethod
     def logp_xnext_max(self, particles, u, t):
         """
-        Return the log-pdf value for the possible future state 'next'
+        Return the max log-pdf value for all possible future states'
         given input u
 
         Args:
