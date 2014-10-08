@@ -21,10 +21,9 @@ def generate_dataset(steps, P0_xi, P0_z, Qxi, Qz, Qxiz, R):
     return (x, y)
 
 
-class Model(mlnlg.MixedNLGaussianInitialGaussianProperBSi):
-#class Model(mlnlg.MixedNLGaussianInitialGaussian):
+class Model(mlnlg.MixedNLGaussianMarginalizedInitialGaussian):
     """ xi_{k+1} = xi_k + z_k + v_xi_k, v_xi ~ N(0,Q_xi)
-        z_{k+1} = z_{k} + v_z, v_z_k ~ N(0, Q_z) 
+        z_{k+1} = z_{k} + v_z, v_z_k ~ N(0, Q_z)
         y_k = xi_k + +z_k + e_k, e_k ~ N(0,R_z),
         (v_xi v_z).T ~ N(0, ((Q_xi, Qxiz), (Qxiz.T Qz)) """
 
