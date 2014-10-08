@@ -1,13 +1,31 @@
 '''
 Created on Jun 25, 2014
 
-@author: ajn
+@author: Jerker Nordh
 '''
 
 class Instrumenter(object):
-    '''
+    """
     Count number of operations performed
-    '''
+
+    Wraps all calls and counts the number of calls * number of particles in
+    each call.
+
+    Results can be access through the member variables:
+
+        - self.cnt_sample
+        - self.cnt_update
+        - self.cnt_measure
+        - self.cnt_pdfxn
+        - self.cnt_pdfxn_full
+        - self.cnt_pdfxnmax
+        - self.cnt_propsmooth
+        - self.cnt_pdfsmooth
+        - self.cnt_eval1st
+
+    Args:
+     - model: Object of encapsulated model class
+    """
 
 
     def __init__(self, model):

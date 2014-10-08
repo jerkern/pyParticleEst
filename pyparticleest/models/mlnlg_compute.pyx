@@ -1,3 +1,8 @@
+"""
+Helper functions for computing some of the heavy parts when using MLNLG and LTV
+models
+"""
+
 import numpy as np
 import scipy.linalg as lalg
 cimport numpy as np
@@ -154,25 +159,3 @@ def compute_l2(N, lxi, dim, perr, Pn, A, Pl, M, out):
         #tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])        
         #out[i, lxi:,lxi:] += tmp2
         out[i, lxi:,lxi:] += Pn[i]
-
-#def compute_l2_grad(perr, lenp, lxi, zl, Pl, M, A, f_grad, A_grad):
-#    N = perr.shape[0]
-#    diff_l2 = np.zeros((N, lenp, perr.shape[1], perr.shape[1]))
-#    if (f_grad != None):
-#        for i in xrange(N):
-#            for j in xrange(lenp):
-#                tmp = f_grad[i][j].dot(perr[i].T)
-#                diff_l2[i,j,:,:] -= tmp + tmp.T
-#    if (A_grad != None):
-#        for i in xrange(N):
-#            for j in xrange(lenp):
-#                tmp = A_grad[i][j].dot(zl[i]).dot(perr[i].T)
-#                diff_l2[i,j,:,:] -= tmp + tmp.T
-#                tmp = A_grad[i][j].dot(Pl[i]).dot(A[i].T)
-#                diff_l2[i,j,:,:] += tmp + tmp.T
-#                tmp = -A_grad[i][j,:lxi].dot(M[i])
-#                diff_l2[i,j,:lxi,lxi:] +=  tmp
-#                diff_l2[i,j,lxi:,:lxi] += tmp.T
-#                tmp = -A_grad[i][j,lxi:].dot(M[i])
-#                diff_l2[i,j,lxi:,lxi:] += tmp
-#    return diff_l2
