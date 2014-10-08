@@ -3,7 +3,11 @@
 @author: Jerker Nordh
 """
 import abc
-import pyparticleest.utils.kalman as kalman
+import os
+# Stupid hack to get readthedocs documentation working
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if (not on_rtd):
+    import pyparticleest.utils.kalman as kalman
 from pyparticleest.interfaces import FFBSiRS
 from pyparticleest.models.rbpf import RBPSBase
 import numpy

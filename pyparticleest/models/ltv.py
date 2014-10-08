@@ -2,8 +2,12 @@
 @author: Jerker Nordh
 """
 from pyparticleest.interfaces import FFBSi
-import pyparticleest.models.mlnlg_compute as mlnlg_compute
-import pyparticleest.utils.kalman as kalman
+import os
+# Stupid hack to get readthedocs documentation working
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if (not on_rtd):
+    import pyparticleest.utils.kalman as kalman
+    import pyparticleest.models.mlnlg_compute as mlnlg_compute
 import numpy
 import scipy.linalg
 
