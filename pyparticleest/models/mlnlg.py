@@ -1152,14 +1152,8 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
     def sample_smooth(self, particles, future_trajs, ut, yt, tt):
         """
-        Create sampled estimates for the smoothed trajectory. Allows the update
-        representation of the particles used in the forward step to include
-        additional data in the backward step, can also for certain models be
-        used to update the points estimates based on the future information.
-
-        Default implementation uses the same format as forward in time it
-        ss part of the ParticleFiltering interface since it is used also when
-        calculating "ancestor" trajectories
+        Calculate statistics needed when evaluating the logp_xnext_full for
+        the marginalized trajectory
 
         Args:
 

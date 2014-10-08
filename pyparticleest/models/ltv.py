@@ -10,10 +10,27 @@ import numpy
 import scipy.linalg
 
 class LTV(FFBSi):
-    """ Base class for particles of the type linear time varying with additive gaussian noise.
+    """
+    Base class for particles of the type linear time varying with additive gaussian noise.
 
-        Implement this type of system by extending this class and provide the methods for returning 
-        the system matrices at each time instant  """
+    Implement this type of system by extending this class and provide the methods for returning
+    the system matrices at each time instant
+
+    z_{t+1} = A*z_t + f + v, v ~ N(0, Q)
+    y_t = C*z_t + h + e, e ~ N(0,R)
+
+    Args:
+     - z0: Initial mean value of the state estimate
+     - P0: Coviariance of initial z estimate
+     - A (array-like): A matrix (if constant)
+     - C (array-like): C matrix (if constant)
+     - Q (array-like): Q matrix (if constant)
+     - R (array-like): R matrix (if constant)
+     - f (array-like): f vector (if constant)
+     - h (array-like): h vector (if constant)
+     - params (array-like): model parameters (if any)
+    """
+
     def __init__(self, z0, P0, A=None, C=None, Q=None,
              R=None, f=None, h=None, params=None):
         self.z0 = numpy.copy(z0).reshape((-1, 1))
@@ -26,6 +43,16 @@ class LTV(FFBSi):
                                         f_k=f, h_k=h)
 
     def create_initial_estimate(self, N):
+        """Sample particles from initial distribution
+
+        Args:
+         - N (int): Number of particles to sample, since the estimate is
+           deterministic there is no reason for N > 1
+
+        Returns:
+         (array-like) with first dimension = N, model specific representation
+         of all particles """
+
         if (N > 1):
             print("N > 1 redundamt for LTV system (N={0})".format(N),)
         lz = len(self.z0)
@@ -38,7 +65,15 @@ class LTV(FFBSi):
         return particles
 
     def set_states(self, particles, z_list, P_list):
-        """ Set the estimate of the Rao-Blackwellized states """
+        """
+        Set the estimate of the states
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - z_list (list): list of mean values for z for each particle
+         - P_list (list): list of covariance matrices for z for each particle
+        """
         lz = len(self.z0)
         N = len(particles)
         for i in xrange(N):
@@ -47,9 +82,18 @@ class LTV(FFBSi):
             particles[i, lz:lzP] = P_list[i].ravel()
 
     def get_states(self, particles):
-        """ Returns two variables, the first a list containing all the
-            expected values, the second a list of the corresponding covariance
-            matrices"""
+        """
+        Return the estimates contained in the particles array
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+
+        Returns
+            (zl, Pl):
+             - zl: list of mean values for z
+             - Pl: list of covariance matrices for z
+        """
         N = len(particles)
         zl = list()
         Pl = list()
@@ -62,11 +106,40 @@ class LTV(FFBSi):
         return (zl, Pl)
 
     def get_pred_dynamics(self, u, t):
-        # Return (A, f, Q)
+        """
+        Return matrices describing affine relation of next
+        nonlinear state conditioned on the current time and input signal
+
+        z_{t+1} = A*z_t + f + v, v ~ N(0, Q)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamp
+
+        Returns:
+         (A, f, Q) where each element is a list
+         with the corresponding matrix for each particle. None indicates
+         that the matrix is identical for all particles and the value stored
+         in this class should be used instead
+        """
         return (None, None, None)
 
     def update(self, particles, u, t, noise):
-        """ Update estimate using noise as input """
+        """ Propagate estimate forward in time
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like):  input signal
+         - t (float): time-stamp
+         - noise: Unused for this type of model
+
+        Returns:
+         (array-like) with first dimension = N, particle estimate at time t+1
+        """
         # Update linear estimate with data from measurement of next non-linear
         # state
         (zl, Pl) = self.get_states(particles)
@@ -80,10 +153,41 @@ class LTV(FFBSi):
         self.set_states(particles, zl, Pl)
 
     def get_meas_dynamics(self, y, t):
+        """
+        Return matrices describing affine relation of measurement and current
+        state estimates
+
+        y_t = C*z_t + h + e, e ~ N(0,R)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns:
+         (y, C, h, R): y is a preprocessed measurement, the rest are lists
+         with the corresponding matrix for each particle. None indicates
+         that the matrix is identical for all particles and the value stored
+         in this class should be used instead
+        """
         return (y, None, None, None)
 
     def measure(self, particles, y, t):
-        """ Return the log-pdf value of the measurement """
+        """
+        Return the log-pdf value of the measurement and update the statistics
+        for the states
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like):  measurement
+         - t (float): time-stamp
+
+        Returns:
+         (array-like) with first dimension = N, logp(y|x^i)
+        """
 
 
         (zl, Pl) = self.get_states(particles)
@@ -98,16 +202,60 @@ class LTV(FFBSi):
         return lyz
 
     def logp_xnext(self, particles, next_part, u, t):
-        """ Return the log-pdf value for the possible future state 'next' given input u """
+        """
+        Return the log-pdf value for the possible future state 'next'
+        given input u.
+
+        Always returns zeros since all particles are always equivalent for this
+        type of model
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part: Unused
+         - u: Unused
+         - t: Unused
+
+        Returns:
+         (array-like) with first dimension = N, numpu.zeros((N,))
+        """
         # Not needed for Linear Gaussian models, always return 0 (all particles will be identical anyhow)
         N = len(particles)
         return numpy.zeros((N,))
 
     def sample_process_noise(self, particles, u, t):
+        """
+        There is no need to sample noise for this type of model
+
+        Args:
+
+         - particles: Unused
+         - next_part: Unused
+         - u: Unused
+         - t: Unused
+
+        Returns:
+         None
+        """
         return None
 
     def sample_smooth(self, particle, future_trajs, ut, yt, tt):
-        """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
+        """
+        Update sufficient statistics based on the future states
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N
+        """
 
         (zl, Pl) = self.get_states(particle)
         M = len(particle)
@@ -132,13 +280,28 @@ class LTV(FFBSi):
 
 
     def fwd_peak_density(self, u, t):
+        """
+        No need for rejections sampling for this type of model, always returns
+        0.0 since all particles are equivalent
+
+        Args:
+         - u: Unused
+         - t: Unused
+
+        Returns
+         (float) 0.0
+        """
         return 0.0
 
     def eval_logp_x0(self, particles, t):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate sum log p(x_0)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+        """
         # Calculate l1 according to (19a)
         N = len(particles)
         (zl, Pl) = self.get_states(particles)
@@ -151,10 +314,14 @@ class LTV(FFBSi):
         return lpz0
 
     def eval_logp_x0_val_grad(self, particles, t):
-        """ Calculate gradient of a term of the I1 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate gradient of sum log p(x_0)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - t (float): time stamp
+        """
         # Calculate l1 according to (19a)
         N = len(particles)
         lparam = len(self.params)
@@ -178,10 +345,17 @@ class LTV(FFBSi):
 
 
     def eval_logp_xnext(self, particles, x_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate log p(x_{t+1}|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - x_next (array-like): future states
+         - t (float): time stamp
+
+        Returns: (array-like)
+        """
         # Calculate l2 according to (16)
         N = len(particles)
         (zl, Pl) = self.get_states(particles)
@@ -203,10 +377,17 @@ class LTV(FFBSi):
         return lpxn
 
     def eval_logp_xnext_val_grad(self, particles, x_next, u, t):
-        """ Calculate gradient of a term of the I2 integral approximation
-            as specified in [1].
-            The gradient is an array where each element is the derivative with 
-            respect to the corresponding parameter"""
+        """
+        Evaluate value and gradient of log p(x_{t+1}|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - x_next (array-like): future states
+         - t (float): time stamp
+
+        Returns: ((array-like), (array-like))
+        """
         # Calculate l2 according to (16)
         N = len(particles)
         lparam = len(self.params)
@@ -241,8 +422,17 @@ class LTV(FFBSi):
 
 
     def eval_logp_y(self, particles, y, t):
-        """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
+        """
+        Evaluate value of log p(y_t|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns: (array-like)
+        """
         N = len(particles)
         self.t = t
         (y, C, h, R) = self.get_meas_dynamics(y=y, t=t)
@@ -259,8 +449,17 @@ class LTV(FFBSi):
         return logpy
 
     def eval_logp_y_val_grad(self, particles, y, t):
-        """ Calculate a term of the I3 integral approximation
-        and its gradient as specified in [1]"""
+        """
+        Evaluate value and gradient of log p(y_t|x_t)
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurement
+         - t (float): time stamp
+
+        Returns: ((array-like), (array-like))
+        """
         N = len(particles)
         lparam = len(self.params)
         (y, C, h, R) = self.get_meas_dynamics(y=y, t=t)
@@ -292,25 +491,63 @@ class LTV(FFBSi):
         return (logpy, logpy_grad)
 
     def get_pred_dynamics_grad(self, u, t):
-        """ Override this method if (A, f, Q) depends on the parameters """
+        """
+        Override this method if (A, f, Q) depends on the parameters
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (A_grad, f_grad, Q_grad): Element-wise gradients with respect to all
+         the parameters for the system matrices
+        """
         return (None, None, None)
 
     def get_meas_dynamics_grad(self, y, t):
-        """ Override this method if (C, h, R) depends on the parameters """
+        """
+        Override this method if (C, h, R) depends on the parameters
+
+        Args:
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - y (array-like): measurment
+         - t (float): time stamps
+
+        Returns:
+         (C_grad, h_grad, R_grad): Element-wise gradients with respect to all
+         the parameters for the system matrices
+        """
         return (None, None, None)
 
     def get_initial_grad(self):
-        """ Default implementation has no dependence on parameters """
+        """
+        Default implementation has no dependence on xi, override if needed
+
+        Calculate gradient estimate of initial state for linear state condition on the
+        nonlinear estimate
+
+        Args:
+         - xi0 (array-like): Initial xi states
+
+        Returns:
+         (z,P): z is a list of element-wise gradients for the inital mean values,
+         P is a list of element-wise gradients for the covariance matrices
+        """
         lparam = len(self.params)
         return (numpy.zeros((lparam, self.kf.lz, 1)),
                 numpy.zeros((lparam, self.kf.lz, self.kf.lz)))
 
     def calc_l1(self, z, P, z0, P0):
+        """ internal helper function """
         z0_diff = z - z0
         l1 = z0_diff.dot(z0_diff.T) + P
         return l1
 
     def calc_l1_grad(self, z, P, z0, P0, z0_grad):
+        """ internal helper function """
         lparams = len(self.params)
         z0_diff = z - z0
         l1 = z0_diff.dot(z0_diff.T) + P
@@ -322,6 +559,7 @@ class LTV(FFBSi):
         return (l1, l1_diff)
 
     def calc_l2(self, zn, Pn, z, P, A, f, M):
+        """ internal helper function """
         predict_err = zn - f - A.dot(z)
         AM = A.dot(M)
         l2 = predict_err.dot(predict_err.T)
@@ -329,6 +567,7 @@ class LTV(FFBSi):
         return (l2, A, M, predict_err)
 
     def calc_l2_grad(self, zn, Pn, z, P, A, f, M, A_grad, f_grad):
+        """ internal helper function """
         lparam = len(self.params)
         predict_err = zn - f - A.dot(z)
         AM = A.dot(M)
@@ -350,6 +589,7 @@ class LTV(FFBSi):
         return (l2, l2_grad)
 
     def calc_l3(self, y, z, P):
+        """ internal helper function """
         meas_diff = self.kf.measurement_diff(y.reshape((-1, 1)),
                                              z,
                                              C=self.kf.C,
@@ -359,6 +599,7 @@ class LTV(FFBSi):
         return l3
 
     def calc_l3_grad(self, y, z, P, C_grad, h_grad):
+        """ internal helper function """
         lparam = len(self.params)
         meas_diff = self.kf.measurement_diff(y.reshape((-1, 1)),
                                              z,

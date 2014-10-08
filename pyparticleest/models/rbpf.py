@@ -179,7 +179,7 @@ class RBPFBase(interfaces.ParticleFiltering):
          - t (float): time stamp
 
         Returns:
-         (y, A_z, f_z, Q_z): y is a preprocessed measurement, the rest are lists
+         (y, C_z, h_z, R_z): y is a preprocessed measurement, the rest are lists
          with the corresponding matrix for each particle. None indicates
          that the matrix is identical for all particles and the value stored
          in this class should be used instead
