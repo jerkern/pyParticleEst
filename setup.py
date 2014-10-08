@@ -7,9 +7,4 @@ setup(name='pyParticleEst',
       author_email='jerker.nordh@control.lth.se',
       description='Framework for particle based estimation methods, such as particle filtering and smoothing',
       license='LGPL',
-      install_requires = [
-	'numpy',
-	'scipy',
-	'cython',
-	]
       )
