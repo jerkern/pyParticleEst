@@ -33,8 +33,12 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['pyximport', 'pyparticleest.utils.kalman', 'scipy.linalg',
-		'pyparticleest.models.mlnlg_compute', 'scipy.optimize']
+MOCK_MODULES = ['pyximport', 
+		'pyparticleest.utils', 
+		'pyparticleest.utils.kalman',
+		'pyparticleest.models', 
+		'pyparticleest.models.mlnlg_compute',
+		'scipy', 'scipy.linalg', 'scipy.optimize']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
 
