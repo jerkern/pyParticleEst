@@ -9,12 +9,44 @@ import matplotlib.pyplot as plt
 
 
 class ParamEstimation(Simulator):
+    """
+    Extension of the Simulator class to iterative perform particle smoothing
+    combined with a gradienst search algorithms for maximizing the likelihood
+    of the parameter estimates
+    """
 
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001,
                  callback=None, callback_sim=None, bounds=None, meas_first=False,
                  smoother='full', smoother_options=None, analytic_gradient=False):
+        """
+        Find the maximum likelihood estimate of the paremeters using an
+        EM-algorihms combined with a gradient search algorithms
+
+        Args:
+         - param0 (array-like): Initial parameter estimate
+         - num_part (int/array-like): Number of particle to use in the forward filter
+           if array each iteration takes the next element from the array when setting
+           up the filter
+         - num_traj (int/array-like): Number of smoothed trajectories to create
+           if array each iteration takes the next element from the array when setting
+           up the smoother
+         - max_iter (int): Max number of EM-iterations to perform
+         - tol (float): When the different in loglikelihood between two iterations
+           is less that his value the algorithm is terminated
+         - callback (function): Callback after each EM-iteration with new estimate
+         - callback_sim (function): Callback after each simulation
+         - bounds (array-like): Hard bounds on parameter estimates
+         - meas_first (bool): If true, first measurement occurs before the first
+           time update
+         - smoother (string): Which particle smoother to use
+         - smoother_options (dict): Extra options for the smoother
+         - analytic_gradient (bool): Use analytic gradient (requires that the model
+           implements ParamEstInterface_GradientSearch)
+        """
+
 
         def fval(params_val):
+            """ internal function """
             self.model.set_params(params_val)
             log_py = self.eval_logp_y()
             log_pxnext = self.eval_logp_xnext()
@@ -23,6 +55,7 @@ class ParamEstimation(Simulator):
             return val
 
         def fval_grad(params_val):
+            """ internal function """
             self.model.set_params(params_val)
             (logp_y, grad_logp_y) = self.eval_logp_y_val_grad()
             (logp_xnext, grad_logp_xnext) = self.eval_logp_xnext_val_grad()
@@ -76,18 +109,21 @@ class ParamEstimation(Simulator):
         return (params_local, Q)
 
     def eval_prob(self):
+        """ internal helper function """
         log_py = self.eval_logp_y()
         log_px0 = self.eval_logp_x0()
         log_pxnext = self.eval_logp_xnext()
         return log_px0 + log_pxnext + log_py
 
     def eval_logp_x0(self):
+        """ internal helper function """
         M = self.straj.traj.shape[1]
         logp_x0 = self.model.eval_logp_x0(self.straj.traj[0],
                                           self.straj.t[0])
         return numpy.sum(logp_x0) / M
 
     def eval_logp_y(self, ind=None, traj_ind=None):
+        """ internal helper function """
         logp_y = 0.0
         M = self.straj.traj.shape[1]
         T = len(self.straj)
@@ -101,6 +137,7 @@ class ParamEstimation(Simulator):
         return logp_y / M
 
     def eval_logp_xnext(self, ind=None, traj_ind=None):
+        """ internal helper function """
         logp_xnext = 0.0
         M = self.straj.traj.shape[1]
         T = len(self.straj)
@@ -113,12 +150,14 @@ class ParamEstimation(Simulator):
         return logp_xnext / M
 
     def eval_logp_x0_val_grad(self):
+        """ internal helper function """
         M = self.straj.traj.shape[1]
         (logp_x0, logp_x0_grad) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
                                                                    self.straj.t[0])
         return (logp_x0 / M, logp_x0_grad / M)
 
     def eval_logp_y_val_grad(self, ind=None, traj_ind=None):
+        """ internal helper function """
         logp_y_grad = numpy.zeros((len(self.model.params)))
         logp_y = 0.0
         M = self.straj.traj.shape[1]
@@ -133,6 +172,7 @@ class ParamEstimation(Simulator):
         return (logp_y / M, logp_y_grad / M)
 
     def eval_logp_xnext_val_grad(self, ind=None, traj_ind=None):
+        """ internal helper function """
         logp_xnext_grad = numpy.zeros((len(self.model.params)))
         logp_xnext = 0.0
         M = self.straj.traj.shape[1]
