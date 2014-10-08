@@ -33,10 +33,12 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['pyparticleest.utils.kalman',
-		'pyparticleest.models.mlnlg_compute',
+MOCK_MODULES = [
+#		'pyparticleest.utils.kalman',
+#		'pyparticleest.models.mlnlg_compute',
 		'scipy', 'scipy.linalg', 'scipy.optimize',
-		'matplotlib', 'matplotlib.pyplot']
+		'matplotlib', 'matplotlib.pyplot'
+		]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
 
