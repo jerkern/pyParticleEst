@@ -2,8 +2,6 @@
 @author: Jerker Nordh
 """
 from pyparticleest.interfaces import FFBSi
-import pyximport
-pyximport.install(inplace=True)
 import pyparticleest.models.mlnlg_compute as mlnlg_compute
 import pyparticleest.utils.kalman as kalman
 import numpy

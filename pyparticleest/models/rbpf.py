@@ -6,8 +6,6 @@
 
 import abc
 import pyparticleest.interfaces as interfaces
-import pyximport
-pyximport.install(inplace=True)
 import pyparticleest.utils.kalman as kalman
 import numpy
 

@@ -2,8 +2,6 @@
     Also illustrates that the """
 
 import numpy
-import pyximport
-pyximport.install(inplace=True)
 import pyparticleest.utils.kalman as kalman
 import pyparticleest.interfaces as interfaces
 import matplotlib.pyplot as plt

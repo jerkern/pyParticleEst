@@ -6,8 +6,6 @@ from pyparticleest.models.rbpf import RBPSBase
 import scipy.linalg
 import numpy.random
 import math
-import pyximport
-pyximport.install(inplace=True)
 import pyparticleest.models.mlnlg_compute as mlnlg_compute
 import pyparticleest.utils.kalman as kalman
 

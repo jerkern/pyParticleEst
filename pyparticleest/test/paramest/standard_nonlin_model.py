@@ -1,7 +1,5 @@
 import numpy
 import math
-import pyximport
-pyximport.install(inplace=True)
 import pyparticleest.utils.kalman as kalman
 import pyparticleest.interfaces as interfaces
 import pyparticleest.paramest.paramest as param_est
@@ -72,7 +70,7 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
     def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
             as specified in [1].
-            The gradient is an array where each element is the derivative with 
+            The gradient is an array where each element is the derivative with
             respect to the corresponding parameter"""
         return kalman.lognormpdf_scalar(particles, self.P0)
 
