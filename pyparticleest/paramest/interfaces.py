@@ -8,8 +8,7 @@ import abc
 class ParamEstInterface(object):
     """ Interface s for particles to be used with the parameter estimation
         algorithm presented in [1]
-        [1] - 'System identification of nonlinear state-space models' by
-              Schon, Wills and Ninness """
+        [1] - 'System identification of nonlinear state-space models' by Schon, Wills and Ninness """
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
@@ -78,9 +77,8 @@ class ParamEstInterface(object):
 
 class ParamEstInterface_GradientSearch(ParamEstInterface):
     """ Interface s for particles to be used with the parameter estimation
-        algorithm presented in [1]
-        [1] - 'System identification of nonlinear state-space models' by
-              Schon, Wills and Ninness """
+        algorithm presented in [1] using analytic gradients
+    """
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
