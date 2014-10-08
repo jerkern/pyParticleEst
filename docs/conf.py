@@ -259,8 +259,8 @@ texinfo_documents = [
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
 
-#from unittest.mock import MagicMock
-from mock import Mock as MagicMock
+from unittest.mock import MagicMock
+#from mock import Mock as MagicMock
 
 class Mock(MagicMock):
     @classmethod
