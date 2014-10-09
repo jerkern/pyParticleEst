@@ -4,4 +4,7 @@
 *~
 *.class
 *.dot
+build/
+dist/
+docs/_build/
 
