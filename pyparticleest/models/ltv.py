@@ -9,7 +9,7 @@ try:
 except ImportError:
     print("Falling back to pure python implementaton, expect horrible performance")
     import pyparticleest.utils.kalman as kalman
-    import pyparticleest.utls.mlnlg_compute as mlnlg_compute
+    import pyparticleest.utils.mlnlg_compute as mlnlg_compute
 
 import numpy
 import scipy.linalg
