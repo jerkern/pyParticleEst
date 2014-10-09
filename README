@@ -40,18 +40,29 @@ implementation by the end user. (outside the scope of this framework)
 
 Installation
 ============
+
+Using PyPI
+**********
+The package is hosted on PyPI, so on many system you can just run:
+
+	pip install pyParticleEst
+
+Manual installation
+*******************
 Make sure that you have numpy and scipy installed
-After downloading the code run
+After downloading the code (see link at top of this document) run:
 
 	python setup.py install
 
 This will build the code and install it to your system using distutils. 
 
 
+Non-Linux systems
+*****************
 There is currently no binary distribution, thus you have to have a C-compiler
-on your system for distutils to build the C-extension modules. On unix-like 
-systems this norally isn't an issue, but for Windows it may be a bit tricker.
-If compilation of the c code fails it will fall back to using pure python code,
+on your system for distutils to build the C-extension modules. On Unix-like 
+systems this normally isn't an issue, but for Windows it may be a bit tricker.
+If compilation of the C code fails it will fall back to using pure python code,
 this is slower but should work on all platforms but will print a warning when
 using the library.
 
