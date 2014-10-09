@@ -6,10 +6,10 @@
 
 import abc
 import pyparticleest.interfaces as interfaces
-import os
-# Stupid hack to get readthedocs documentation working
-on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-if (not on_rtd):
+try:
+    import pyparticleest.utils.ckalman as kalman
+except ImportError:
+    print("Falling back to pure python implementaton, expect horrible performance")
     import pyparticleest.utils.kalman as kalman
 import numpy
 

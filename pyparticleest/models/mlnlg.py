@@ -6,14 +6,14 @@ from pyparticleest.models.rbpf import RBPSBase
 import scipy.linalg
 import numpy.random
 import math
-import os
-# Stupid hack to get readthedocs documentation working
-#on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-#if (not on_rtd):
-#    import pyparticleest.utils.kalman as kalman
-#    import pyparticleest.models.mlnlg_compute as mlnlg_compute
-import pyparticleest.utils.kalman as kalman
-import pyparticleest.models.mlnlg_compute as mlnlg_compute
+
+try:
+    import pyparticleest.utils.ckalman as kalman
+    import pyparticleest.utils.cmlnlg_compute as mlnlg_compute
+except ImportError:
+    print("Falling back to pure python implementaton, expect horrible performance")
+    import pyparticleest.utils.kalman as kalman
+    import pyparticleest.utils.mlnlg_compute as mlnlg_compute
 
 class MixedNLGaussianSampled(RBPSBase):
     """
