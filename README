@@ -47,9 +47,14 @@ After downloading the code run
 
 This will build the code and install it to your system using distutils. 
 
+
 There is currently no binary distribution, thus you have to have a C-compiler
 on your system for distutils to build the C-extension modules. On unix-like 
 systems this norally isn't an issue, but for Windows it may be a bit tricker.
+If compilation of the c code fails it will fall back to using pure python code,
+this is slower but should work on all platforms but will print a warning when
+using the library.
+
 This link provides some advice on how to configure MinGW to compile on Windows.
 
 http://eli.thegreenplace.net/2008/06/28/compiling-python-extensions-with-distutils-and-mingw
