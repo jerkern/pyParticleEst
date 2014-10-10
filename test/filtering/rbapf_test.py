@@ -45,7 +45,7 @@ def generate_dataset(length, Qz, R, Qes, Qeb):
 
     return (y.T.tolist(), e_vec, z_vec)
 
-class ParticleAPF(mlnlg.MixedNLGaussianInitialGaussian):
+class ParticleAPF(mlnlg.MixedNLGaussianSampledInitialGaussian):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
     def __init__(self, Qz, R, Qes, Qeb):
         """ Define all model variables """

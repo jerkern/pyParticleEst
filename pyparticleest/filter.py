@@ -230,9 +230,9 @@ class ParticleTrajectory(object):
         pa = ParticleApproximation(particles=particles)
         self.traj = [TrajectoryStep(pa, t=t0, ancestors=numpy.arange(N)), ]
 
-        if (filter == 'PF'):
+        if (filter.lower() == 'pf'):
             self.pf = ParticleFilter(model=model, res=resample)
-        elif (filter == 'APF'):
+        elif (filter.lower() == 'apf'):
             self.pf = AuxiliaryParticleFilter(model=model, res=resample)
         else:
             raise ValueError('Bad filter type')
