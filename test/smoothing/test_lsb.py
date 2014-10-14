@@ -109,85 +109,6 @@ class ParticleLSB(mlnlg.MixedNLGaussianMarginalizedInitialGaussian):
 
         return (numpy.asarray(y).reshape((-1, 1)), None, h, None)
 
-class ParticleLSB_EKF(ParticleLSB):
-
-    def calc_Sigma_xi(self, particles, u, t):
-        """ Return sampled process noise for the non-linear states """
-        (Axi, _fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
-        (_xil, _zl, Pl) = self.get_states(particles)
-        N = len(particles)
-
-        Sigma = numpy.zeros((N, self.lxi, self.lxi))
-        for i in xrange(N):
-            Sigma[i] = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
-
-        return Sigma
-
-    def eval_1st_stage_weights(self, particles, u, y, t):
-        N = len(particles)
-        part = numpy.copy(particles)
-        xin = self.pred_xi(part, u, t)
-        Sigma = self.calc_Sigma_xi(particles, u, t)
-        self.cond_predict(part, xin, u, t)
-
-        tmp = numpy.vstack(part)
-        h = 0.05 * tmp[:, 0] ** 2
-        h_grad = 0.1 * tmp[:, 0]
-
-        tmp = (h_grad ** 2)
-        Rext = self.kf.R + Sigma * tmp[:, numpy.newaxis, numpy.newaxis]
-        logRext = numpy.log(Rext)
-        diff = y - h
-
-        lyz = numpy.empty(N)
-        l2pi = math.log(2 * math.pi)
-        for i in xrange(N):
-            lyz[i] = -0.5 * (l2pi + logRext[i, 0, 0] + (diff[i].ravel() ** 2) / Rext[i, 0, 0])
-        return lyz
-
-class ParticleLSB_UKF(ParticleLSB):
-
-    def eval_1st_stage_weights(self, particles, u, y, t):
-        N = len(particles)
-        # xin = self.pred_xi(part, u, t)
-
-        (Axi, fxi, _, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
-        (_xil, zl, Pl) = self.get_states(particles)
-
-        Rext = numpy.empty(N)
-        diff = numpy.empty(N)
-
-        for i in xrange(N):
-            m = numpy.vstack((zl[i], numpy.zeros((6, 1))))
-            K = scipy.linalg.block_diag(Pl[i], self.Qxi, self.kf.Q, self.kf.R)
-            Na = len(K)
-            (U, s, _V) = numpy.linalg.svd(Na * K)
-            Kroot = U.dot(numpy.diag(numpy.sqrt(s)))
-
-            ypred = numpy.empty(2 * Na)
-            # Some ugly hard-coding here of the function f and g
-            # g = 0.05*xi**2
-            for j in xrange(Na):
-                val = m + Kroot[:, j:j + 1]
-                xin = fxi[i] + Axi[i].dot(val[:4]) + val[4]
-                ypred[j] = 0.05 * (xin) ** 2 + val[9]
-
-                val = m - Kroot[:, j:j + 1]
-                xin = fxi[i] + Axi[i].dot(val[:4]) + val[4]
-                ypred[Na + j] = 0.05 * (xin) ** 2 + val[9]
-
-            # Construct estimate of covariance for predicted measurement
-            Rext[i] = numpy.cov(ypred)
-            diff[i] = y - numpy.mean(ypred)
-
-        logRext = numpy.log(Rext)
-
-        lyz = numpy.empty(N)
-        l2pi = math.log(2 * math.pi)
-        for i in xrange(N):
-            lyz[i] = -0.5 * (l2pi + logRext[i] + (diff[i].ravel() ** 2) / Rext[i])
-        return lyz
-
 
 if __name__ == '__main__':
 
@@ -223,52 +144,6 @@ if __name__ == '__main__':
                 rmse_eta = numpy.sqrt(numpy.mean(sqr_err_eta[k, :]))
                 rmse_theta = numpy.sqrt(numpy.mean(sqr_err_theta[k, :]))
                 print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
-        elif (sys.argv[1] == 'apf_compare'):
-
-            mode = sys.argv[2]
-
-            print "Running tests for %s" % mode
-
-            sims = 25000
-            part_count = (10, 15, 20, 25, 30, 40, 50, 75, 100)
-            rmse_eta = numpy.zeros((sims, len(part_count)))
-            rmse_theta = numpy.zeros((sims, len(part_count)))
-            filt = 'PF'
-            model = ParticleLSB()
-            if (mode.lower() == 'epf'):
-                model = ParticleLSB_EKF()
-                filt = 'APF'
-            elif (mode.lower() == 'upf'):
-                model = ParticleLSB_UKF()
-                filt = 'APF'
-            elif (mode.lower() == 'apf'):
-                filt = 'APF'
-            else:
-                pass
-
-            for k in range(sims):
-
-                # Create reference
-                numpy.random.seed(k)
-                (y, e, z) = generate_dataset(steps)
-                sim = simulator.Simulator(model=model, u=None, y=y)
-
-                for ind, pc in enumerate(part_count):
-
-                    sim.simulate(pc, num_traj=1, res=0.67, filter=filt, smoother='ancestor')
-                    avg = sim.get_filtered_mean()
-                    theta_avg = 25.0 + C_theta.dot(avg[:, 1:5].T).T
-
-                    theta = 25.0 + C_theta.dot(z.reshape((4, -1)))
-                    sqr_err_eta = (avg[:, 0] - e[0, :]) ** 2
-                    sqr_err_theta = (theta_avg[:, 0] - theta[0, :]) ** 2
-
-                    rmse_eta[k, ind] = numpy.sqrt(numpy.mean(sqr_err_eta))
-                    rmse_theta[k, ind] = numpy.sqrt(numpy.mean(sqr_err_theta))
-
-            for ind, pc in enumerate(part_count):
-                print "%d: (%f, %f)" % (pc, numpy.mean(rmse_eta[:, ind]), numpy.mean(rmse_theta[:, ind]))
-
 
     else:
 

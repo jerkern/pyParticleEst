@@ -36,7 +36,7 @@ def generate_reference(uvec, steps, c_true):
     return (u, y, x)
 
 
-class ParticleParamOutput(mlnlg.MixedNLGaussianInitialGaussian):
+class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """

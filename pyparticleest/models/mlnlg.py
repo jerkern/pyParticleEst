@@ -1049,6 +1049,9 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         rejection sampling, it is up to the end user which method is best for
         their particular problem """
 
+    def logp_xnext_max(self, particles, u, t):
+        raise NotImplementedError("MixedNLGaussianMarginalized doesn't support rejection sampling")
+
     def calc_prop1(self, particles, next_part, u, t):
         """ internal helper function """
         M = len(particles)

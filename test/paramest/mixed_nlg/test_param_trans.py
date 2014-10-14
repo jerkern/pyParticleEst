@@ -2,7 +2,7 @@
 
 import numpy
 import pyparticleest.paramest.paramest as param_est
-from pyparticleest.models.mlnlg import MixedNLGaussianInitialGaussian
+from pyparticleest.models.mlnlg import MixedNLGaussianSampledInitialGaussian
 import matplotlib.pyplot as plt
 
 R = numpy.array([[0.1]])
@@ -33,7 +33,7 @@ def generate_reference(z0, P0, theta_true, steps):
     return (y, states)
 
 
-class ParticleParamTrans(MixedNLGaussianInitialGaussian):
+class ParticleParamTrans(MixedNLGaussianSampledInitialGaussian):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params, R, Qxi, Qz):
         """ Define all model variables """
