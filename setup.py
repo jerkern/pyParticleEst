@@ -18,7 +18,7 @@ else:
     extensions = None
 
 name = 'pyParticleEst'
-version = '0.9'
+version = '1.0'
 packages = ['pyparticleest', 'pyparticleest/models', 'pyparticleest/paramest', 'pyparticleest/utils']
 url = 'http://www.control.lth.se/Staff/JerkerNordh/pyparticleest.html'
 author = 'Jerker Nordh'
