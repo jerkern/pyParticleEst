@@ -372,7 +372,11 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         """
         self.params = numpy.copy(params).reshape((-1, 1))
 
+    def post_smoothing(self, st):
+        return self.pre_mhips_pass(st)
 
+    def pre_mhips_pass(self, st):
+        return st.traj
 
 class NonlinearGaussianInitialGaussian(NonlinearGaussian):
     """

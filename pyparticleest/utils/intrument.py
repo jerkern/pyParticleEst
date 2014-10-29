@@ -115,3 +115,9 @@ class Instrumenter(object):
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.cnt_eval1st += len(particles)
         return self.model.eval_1st_stage_weights(particles, u, y, t)
+
+    def pre_mhips_pass(self, st):
+        return self.model.pre_mhips_pass(st)
+
+    def post_smoothing(self, st):
+        return self.model.post_smoothing(st)
