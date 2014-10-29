@@ -302,31 +302,18 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
          - st (SmoothTrajectory): Smoothed estimate (with post processing step)
 
         Returns:
-         (array-like): Smoothed estimate with sufficent statistics for linear
+         (array-like): Smoothed estimate with sufficient statistics for linear
          states
         """
         T = st.traj.shape[0]
         M = st.traj.shape[1]
 
-        particles = numpy.copy(st.traj[0])
-        lx = particles.shape[1]
-        straj = numpy.zeros((T, M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
-        (xil, _zl, _Pl) = self.get_states(particles)
-        (z0, P0) = self.get_rb_initial(xil)
-        self.set_states(particles, xil, z0, P0)
+        lx = self.lxi + self.kf.lz + self.kf.lz ** 2
+        # Allocate extra space for Mz
+        straj = numpy.zeros((T, M, lx + self.kf.lz ** 2))
 
-        for i in xrange(T - 1):
-            if (st.y[i] != None):
-                self.measure(particles, y=st.y[i], t=st.t[i])
-            (xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
-            straj[i, :, :lx] = particles
-
-            self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
-
-        if (st.y[-1] != None):
-            self.measure(particles, y=st.y[-1], t=st.t[-1])
-
-        straj[-1, :, :lx] = particles
+        # Forward filtering
+        straj[:, :, :lx] = self.pre_mhips_pass(st)
 
         # Backward smoothing
         for i in reversed(xrange(T - 1)):
@@ -342,6 +329,34 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
                 self.set_states(straj[i, j:j + 1, :], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
                 self.set_Mz(straj[i, j:j + 1, :], Ms[numpy.newaxis])
 
+        return straj
+
+    def pre_mhips_pass(self, st):
+        T = st.traj.shape[0]
+        M = st.traj.shape[1]
+
+        lx = self.lxi + self.kf.lz + self.kf.lz ** 2
+        straj = numpy.zeros((T, M, lx))
+        particles = numpy.empty((M, lx))
+        #(xil, _zl, _Pl) = self.get_states(particles)
+        xil = straj[0, :, :self.lxi].reshape((M, self.lxi, 1))
+
+        (z0, P0) = self.get_rb_initial(xil)
+        self.set_states(particles, xil, z0, P0)
+
+        for i in xrange(T - 1):
+            if (st.y[i] != None):
+                self.measure(particles, y=st.y[i], t=st.t[i])
+            straj[i] = particles
+
+            #(xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
+            xin = st.traj[i + 1, :, :self.lxi].reshape((M, self.lxi, 1))
+            self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
+
+        if (st.y[-1] != None):
+            self.measure(particles, y=st.y[-1], t=st.t[-1])
+
+        straj[-1] = particles
         return straj
 
     def set_states(self, particles, xi_list, z_list, P_list):

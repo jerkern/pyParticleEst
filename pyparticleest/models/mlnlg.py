@@ -501,12 +501,14 @@ class MixedNLGaussianSampled(RBPSBase):
          (array-like) with first dimension = N
         """
         M = len(particles)
-        res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
+        res = numpy.zeros((M, self.lxi + self.kf.lz))
         part = numpy.copy(particles)
         (xil, zl, Pl) = self.get_states(part)
 
         if (future_trajs != None):
-            (xinl, znl, _unused) = self.get_states(future_trajs[0])
+            xinl = future_trajs[0, :, :self.lxi].reshape((M, self.lxi, 1))
+            znl = future_trajs[0, :, self.lxi:].reshape((M, self.kf.lz, 1))
+            #(xinl, znl, _unused) = self.get_states(future_trajs[0])
             (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=ut[0],
                                                             t=tt[0])
 
@@ -517,7 +519,7 @@ class MixedNLGaussianSampled(RBPSBase):
             for j in range(M):
                 self.kf.measure_full(znl[j], zl[j], Pl[j],
                                      C=Acond[j], h_k=fcond[j], R=Qcond[j])
-            self.set_states(particles, xil, zl, Pl)
+            #self.set_states(particles, xil, zl, Pl)
 
         # During the backward smoothing the next_part contain sampled
         # z-variables, the full distrubition for the z_1:T conditioned on xi_1:T
@@ -527,8 +529,28 @@ class MixedNLGaussianSampled(RBPSBase):
             xi = numpy.copy(xil[j]).ravel()
             z = numpy.random.multivariate_normal(zl[j].ravel(),
                                                  Pl[j]).ravel()
-            res[j, :self.lxi + self.kf.lz] = numpy.hstack((xi, z))
+            res[j] = numpy.hstack((xi, z))
         return res
+
+    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
+        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
+        # Trivial choice of q, discard y_T and x_{t+1}
+        if (partp != None):
+            noise = self.sample_process_noise(partp, up, tp)
+            prop_part = numpy.copy(partp)
+            self.update(prop_part, up, tp, noise)
+        else:
+            M = future_trajs.shape[1]
+            prop_part = self.create_initial_estimate(M)
+
+        return prop_part
+
+    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+        """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
+        if (partp != None):
+            return self.logp_xnext(partp, prop_part, up, tp)
+        else:
+            return self.eval_logp_x0(prop_part, t=tt[0])
 
     def set_params(self, params):
         """
@@ -582,7 +604,7 @@ class MixedNLGaussianSampled(RBPSBase):
         Args:
          - xil (list): Initial xi states
         """
-        return 0.0
+        return numpy.zeros(len(xil))
 
     def eval_logp_xi0_grad(self, xil):
         """
@@ -610,7 +632,7 @@ class MixedNLGaussianSampled(RBPSBase):
         (xil, zl, Pl) = self.get_states(particles)
         (z0, P0) = self.get_rb_initial(xil)
         lpxi0 = self.eval_logp_xi0(xil)
-        lpz0 = 0.0
+        lpz0 = numpy.empty((N,))
         for i in xrange(N):
             z0_diff = zl[i] - z0[i]
             l1 = z0_diff.dot(z0_diff.T) + Pl[i]
@@ -618,7 +640,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0]))) * 2
             tmp = scipy.linalg.cho_solve(P0cho, l1, check_finite=False)
-            lpz0 -= 0.5 * (ld + numpy.trace(tmp))
+            lpz0[i] = -0.5 * (ld + numpy.trace(tmp))
         return lpxi0 + lpz0
 
     def eval_logp_x0_val_grad(self, particles, t):
@@ -996,10 +1018,10 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
          - xil (list): Initial xi states
         """
         N = len(xil)
-        res = 0.0
+        res = numpy.empty((N,))
         Pchol = scipy.linalg.cho_factor(self.Pxi0, check_finite=False)
         for i in xrange(N):
-            res += kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
+            res[i] = kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
         return res
 
     def get_xi_intitial_grad(self, N):
@@ -1060,10 +1082,11 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         OHind = lxi
         OHlen = lz * lz
         LHind = lxi + OHlen
+        LHlen = lz
 
         xinl = next_part[:, :lxi]
         OHnl = next_part[:, OHind:OHind + OHlen].reshape((M, lz, lz))
-        LHnl = next_part[:, LHind:].reshape((M, lz, 1))
+        LHnl = next_part[:, LHind:LHind + LHlen].reshape((M, lz, 1))
 
         logZ = numpy.zeros(M)
         Omega = numpy.zeros_like(OHnl)
@@ -1115,6 +1138,44 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
                        tmp.T.dot(numpy.linalg.solve(L[j], tmp)))
         return (eta, L)
 
+    def logp_xnext(self, particles, next_part, u, t):
+        """
+        Return the log-pdf value for the possible future nonlinear state
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1}|x_t^i)
+        """
+
+        # During the backward smoothing the next_part contain sampled
+        # z-variables, the full distrubition for the z_1:T conditioned on xi_1:T
+        # is recovered in the post_smooting step
+
+        N = len(particles)
+        Nn = len(next_part)
+        if (N > 1 and Nn == 1):
+            next_part = numpy.repeat(next_part, N, 0)
+        lpx = numpy.empty(N)
+        (_, _, Pl) = self.get_states(particles)
+        (Axi, _, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+
+        xp = self.pred_xi(particles, u, t)
+
+        for i in xrange(N):
+            x_next = next_part[i, :self.lxi].reshape((self.lxi, 1))
+            Sigma = Axi[i].dot(Pl[i]).dot(Axi[i].T) + Qxi[i]
+            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
+            lpx[i] = kalman.lognormpdf_cho(x_next - xp[i], Schol)
+
+        return lpx
 
     def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
         """

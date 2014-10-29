@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     model = Model(P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
     sim = simulator.Simulator(model, None, y)
-    sim.simulate(num, nums, 'PF', 'full', meas_first=False)
+    sim.simulate(num, nums, 'PF', 'mhips', meas_first=False)
 
     if (True):
         plt.plot(range(steps + 1), x[0, :], 'r-')
