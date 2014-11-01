@@ -48,8 +48,12 @@ class ParamEstimation(Simulator):
         def fval(params_val):
             """ internal function """
             self.model.set_params(params_val)
-            log_py = self.eval_logp_y()
-            log_pxnext = self.eval_logp_xnext()
+            log_py = self.model.eval_logp_y_fulltraj(self.straj,
+                                                     self.straj.y,
+                                                     self.straj.t)
+            log_pxnext = self.model.eval_logp_xnext_fulltraj(self.straj,
+                                                             self.straj.u,
+                                                             self.straj.t)
             log_px0 = self.eval_logp_x0()
             val = -1.0 * (log_py + log_px0 + log_pxnext)
             return val
@@ -121,33 +125,6 @@ class ParamEstimation(Simulator):
         logp_x0 = self.model.eval_logp_x0(self.straj.traj[0],
                                           self.straj.t[0])
         return numpy.sum(logp_x0) / M
-
-    def eval_logp_y(self, ind=None, traj_ind=None):
-        """ internal helper function """
-        logp_y = 0.0
-        M = self.straj.traj.shape[1]
-        T = len(self.straj)
-        for t in xrange(T):
-            if (self.straj.y[t] != None):
-                val = self.model.eval_logp_y(self.straj.traj[t],
-                                             self.straj.y[t],
-                                             self.straj.t[t])
-                logp_y += numpy.sum(val)
-
-        return logp_y / M
-
-    def eval_logp_xnext(self, ind=None, traj_ind=None):
-        """ internal helper function """
-        logp_xnext = 0.0
-        M = self.straj.traj.shape[1]
-        T = len(self.straj)
-        for t in xrange(T - 1):
-            val = self.model.eval_logp_xnext(self.straj.traj[t],
-                                             self.straj.traj[t + 1],
-                                             self.straj.u[t],
-                                             self.straj.t[t])
-            logp_xnext += numpy.sum(val)
-        return logp_xnext / M
 
     def eval_logp_x0_val_grad(self):
         """ internal helper function """

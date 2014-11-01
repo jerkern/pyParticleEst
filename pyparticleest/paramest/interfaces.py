@@ -4,11 +4,9 @@ Interfaces required for using the parameter estimation methods
 @author: Jerker Nordh
 '''
 import abc
+import numpy
 
-class ParamEstInterface(object):
-    """ Interface s for particles to be used with the parameter estimation
-        algorithm presented in [1]
-        [1] - 'System identification of nonlinear state-space models' by Schon, Wills and Ninness """
+class ParamEstIntFullTraj(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
@@ -34,6 +32,43 @@ class ParamEstInterface(object):
 
         Returns: (array-like) or (float) """
         pass
+
+    @abc.abstractmethod
+    def eval_logp_xnext(self, particles, x_next, u, t):
+        pass
+
+    def eval_logp_xnext_fulltraj(self, straj, ut, tt):
+        logp_xnext = 0.0
+        M = straj.traj.shape[1]
+        T = straj.traj.shape[0]
+        for i in xrange(T - 1):
+            val = self.eval_logp_xnext(straj.traj[i],
+                                       straj.traj[i + 1],
+                                       ut[i], tt[i])
+            logp_xnext += numpy.sum(val)
+        return logp_xnext / M
+
+    @abc.abstractmethod
+    def eval_logp_y(self, particles, y, t):
+        pass
+
+    def eval_logp_y_fulltraj(self, straj, yt, tt):
+        logp_y = 0.0
+        M = straj.traj.shape[1]
+        T = straj.traj.shape[0]
+        for i in xrange(T):
+            if (yt[i] != None):
+                val = self.eval_logp_y(straj.traj[i], yt[i], tt[i])
+                logp_y += numpy.sum(val)
+
+        return logp_y / M
+
+class ParamEstInterface(ParamEstIntFullTraj):
+    """ Interface s for particles to be used with the parameter estimation
+        algorithm presented in [1]
+        [1] - 'System identification of nonlinear state-space models' by Schon, Wills and Ninness """
+    __metaclass__ = abc.ABCMeta
+
 
     def eval_logp_xnext(self, particles, particles_next, u, t):
         """
