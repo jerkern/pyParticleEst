@@ -445,6 +445,6 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
         else:
             Pchol = scipy.linalg.cho_factor(self.Px0, check_finite=False)
             for i in xrange(N):
-                res[i] = kalman.lognormpdf_cho(particles[i] - self.x0, Pchol)
+                res[i] = kalman.lognormpdf_cho(particles[i].ravel() - self.x0.ravel(), Pchol)
 
         return res
