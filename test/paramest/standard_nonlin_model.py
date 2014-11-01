@@ -53,7 +53,7 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
     def logp_xnext(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
         pn = 0.5 * particles + 25.0 * particles / (1 + particles ** 2) + 8 * math.cos(1.2 * t)
-        return kalman.lognormpdf_scalar(pn - next_part.ravel(), self.Q)
+        return kalman.lognormpdf_scalar(pn.ravel() - next_part.ravel(), self.Q)
 
     def logp_xnext_max(self, particles, u, t):
         return self.logxn_max
@@ -79,6 +79,23 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
             return numpy.copy(particles[new_ind])
         else:
             return numpy.copy(particles)
+
+    def eval_logp_xnext_fulltraj(self, straj, ut, tt):
+        M = straj.traj.shape[1]
+        part = straj.traj
+        cost = 8.0 * numpy.cos(1.2 * numpy.asarray(tt, dtype=float))
+        xp = 0.5 * part + 25.0 * part / (1 + part ** 2) + numpy.repeat(cost.reshape(-1, 1, 1), repeats=M, axis=1)
+        diff = part[1:] - xp[:-1]
+        logp = kalman.lognormpdf_scalar(diff.ravel(), self.Q)
+        return numpy.sum(logp) / M
+
+
+    def eval_logp_y_fulltraj(self, straj, yt, tt):
+        M = straj.traj.shape[1]
+        yp = 0.05 * straj.traj ** 2
+        diff = yp - numpy.repeat(numpy.asarray(yt, dtype=float).reshape((-1, 1, 1)),
+                                 repeats=M, axis=1)
+        return numpy.sum(kalman.lognormpdf_scalar(diff.ravel(), self.R)) / M
 
 def callback(params, Q):
     print "params = %s" % numpy.exp(params)
@@ -121,7 +138,7 @@ if __name__ == '__main__':
     model = Model(P0, Q, R)
     estimator = param_est.ParamEstimation(model, u=None, y=y)
     callback(theta0, None)
-    estimator.maximize(theta0, num, M, smoother='rsas', meas_first=True, max_iter=len(iterations),
+    estimator.maximize(theta0, num, M, smoother='mcmc', meas_first=True, max_iter=len(iterations),
                        callback=callback)
 #     plt.ion()
 #     estimator.maximize(theta0, num, M, smoother='full', meas_first=True, max_iter=len(iterations),
