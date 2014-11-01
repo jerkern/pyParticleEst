@@ -34,8 +34,19 @@ class ParamEstIntFullTraj(object):
         pass
 
     @abc.abstractmethod
-    def eval_logp_xnext(self, particles, x_next, u, t):
+    def eval_logp_xnext_fulltraj(self, straj, ut, tt):
         pass
+
+    @abc.abstractmethod
+    def eval_logp_y_fulltraj(self, straj, yt, tt):
+        pass
+
+class ParamEstInterface(ParamEstIntFullTraj):
+    """ Interface s for particles to be used with the parameter estimation
+        algorithm presented in [1]
+        [1] - 'System identification of nonlinear state-space models' by Schon, Wills and Ninness """
+    __metaclass__ = abc.ABCMeta
+
 
     def eval_logp_xnext_fulltraj(self, straj, ut, tt):
         logp_xnext = 0.0
@@ -48,10 +59,6 @@ class ParamEstIntFullTraj(object):
             logp_xnext += numpy.sum(val)
         return logp_xnext / M
 
-    @abc.abstractmethod
-    def eval_logp_y(self, particles, y, t):
-        pass
-
     def eval_logp_y_fulltraj(self, straj, yt, tt):
         logp_y = 0.0
         M = straj.traj.shape[1]
@@ -62,13 +69,6 @@ class ParamEstIntFullTraj(object):
                 logp_y += numpy.sum(val)
 
         return logp_y / M
-
-class ParamEstInterface(ParamEstIntFullTraj):
-    """ Interface s for particles to be used with the parameter estimation
-        algorithm presented in [1]
-        [1] - 'System identification of nonlinear state-space models' by Schon, Wills and Ninness """
-    __metaclass__ = abc.ABCMeta
-
 
     def eval_logp_xnext(self, particles, particles_next, u, t):
         """
@@ -110,14 +110,53 @@ class ParamEstInterface(ParamEstIntFullTraj):
 
 
 
-class ParamEstInterface_GradientSearch(ParamEstInterface):
+class ParamEstInterface_GradientSearchFullTraj(ParamEstInterface):
+    @abc.abstractmethod
+    def eval_logp_y_val_grad_fulltraj(self, straj, yt, tt):
+        pass
+
+    @abc.abstractmethod
+    def eval_logp_xnext_val_grad_fulltraj(self, straj, ut, tt):
+        pass
+
+
+class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj):
     """ Interface s for particles to be used with the parameter estimation
         algorithm presented in [1] using analytic gradients
     """
     __metaclass__ = abc.ABCMeta
 
+    def eval_logp_y_val_grad_fulltraj(self, straj, yt, tt):
+        logp_y_grad = numpy.zeros((len(self.params)))
+        logp_y = 0.0
+        M = straj.traj.shape[1]
+        T = len(straj)
+        for t in xrange(T):
+            if (self.straj.y[t] != None):
+                (val, grad) = self.eval_logp_y_val_grad(straj.traj[t],
+                                                        straj.y[t],
+                                                        straj.t[t])
+                logp_y += val
+                logp_y_grad += grad
+        return (logp_y / M, logp_y_grad / M)
+
+    def eval_logp_xnext_val_grad_fulltraj(self, straj, ut, tt):
+        logp_xnext_grad = numpy.zeros((len(self.params)))
+        logp_xnext = 0.0
+        M = straj.traj.shape[1]
+        T = len(straj)
+        for t in xrange(T - 1):
+            (val, grad) = self.eval_logp_xnext_val_grad(straj.traj[t],
+                                                        straj.traj[t + 1],
+                                                        straj.u[t],
+                                                        straj.t[t])
+            logp_xnext += val
+            logp_xnext_grad += grad
+
+        return (logp_xnext / M, logp_xnext_grad / M)
+
     @abc.abstractmethod
-    def eval_logp_x0_val_grad(self, particles):
+    def eval_logp_x0_val_grad(self, particles, t):
         """
         Calculate term of the I1 integral approximation as specified in [1].
         Eg. Evaluate log p(x_0) or sum log p(x_0)

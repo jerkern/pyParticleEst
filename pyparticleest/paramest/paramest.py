@@ -54,16 +54,26 @@ class ParamEstimation(Simulator):
             log_pxnext = self.model.eval_logp_xnext_fulltraj(self.straj,
                                                              self.straj.u,
                                                              self.straj.t)
-            log_px0 = self.eval_logp_x0()
+            tmp = self.model.eval_logp_x0(self.straj.traj[0],
+                                          self.straj.t[0])
+            log_px0 = numpy.mean(tmp)
+
             val = -1.0 * (log_py + log_px0 + log_pxnext)
             return val
 
         def fval_grad(params_val):
             """ internal function """
             self.model.set_params(params_val)
-            (logp_y, grad_logp_y) = self.eval_logp_y_val_grad()
-            (logp_xnext, grad_logp_xnext) = self.eval_logp_xnext_val_grad()
-            (logp_x0, grad_logp_x0) = self.eval_logp_x0_val_grad()
+            (logp_y, grad_logp_y) = self.model.eval_logp_y_val_grad_fulltraj(self.straj,
+                                                                             self.straj.y,
+                                                                             self.straj.t)
+            (logp_xnext, grad_logp_xnext) = self.model.eval_logp_xnext_val_grad_fulltraj(self.straj,
+                                                                                         self.straj.u,
+                                                                                         self.straj.t)
+
+            (tmp1, tmp2) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
+                                                                   self.straj.t[0])
+            (logp_x0, grad_logp_x0) = (numpy.mean(tmp1), numpy.mean(tmp2))
             val = -1.0 * (logp_y + logp_x0 + logp_xnext)
             grad = -1.0 * (grad_logp_y + grad_logp_xnext + grad_logp_x0)
             return (val, grad)
@@ -112,57 +122,6 @@ class ParamEstimation(Simulator):
                 break
         return (params_local, Q)
 
-    def eval_prob(self):
-        """ internal helper function """
-        log_py = self.eval_logp_y()
-        log_px0 = self.eval_logp_x0()
-        log_pxnext = self.eval_logp_xnext()
-        return log_px0 + log_pxnext + log_py
-
-    def eval_logp_x0(self):
-        """ internal helper function """
-        M = self.straj.traj.shape[1]
-        logp_x0 = self.model.eval_logp_x0(self.straj.traj[0],
-                                          self.straj.t[0])
-        return numpy.sum(logp_x0) / M
-
-    def eval_logp_x0_val_grad(self):
-        """ internal helper function """
-        M = self.straj.traj.shape[1]
-        (logp_x0, logp_x0_grad) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
-                                                                   self.straj.t[0])
-        return (logp_x0 / M, logp_x0_grad / M)
-
-    def eval_logp_y_val_grad(self, ind=None, traj_ind=None):
-        """ internal helper function """
-        logp_y_grad = numpy.zeros((len(self.model.params)))
-        logp_y = 0.0
-        M = self.straj.traj.shape[1]
-        T = len(self.straj)
-        for t in xrange(T):
-            if (self.straj.y[t] != None):
-                (val, grad) = self.model.eval_logp_y_val_grad(self.straj.traj[t],
-                                                              self.straj.y[t],
-                                                              self.straj.t[t])
-                logp_y += val
-                logp_y_grad += grad
-        return (logp_y / M, logp_y_grad / M)
-
-    def eval_logp_xnext_val_grad(self, ind=None, traj_ind=None):
-        """ internal helper function """
-        logp_xnext_grad = numpy.zeros((len(self.model.params)))
-        logp_xnext = 0.0
-        M = self.straj.traj.shape[1]
-        T = len(self.straj)
-        for t in xrange(T - 1):
-            (val, grad) = self.model.eval_logp_xnext_val_grad(self.straj.traj[t],
-                                                              self.straj.traj[t + 1],
-                                                              self.straj.u[t],
-                                                              self.straj.t[t])
-            logp_xnext += val
-            logp_xnext_grad += grad
-
-        return (logp_xnext / M, logp_xnext_grad / M)
 
 class GradPlot():
     def __init__(self, params, vals, diff):
@@ -200,13 +159,30 @@ class GradientTest(ParamEstimation):
             tmp = numpy.copy(self.params)
             tmp[param_id] = param_vals[k]
             self.set_params(tmp)
-            logpy[k] = self.eval_logp_y()
-            logpxn[k] = self.eval_logp_xnext()
-            logpx0[k] = self.eval_logp_x0()
+            logpy[k] = self.model.eval_logp_y_fulltraj(self.straj,
+                                                       self.straj.y,
+                                                       self.straj.t)
+            logpxn[k] = self.model.eval_logp_xnext_fulltraj(self.straj,
+                                                             self.straj.u,
+                                                             self.straj.t)
+            tmp = self.model.eval_logp_x0(self.straj.traj[0],
+                                          self.straj.t[0])
+            logpx0[k] = numpy.mean(tmp)
+
             if (analytic_grad):
-                grad_logpy[k] = self.eval_logp_y_val_grad()[1]
-                grad_logpxn[k] = self.eval_logp_xnext_val_grad()[1]
-                grad_logpx0[k] = self.eval_logp_x0_val_grad()[1]
+                (_, grad_logp_y) = self.model.eval_logp_y_val_grad_fulltraj(self.straj,
+                                                                             self.straj.y,
+                                                                             self.straj.t)
+                (_, grad_logp_xnext) = self.model.eval_logp_xnext_val_grad_fulltraj(self.straj,
+                                                                                     self.straj.u,
+                                                                                     self.straj.t)
+                (tmp1, tmp2) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
+                                                                self.straj.t[0])
+                (_, grad_logp_x0) = (numpy.mean(tmp1), numpy.mean(tmp2))
+
+                grad_logpy[k] = grad_logp_y
+                grad_logpxn[k] = grad_logp_xnext
+                grad_logpx0[k] = grad_logp_x0
                 self.plot_y = GradPlot(param_vals, logpy, grad_logpy[:, param_id])
                 self.plot_xn = GradPlot(param_vals, logpxn, grad_logpxn[:, param_id])
                 self.plot_x0 = GradPlot(param_vals, logpx0, grad_logpx0[:, param_id])
