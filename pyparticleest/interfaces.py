@@ -27,7 +27,7 @@ class ParticleFiltering(object):
         pass
 
     @abc.abstractmethod
-    def sample_process_noise(self, particles, u, t):
+    def sample_process_noise(self, ptraj, ut, tt):
         """
         Sample process noise
 
@@ -43,7 +43,7 @@ class ParticleFiltering(object):
         pass
 
     @abc.abstractmethod
-    def update(self, particles, u, t, noise):
+    def update(self, particles, ptraj, utt, tt, noise):
         """ Propagate estimate forward in time
 
         Args:
@@ -124,6 +124,7 @@ class ParticleFiltering(object):
         else:
             return numpy.copy(particles)
 
+
 class AuxiliaryParticleFiltering(object):
     """
     Base class for particles to be used with auxiliary particle filtering
@@ -150,7 +151,43 @@ class AuxiliaryParticleFiltering(object):
         """
         pass
 
-class FFBSi(ParticleFiltering):
+class FFProposeFromMeasure(object):
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def propose_from_y(self, N, y, t):
+        """
+        Create N particles from p(x_t|y_t)
+        """
+        pass
+
+    @abc.abstractmethod
+    def logp_xnext(self, ptraj, ptt, utt, next_part):
+        """
+        Return the log-pdf value for the possible future state 'next'
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1}|x_t^i)
+        """
+        pass
+
+class FFBSiGeneric(ParticleFiltering):
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+        pass
+
+class FFBSi(FFBSiGeneric):
     """
     Base class for particles to be used with particle smoothing
     (Backward Simulation)

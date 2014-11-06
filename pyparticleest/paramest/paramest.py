@@ -17,7 +17,8 @@ class ParamEstimation(Simulator):
 
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001,
                  callback=None, callback_sim=None, bounds=None, meas_first=False,
-                 smoother='full', smoother_options=None, analytic_gradient=False):
+                 filter='pf', smoother='full', smoother_options=None,
+                 analytic_gradient=False):
         """
         Find the maximum likelihood estimate of the paremeters using an
         EM-algorihms combined with a gradient search algorithms
@@ -98,8 +99,8 @@ class ParamEstimation(Simulator):
                 else:
                     numt = num_traj[-1]
 
-            self.simulate(nump, numt, smoother=smoother, smoother_options=smoother_options,
-                          meas_first=meas_first)
+            self.simulate(nump, numt, filter=filter, smoother=smoother,
+                          smoother_options=smoother_options, meas_first=meas_first)
             if (callback_sim != None):
                 callback_sim(self)
             # res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
