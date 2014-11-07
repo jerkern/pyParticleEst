@@ -60,7 +60,7 @@ class ParticleFilter(object):
          - resampled (bool): were the particles resampled
          - ancestors (array-like): anecstral indices for particles at time t+1
         """
-        pa = traj[-1].pa
+        pa = ParticleApproximation(traj[-1].pa.part, traj[-1].pa.w)
 
         resampled = False
         if (self.res > 0 and pa.calc_Neff() < self.res * pa.num):
@@ -71,7 +71,7 @@ class ParticleFilter(object):
             ancestors = numpy.arange(pa.num, dtype=int)
 
 
-        pa = self.update(traj, ancestors, pa, inplace=False)
+        pa = self.update(traj, ancestors, pa, inplace=True)
         if (y != None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
         return (pa, resampled, ancestors)
@@ -99,10 +99,7 @@ class ParticleFilter(object):
 #            pa.part[k].prep_update(u)
 
         if (not inplace):
-            ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors), traj[-1].pa.w)
-
-            pa_out = copy.deepcopy(pa)
-            pa = pa_out
+            pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors), traj[-1].pa.w)
 
         v = self.model.sample_process_noise(particles=pa.part, u=traj[-1].u,
                                             t=traj[-1].t)
@@ -489,7 +486,7 @@ class ParticleApproximation(object):
     """
     def __init__(self, particles=None, logw=None, seed=None, num=None):
         if (particles != None):
-            self.part = numpy.asarray(particles)
+            self.part = numpy.copy(numpy.asarray(particles))
             num = len(particles)
         else:
             self.part = numpy.empty(num, type(seed))
