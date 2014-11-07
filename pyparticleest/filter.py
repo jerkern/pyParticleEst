@@ -60,7 +60,7 @@ class ParticleFilter(object):
          - resampled (bool): were the particles resampled
          - ancestors (array-like): anecstral indices for particles at time t+1
         """
-        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part), traj[-1].pa.w)
+        pa = traj[-1].pa
 
         resampled = False
         if (self.res > 0 and pa.calc_Neff() < self.res * pa.num):
@@ -70,12 +70,13 @@ class ParticleFilter(object):
         else:
             ancestors = numpy.arange(pa.num, dtype=int)
 
-        pa = self.update(pa, u=traj[-1].u, t=traj[-1].t)
+
+        pa = self.update(traj, ancestors, pa, inplace=False)
         if (y != None):
-            pa = self.measure(pa, y=y, t=traj[-1].t + 1)
+            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
         return (pa, resampled, ancestors)
 
-    def update(self, pa, u, t, inplace=True):
+    def update(self, traj, ancestors, pa, inplace=True):
         """
         Update particle approximation of x_t to x_{t+1} using u as input.
 
@@ -91,8 +92,6 @@ class ParticleFilter(object):
             ParticleApproximation for time t+1
         """
 
-        u = numpy.reshape(u, (-1, 1))
-
         # Prepare the particle for the update, eg. for
         # mixed linear/non-linear calculate the variables that
         # depend on the current state
@@ -100,16 +99,19 @@ class ParticleFilter(object):
 #            pa.part[k].prep_update(u)
 
         if (not inplace):
+            ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors), traj[-1].pa.w)
+
             pa_out = copy.deepcopy(pa)
             pa = pa_out
 
-        v = self.model.sample_process_noise(particles=pa.part, u=u, t=t)
-        self.model.update(particles=pa.part, u=u, t=t, noise=v)
-
+        v = self.model.sample_process_noise(particles=pa.part, u=traj[-1].u,
+                                            t=traj[-1].t)
+        self.model.update_full(particles=pa.part, traj=traj,
+                               ancestors=ancestors, noise=v)
         return pa
 
 
-    def measure(self, pa, y, t, inplace=True):
+    def measure(self, traj, ancestors, pa, y, t, inplace=True):
         """
         Evaluate and update particle approximation using new measurement y
 
@@ -129,7 +131,8 @@ class ParticleFilter(object):
             pa_out = copy.deepcopy(pa)
             pa = pa_out
 
-        new_weights = self.model.measure(particles=pa.part, y=y, t=t)
+        new_weights = self.model.measure_full(traj=traj, ancestors=ancestors,
+                                              particles=pa.part, y=y, t=t)
 
         # Try to keep weights from going to -Inf
         m = numpy.max(new_weights)
@@ -259,7 +262,7 @@ class FFPropY(object):
 
         return (pa, resampled, ancestors)
 
-    def measure(self, traj, inplace=True):
+    def measure(self, traj, ancestors, pa, y, t, inplace=True):
         """
         Evaluate and update particle approximation using new measurement y
 
@@ -275,10 +278,7 @@ class FFPropY(object):
             ParticleApproximation for time t
         """
 
-        assert(inplace)
-        pa = traj[-1].pa
-        y = traj[-1].y
-        t = traj[-1].t
+        assert(not inplace)
 
         pa.part = self.model.propose_from_y(self.N, y=y, t=t)
 
@@ -390,7 +390,9 @@ class ParticleTrajectory(object):
                 self.traj.append(TrajectoryStep(pa, t=self.t0,
                                                 ancestors=numpy.arange(self.N)))
             self.traj[-1].y = y
-            self.pf.measure(self.traj, inplace=True)
+            self.pf.measure(traj=self.traj, ancestors=self.traj[-1].ancestors,
+                            pa=self.traj[-1].pa, y=self.traj[-1].y,
+                            t=self.traj[-1].t, inplace=True)
 
     def prep_rejection_sampling(self):
         """

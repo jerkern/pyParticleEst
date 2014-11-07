@@ -6,24 +6,15 @@ classes of algorithms present in the framework
 import abc
 import numpy
 
-class ParticleFiltering(object):
-    """
-    Base class for particles to be used with particle filtering.
-    particles are a model specific array where the first dimension
-    indexes the different particles.
-    """
+class ParticleFilteringNonMarkov():
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def create_initial_estimate(self, N):
-        """Sample particles from initial distribution
+    def update_full(self, particles, traj, ancestors, noise):
+        pass
 
-        Args:
-         - N (int): Number of particles to sample
-
-        Returns:
-         (array-like) with first dimension = N, model specific representation
-         of all particles """
+    @abc.abstractmethod
+    def measure_full(self, particles, traj, ancestors, y, t):
         pass
 
     @abc.abstractmethod
@@ -43,7 +34,82 @@ class ParticleFiltering(object):
         pass
 
     @abc.abstractmethod
-    def update(self, particles, ptraj, utt, tt, noise):
+    def create_initial_estimate(self, N):
+        """Sample particles from initial distribution
+
+        Args:
+         - N (int): Number of particles to sample
+
+        Returns:
+         (array-like) with first dimension = N, model specific representation
+         of all particles """
+        pass
+
+    def copy_ind(self, particles, new_ind=None):
+        """
+        Copy select particles, can be overriden for models that require
+        special handling of the particle representations when copying them
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - new_ind (array-like): Array of ints, specifying indices to copy
+
+        Returns:
+         (array-like) with first dimension = len(new_ind)
+        """
+        if (new_ind != None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
+
+
+    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+        """
+        Create sampled estimates for the smoothed trajectory. Allows the update
+        representation of the particles used in the forward step to include
+        additional data in the backward step, can also for certain models be
+        used to update the points estimates based on the future information.
+
+        Default implementation uses the same format as forward in time it
+        ss part of the ParticleFiltering interface since it is used also when
+        calculating "ancestor" trajectories
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N
+        """
+        # default implementation uses the same format as forward in time
+        # Is part of the ParticleFiltering interface since it is used
+        # also when calculating "ancestor trajectories"
+        return numpy.copy(particles)
+
+
+class ParticleFiltering(ParticleFilteringNonMarkov):
+    """
+    Base class for particles to be used with particle filtering.
+    particles are a model specific array where the first dimension
+    indexes the different particles.
+    """
+    __metaclass__ = abc.ABCMeta
+
+    def update_full(self, particles, traj, ancestors, noise):
+        return self.update(particles=particles, u=traj[-1].u, t=traj[-1].t, noise=noise)
+
+    def measure_full(self, particles, traj, ancestors, y, t):
+        return self.measure(particles, y, t)
+
+    @abc.abstractmethod
+    def update(self, particles, u, t, noise):
         """ Propagate estimate forward in time
 
         Args:
@@ -77,52 +143,6 @@ class ParticleFiltering(object):
         """
         pass
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """
-        Create sampled estimates for the smoothed trajectory. Allows the update
-        representation of the particles used in the forward step to include
-        additional data in the backward step, can also for certain models be
-        used to update the points estimates based on the future information.
-
-        Default implementation uses the same format as forward in time it
-        ss part of the ParticleFiltering interface since it is used also when
-        calculating "ancestor" trajectories
-
-        Args:
-
-         - particles  (array-like): Model specific representation
-           of all particles, with first dimension = N (number of particles)
-         - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
-
-        Returns:
-         (array-like) with first dimension = N
-        """
-        # default implementation uses the same format as forward in time
-        # Is part of the ParticleFiltering interface since it is used
-        # also when calculating "ancestor trajectories"
-        return numpy.copy(particles)
-
-    def copy_ind(self, particles, new_ind=None):
-        """
-        Copy select particles, can be overriden for models that require
-        special handling of the particle representations when copying them
-
-        Args:
-
-         - particles  (array-like): Model specific representation
-           of all particles, with first dimension = N (number of particles)
-         - new_ind (array-like): Array of ints, specifying indices to copy
-
-        Returns:
-         (array-like) with first dimension = len(new_ind)
-        """
-        if (new_ind != None):
-            return numpy.copy(particles[new_ind])
-        else:
-            return numpy.copy(particles)
 
 
 class AuxiliaryParticleFiltering(object):
