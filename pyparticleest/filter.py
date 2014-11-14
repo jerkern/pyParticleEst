@@ -446,7 +446,7 @@ class ParticleTrajectory(object):
             # Calculate coefficients needed for rejection sampling in the backward smoothing
             coeffs = numpy.empty(len(self.traj), dtype=float)
             for k in range(len(self.traj)):
-                coeffs[k] = self.pf.model.logp_xnext_max(particles=self.traj[k].pa.part,
+                coeffs[k] = self.pf.model.logp_xnext_max_full(ptraj=self.traj[:k + 1],
                                                          u=self.traj[k].u, t=self.traj[k].t)
             options['maxpdf'] = coeffs
             if (method == 'rs'):

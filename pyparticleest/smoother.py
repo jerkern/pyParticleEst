@@ -6,7 +6,7 @@
 import numpy
 import filter as pf
 
-def bsi_full(pa, model, future_trajs, ut, yt, tt):
+def bsi_full(ptraj, model, future_trajs, ut, yt, tt):
     """
     Perform backward simulation by drawing particles from
     the categorical distribution with weights given by
@@ -22,12 +22,16 @@ def bsi_full(pa, model, future_trajs, ut, yt, tt):
     """
 
     M = future_trajs.shape[1]
+    N = len(ptraj[-1].pa.part)
     res = numpy.empty(M, dtype=int)
+    pind = numpy.asarray(range(N))
     for j in xrange(M):
-        p_next = model.logp_xnext_full(pa.part, future_trajs[:, j:(j + 1)],
+        find = j * numpy.ones((N,), dtype=int)
+        p_next = model.logp_xnext_full(ptraj, pind,
+                                       future_trajs, find,
                                        ut=ut, yt=yt, tt=tt)
 
-        w = pa.w + p_next
+        w = ptraj[-1].pa.w + p_next
         w = w - numpy.max(w)
         w_norm = numpy.exp(w)
         w_norm /= numpy.sum(w_norm)
@@ -35,7 +39,7 @@ def bsi_full(pa, model, future_trajs, ut, yt, tt):
     return res
 
 
-def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
+def bsi_rs(ptraj, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
     """
     Perform backward simulation by using rejection sampling to draw particles
     from the categorical distribution with weights given by
@@ -52,6 +56,7 @@ def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
      - max_iter (int): number of attempts before falling back to bsi_full
     """
 
+    pa = ptraj[-1].pa
     M = future_trajs.shape[1]
     todo = numpy.asarray(range(M))
     res = numpy.empty(M, dtype=int)
@@ -62,7 +67,8 @@ def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
     for _i in xrange(max_iter):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
-        pn = model.logp_xnext_full(pa.part[ind], future_trajs[:, todo],
+        pn = model.logp_xnext_full(ptraj, ind,
+                                   future_trajs, todo,
                                    ut=ut, yt=yt, tt=tt)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
@@ -74,10 +80,10 @@ def bsi_rs(pa, model, future_trajs, ut, yt, tt, maxpdf, max_iter):
     # TODO, is there an efficient way to store those weights
     # already calculated to avoid double work, or will that
     # take more time than simply evaulating them all again?
-    res[todo] = bsi_full(pa, model, future_trajs[:, todo], ut=ut, yt=yt, tt=tt)
+    res[todo] = bsi_full(ptraj, model, future_trajs[:, todo], ut=ut, yt=yt, tt=tt)
     return res
 
-def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio):
+def bsi_rsas(ptraj, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio):
     """
     Perform backward simulation by using rejection sampling to draw particles
     from the categorical distribution with weights given by
@@ -105,7 +111,7 @@ def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio)
      - ratio (float): cost ration of running rejection sampling compared to
        switching to the full bsi (D_0 / D_1)
     """
-
+    pa = ptraj[-1].pa
     M = future_trajs.shape[1]
     todo = numpy.asarray(range(M))
     res = numpy.empty(M, dtype=int)
@@ -119,7 +125,8 @@ def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio)
     while (True):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
-        pn = model.logp_xnext_full(pa.part[ind], future_trajs[:, todo],
+        pn = model.logp_xnext_full(ptraj, ind,
+                                   future_trajs, todo,
                                    ut=ut, yt=yt, tt=tt)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
@@ -140,10 +147,10 @@ def bsi_rsas(pa, model, future_trajs, ut, yt, tt, maxpdf, x1, P1, sv, sw, ratio)
         if (pk < stop_criteria):
             break
 
-    res[todo] = bsi_full(pa, model, future_trajs[:, todo], ut=ut, yt=yt, tt=tt)
+    res[todo] = bsi_full(ptraj, model, future_trajs[:, todo], ut=ut, yt=yt, tt=tt)
     return res
 
-def bsi_mcmc(pa, model, future_trajs, ut, yt, tt, R, ancestors):
+def bsi_mcmc(ptraj, model, future_trajs, ut, yt, tt, R, ancestors):
     """
     Perform backward simulation by using Metropolis-Hastings to draw particles
     from the categorical distribution with weights given by
@@ -163,16 +170,20 @@ def bsi_mcmc(pa, model, future_trajs, ut, yt, tt, R, ancestors):
     # backward particles, initialized with the filtered trajectory
 
     M = future_trajs.shape[1]
+    find = numpy.asarray(range(M), dtype=int)
     ind = ancestors
+    pa = ptraj[-1].pa
     weights = numpy.copy(pa.w)
     weights -= numpy.max(weights)
     weights = numpy.exp(weights)
     weights /= numpy.sum(weights)
-    pind = model.logp_xnext_full(pa.part[ind], future_trajs,
+    pind = model.logp_xnext_full(ptraj, ind,
+                                 future_trajs, find,
                                  ut=ut, yt=yt, tt=tt)
     for _j in xrange(R):
         propind = numpy.random.permutation(pf.sample(weights, M))
-        pprop = model.logp_xnext_full(pa.part[propind], future_trajs,
+        pprop = model.logp_xnext_full(ptraj, propind,
+                                      future_trajs, find,
                                       ut=ut, yt=yt, tt=tt)
         diff = pprop - pind
         diff[diff > 0.0] = 0.0
@@ -367,19 +378,19 @@ class SmoothTrajectory(object):
             tt = self.t[cur_ind:]
 
             if (method == 'rs'):
-                ind = bsi_rs(pa, self.model, ft, ut=ut, yt=yt, tt=tt,
+                ind = bsi_rs(pt[:cur_ind + 1], self.model, ft, ut=ut, yt=yt, tt=tt,
                              maxpdf=options['maxpdf'][cur_ind],
                              max_iter=int(max_iter))
             elif (method == 'rsas'):
-                ind = bsi_rsas(pa, self.model, ft, ut=ut, yt=yt, tt=tt,
+                ind = bsi_rsas(pt[:cur_ind + 1], self.model, ft, ut=ut, yt=yt, tt=tt,
                                maxpdf=options['maxpdf'][cur_ind], x1=x1,
                                P1=P1, sv=sv, sw=sw, ratio=ratio)
             elif (method == 'mcmc'):
-                ind = bsi_mcmc(pa, self.model, ft, ut=ut, yt=yt, tt=tt,
+                ind = bsi_mcmc(pt[:cur_ind + 1], self.model, ft, ut=ut, yt=yt, tt=tt,
                                R=options['R'], ancestors=ancestors)
                 ancestors = step.ancestors[ind]
             elif (method == 'full'):
-                ind = bsi_full(pa, self.model, ft, ut=ut, yt=yt, tt=tt)
+                ind = bsi_full(pt[:cur_ind + 1], self.model, ft, ut=ut, yt=yt, tt=tt)
             elif (method == 'ancestor'):
                 ind = ancestors
                 ancestors = step.ancestors[ind]

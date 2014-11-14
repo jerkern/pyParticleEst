@@ -200,21 +200,21 @@ class FFProposeFromMeasure(object):
         """
         pass
 
-class FFBSiGeneric(ParticleFiltering):
+class FFBSiNonMarkov(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, ut, yt, tt):
         pass
 
-class FFBSi(FFBSiGeneric):
+class FFBSi(FFBSiNonMarkov):
     """
     Base class for particles to be used with particle smoothing
     (Backward Simulation)
     """
     __metaclass__ = abc.ABCMeta
 
-    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+    def logp_xnext_full(self, past_trajs, pind, future_trajs, find, ut, yt, tt):
         """
         Return the log-pdf value for the entire future trajectory.
         Useful for non-markovian modeles, that result from e.g
@@ -237,7 +237,8 @@ class FFBSi(FFBSiGeneric):
         """
 
         # Default implemenation for markovian models, just look at the next state
-        return self.logp_xnext(particles, next_part=future_trajs[0],
+        return self.logp_xnext(particles=past_trajs[-1].pa.part[pind],
+                               next_part=future_trajs[0][find],
                                u=ut[0], t=tt[0])
 
     @abc.abstractmethod
@@ -259,6 +260,29 @@ class FFBSi(FFBSiGeneric):
         """
         pass
 
+class FFBSiRSNonMarkov(FFBSi):
+    """
+    Base class for models to be used with rejection sampling methods
+    """
+    __metaclass__ = abc.ABCMeta
+    @abc.abstractmethod
+    def logp_xnext_max_full(self, ptraj, u, t):
+        """
+        Return the max log-pdf value for all possible future states'
+        given input u
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - next_part (array-like): particle estimate for t+1
+         - u (array-like): input signal
+         - t (float): time stamps
+
+        Returns:
+         (array-like) with first dimension = N, argmax_{x_{t+1}} logp(x_{t+1}|x_t)
+        """
+        pass
 
 class FFBSiRS(FFBSi):
     """
@@ -284,6 +308,9 @@ class FFBSiRS(FFBSi):
         """
         pass
 
+
+    def logp_xnext_max_full(self, ptraj, u, t):
+        return self.logp_xnext_max(ptraj[-1].pa.part, u, t)
 class SampleProposer(object):
     """
     Base class for models to be used with methods that require drawing of new
