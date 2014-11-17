@@ -205,11 +205,11 @@ class FFPropY(object):
        triggers resampling. 0 disables resampling
     """
 
-    def __init__(self, model, res=0):
+    def __init__(self, model, N, res=0):
 
         self.res = res
         self.model = model
-        self.N = None
+        self.N = N
 
     def create_initial_estimate(self, N):
         self.N = N
@@ -243,7 +243,12 @@ class FFPropY(object):
             ancestors = numpy.arange(pa.num, dtype=int)
 
         partn = self.model.propose_from_y(len(pa.part), y=y, t=traj[-1].t + 1)
-        wn = self.model.logp_xnext(traj, partn, ancestors)
+
+        pind = numpy.asarray(range(self.N))
+        # FIXME, send proper ut/ut/tt trajectories
+        future_trajs = self.model.sample_smooth(partn, future_trajs=None, ut=None, yt=None, tt=None)
+        wn = self.model.logp_xnext_full(traj, pind, future_trajs, find=pind,
+                                        ut=None, yt=None, tt=None)
         pa.part = partn
         # Try to keep weights from going to -Inf
         m = numpy.max(wn)
@@ -276,9 +281,8 @@ class FFPropY(object):
         """
 
         assert(not inplace)
-
-        pa.part = self.model.propose_from_y(self.N, y=y, t=t)
-
+        part = self.model.propose_from_y(self.N, y=y, t=t)
+        pa = ParticleApproximation(part)
         return pa
 
 
@@ -329,7 +333,7 @@ class ParticleTrajectory(object):
             self.pf = AuxiliaryParticleFilter(model=model, res=resample)
             sampleInitial = True
         elif (filter.lower() == 'pfy'):
-            self.pf = FFPropY(model=model, res=resample)
+            self.pf = FFPropY(model=model, N=N, res=resample)
             self.using_pfy = True
         else:
             raise ValueError('Bad filter type')
@@ -376,8 +380,12 @@ class ParticleTrajectory(object):
             else:
                 t = 0
             self.traj.append(TrajectoryStep(None, t=t, y=y, ancestors=None))
-            part = self.pf.measure(self.traj, inplace=False)
-            pa = ParticleApproximation(part)
+            pa = self.pf.measure(traj=self.traj,
+                                 ancestors=self.traj[-1].ancestors,
+                                 pa=None,
+                                 y=self.traj[-1].y,
+                                 t=self.traj[-1].t,
+                                 inplace=False)
             self.traj[-1].pa = pa
             self.traj[-1].ancestors = numpy.arange(pa.num, dtype=int)
         else:

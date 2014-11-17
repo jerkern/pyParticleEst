@@ -7,6 +7,13 @@ import abc
 import numpy
 import scipy.optimize
 
+class ParamEst(object):
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def maximize(self, straj):
+        pass
+
 class ParamEstIntFullTraj(object):
     __metaclass__ = abc.ABCMeta
 

@@ -28,10 +28,10 @@ class Model(interfaces.FFProposeFromMeasure):
         self.R = numpy.copy(R)
 
     def propose_from_y(self, N, y, t):
-        return numpy.random.normal(y, self.R, (N,)).reshape((-1, 1))
+        return numpy.random.normal(y, numpy.sqrt(self.R), (N,)).reshape((-1, 1))
 
     def create_initial_estimate(self, N):
-        return numpy.random.normal(0.0, self.P0, (N,)).reshape((-1, 1))
+        return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)).reshape((-1, 1))
 
     def logp_xnext(self, traj, partn, ancestors):
         diff = partn - traj[-1].pa.part[ancestors]
