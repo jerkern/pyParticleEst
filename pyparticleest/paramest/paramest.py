@@ -45,40 +45,6 @@ class ParamEstimation(Simulator):
            implements ParamEstInterface_GradientSearch)
         """
 
-
-        def fval(params_val):
-            """ internal function """
-            self.model.set_params(params_val)
-            log_py = self.model.eval_logp_y_fulltraj(self.straj,
-                                                     self.straj.y,
-                                                     self.straj.t)
-            log_pxnext = self.model.eval_logp_xnext_fulltraj(self.straj,
-                                                             self.straj.u,
-                                                             self.straj.t)
-            tmp = self.model.eval_logp_x0(self.straj.traj[0],
-                                          self.straj.t[0])
-            log_px0 = numpy.mean(tmp)
-
-            val = -1.0 * (log_py + log_px0 + log_pxnext)
-            return val
-
-        def fval_grad(params_val):
-            """ internal function """
-            self.model.set_params(params_val)
-            (logp_y, grad_logp_y) = self.model.eval_logp_y_val_grad_fulltraj(self.straj,
-                                                                             self.straj.y,
-                                                                             self.straj.t)
-            (logp_xnext, grad_logp_xnext) = self.model.eval_logp_xnext_val_grad_fulltraj(self.straj,
-                                                                                         self.straj.u,
-                                                                                         self.straj.t)
-
-            (tmp1, tmp2) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
-                                                                   self.straj.t[0])
-            (logp_x0, grad_logp_x0) = (numpy.mean(tmp1), numpy.mean(tmp2))
-            val = -1.0 * (logp_y + logp_x0 + logp_xnext)
-            grad = -1.0 * (grad_logp_y + grad_logp_xnext + grad_logp_x0)
-            return (val, grad)
-
         params_local = numpy.copy(param0)
         Q = -numpy.Inf
         for _i in xrange(max_iter):
@@ -103,25 +69,22 @@ class ParamEstimation(Simulator):
                           smoother_options=smoother_options, meas_first=meas_first)
             if (callback_sim != None):
                 callback_sim(self)
+
+            params_local = self.model.maximize(self.straj)
             # res = scipy.optimize.minimize(fun=fval, x0=params, method='nelder-mead', jac=fgrad)
-            if (analytic_gradient):
-                res = scipy.optimize.minimize(fun=fval_grad, x0=params_local, method='l-bfgs-b', jac=True,
-                                              options=dict({'maxiter':10, 'maxfun':100}), bounds=bounds,)
-            else:
-                res = scipy.optimize.minimize(fun=fval, x0=params_local, method='l-bfgs-b', jac=False,
-                                              options=dict({'maxiter':10, 'maxfun':100}), bounds=bounds,)
 
-            params_local = res.x
-
+            # FIXME: Q value not accesible (not needed?)
+            # Should the callback define when we terminate the EM-algorithm?
             # (Q, Q_grad) = fval(params_local)
-            Q = fval(params_local)
-            Q = -Q
+            #Q = fval(params_local)
+            #Q = -Q
             # Q_grad = -Q_grad
             if (callback != None):
-                callback(params=params_local, Q=Q)
-            if (numpy.abs(Q - Q_old) < tol):
-                break
-        return (params_local, Q)
+                callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
+#            if (numpy.abs(Q - Q_old) < tol):
+#                break
+        #return (params_local, Q)
+        return (params_local, -numpy.Inf)
 
 
 class GradPlot():

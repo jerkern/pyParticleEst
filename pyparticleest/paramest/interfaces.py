@@ -5,6 +5,7 @@ Interfaces required for using the parameter estimation methods
 '''
 import abc
 import numpy
+import scipy.optimize
 
 class ParamEstIntFullTraj(object):
     __metaclass__ = abc.ABCMeta
@@ -132,7 +133,7 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
         M = straj.traj.shape[1]
         T = len(straj)
         for t in xrange(T):
-            if (self.straj.y[t] != None):
+            if (straj.y[t] != None):
                 (val, grad) = self.eval_logp_y_val_grad(straj.traj[t],
                                                         straj.y[t],
                                                         straj.t[t])
@@ -215,3 +216,67 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
         Returns: ((array-like) or (float), array-like) (value, gradient)
         """
         pass
+
+
+class ParamEstBaseNumeric(ParamEstIntFullTraj):
+    def __init__(self, param_bounds=None, **kwargs):
+        self.param_bounds = param_bounds
+        super(ParamEstBaseNumeric, self).__init__(*kwargs)
+
+    def set_param_bounds(self, bounds):
+        self.param_bounds = bounds
+
+    def maximize(self, straj):
+        def fval(params_val):
+            """ internal function """
+            self.set_params(params_val)
+            log_py = self.eval_logp_y_fulltraj(straj,
+                                               straj.y,
+                                               straj.t)
+            log_pxnext = self.eval_logp_xnext_fulltraj(straj,
+                                                       straj.u,
+                                                       straj.t)
+            tmp = self.eval_logp_x0(straj.traj[0],
+                                    straj.t[0])
+            log_px0 = numpy.mean(tmp)
+
+            val = -1.0 * (log_py + log_px0 + log_pxnext)
+            return val
+
+        res = scipy.optimize.minimize(fun=fval, x0=self.params, method='l-bfgs-b', jac=False,
+                                      options=dict({'maxiter':10, 'maxfun':100}),
+                                      bounds=self.param_bounds,)
+        return res.x
+
+class ParamEstBaseNumericGrad(ParamEstInterface_GradientSearchFullTraj):
+    def __init__(self, param_bounds=None, **kwargs):
+        self.param_bounds = param_bounds
+        super(ParamEstBaseNumericGrad, self).__init__(*kwargs)
+
+    def set_param_bounds(self, bounds):
+        self.param_bounds = bounds
+
+    def maximize(self, straj):
+
+        def fval_grad(params_val):
+            """ internal function """
+            self.set_params(params_val)
+            (logp_y, grad_logp_y) = self.eval_logp_y_val_grad_fulltraj(straj,
+                                                                       straj.y,
+                                                                       straj.t)
+            (logp_xnext, grad_logp_xnext) = self.eval_logp_xnext_val_grad_fulltraj(straj,
+                                                                                   straj.u,
+                                                                                   straj.t)
+
+            (tmp1, tmp2) = self.eval_logp_x0_val_grad(straj.traj[0],
+                                                      straj.t[0])
+            (logp_x0, grad_logp_x0) = (numpy.mean(tmp1), numpy.mean(tmp2))
+            val = -1.0 * (logp_y + logp_x0 + logp_xnext)
+            grad = -1.0 * (grad_logp_y + grad_logp_xnext + grad_logp_x0)
+            return (val, grad)
+
+        res = scipy.optimize.minimize(fun=fval_grad, x0=self.params, method='l-bfgs-b', jac=True,
+                                      options=dict({'maxiter':10, 'maxfun':100}),
+                                      bounds=self.param_bounds,)
+
+        return res.x
