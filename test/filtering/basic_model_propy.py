@@ -17,7 +17,8 @@ def generate_dataset(steps, P0, Q, R):
 
     return (x, y)
 
-class Model(interfaces.FFProposeFromMeasure):
+class Model(interfaces.FFProposeFromMeasure,
+            interfaces.FFBSi):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """
@@ -33,8 +34,8 @@ class Model(interfaces.FFProposeFromMeasure):
     def create_initial_estimate(self, N):
         return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)).reshape((-1, 1))
 
-    def logp_xnext(self, traj, partn, ancestors):
-        diff = partn - traj[-1].pa.part[ancestors]
+    def logp_xnext(self, particles, next_part, u, t):
+        diff = next_part - particles
         return kalman.lognormpdf_scalar(diff, self.Q)
 #
 #    def sample_process_noise(self, particles, u, t):

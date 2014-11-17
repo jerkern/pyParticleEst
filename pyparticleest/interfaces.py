@@ -171,7 +171,7 @@ class AuxiliaryParticleFiltering(object):
         """
         pass
 
-class FFBSiNonMarkov(ParticleFilteringNonMarkov):
+class FFBSiNonMarkov(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod

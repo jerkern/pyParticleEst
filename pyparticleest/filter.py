@@ -244,11 +244,12 @@ class FFPropY(object):
 
         partn = self.model.propose_from_y(len(pa.part), y=y, t=traj[-1].t + 1)
 
-        pind = numpy.asarray(range(self.N))
+        find = numpy.asarray(range(self.N))
         # FIXME, send proper ut/ut/tt trajectories
         future_trajs = self.model.sample_smooth(partn, future_trajs=None, ut=None, yt=None, tt=None)
-        wn = self.model.logp_xnext_full(traj, pind, future_trajs, find=pind,
-                                        ut=None, yt=None, tt=None)
+        wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
+                                        find=find,
+                                        ut=(None,), yt=(None,), tt=(None,))
         pa.part = partn
         # Try to keep weights from going to -Inf
         m = numpy.max(wn)
