@@ -16,9 +16,8 @@ class ParamEstimation(Simulator):
     """
 
     def maximize(self, param0, num_part, num_traj, max_iter=1000, tol=0.001,
-                 callback=None, callback_sim=None, bounds=None, meas_first=False,
-                 filter='pf', smoother='full', smoother_options=None,
-                 analytic_gradient=False):
+                 callback=None, callback_sim=None, meas_first=False,
+                 filter='pf', smoother='full', smoother_options=None):
         """
         Find the maximum likelihood estimate of the paremeters using an
         EM-algorihms combined with a gradient search algorithms
@@ -86,6 +85,78 @@ class ParamEstimation(Simulator):
         #return (params_local, Q)
         return (params_local, -numpy.Inf)
 
+
+class ParamEstimationSAEM(Simulator):
+    """
+    Extension of the Simulator class to iterative perform particle smoothing
+    combined with a gradienst search algorithms for maximizing the likelihood
+    of the parameter estimates
+    """
+
+    def maximize(self, param0, num_part, max_iter=1000, tol=0.001,
+                 callback=None, callback_sim=None, meas_first=False,
+                 filter='pf', smoother='full', smoother_options=None):
+        """
+        Find the maximum likelihood estimate of the paremeters using an
+        EM-algorihms combined with a gradient search algorithms
+
+        Args:
+         - param0 (array-like): Initial parameter estimate
+         - num_part (int/array-like): Number of particle to use in the forward filter
+           if array each iteration takes the next element from the array when setting
+           up the filter
+         - num_traj (int/array-like): Number of smoothed trajectories to create
+           if array each iteration takes the next element from the array when setting
+           up the smoother
+         - max_iter (int): Max number of EM-iterations to perform
+         - tol (float): When the different in loglikelihood between two iterations
+           is less that his value the algorithm is terminated
+         - callback (function): Callback after each EM-iteration with new estimate
+         - callback_sim (function): Callback after each simulation
+         - bounds (array-like): Hard bounds on parameter estimates
+         - meas_first (bool): If true, first measurement occurs before the first
+           time update
+         - smoother (string): Which particle smoother to use
+         - smoother_options (dict): Extra options for the smoother
+         - analytic_gradient (bool): Use analytic gradient (requires that the model
+           implements ParamEstInterface_GradientSearch)
+        """
+
+        params_local = numpy.copy(param0)
+        Q = -numpy.Inf
+        alltrajs = None
+        weights = numpy.empty((max_iter,))
+
+        for i in xrange(max_iter):
+            Q_old = Q
+            self.set_params(params_local)
+            if (numpy.isscalar(num_part)):
+                nump = num_part
+            else:
+                if (i < len(num_part)):
+                    nump = num_part[i]
+                else:
+                    nump = num_part[-1]
+
+            w = 1.0 / (i + 1)
+            weights[:i] *= (1 - w)
+            weights[i] = w
+
+            self.simulate(nump, 1, filter=filter, smoother=smoother,
+                          smoother_options=smoother_options, meas_first=meas_first)
+            if (callback_sim != None):
+                callback_sim(self)
+
+            if (alltrajs == None):
+                alltrajs = numpy.copy(self.straj.traj)
+            else:
+                alltrajs = numpy.concatenate((alltrajs, self.straj.traj), axis=1)
+
+            params_local = self.model.maximize_weighted(self.straj, alltrajs, weights[:i + 1])
+
+            if (callback != None):
+                callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
+        return (params_local, -numpy.Inf)
 
 class GradPlot():
     def __init__(self, params, vals, diff):
