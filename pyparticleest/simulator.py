@@ -41,8 +41,10 @@ class Simulator():
         self.params = numpy.copy(params)
         self.model.set_params(self.params)
 
-    def simulate(self, num_part, num_traj, filter='PF', smoother='full',
-                 smoother_options=None, res=0.67, meas_first=False):
+    def simulate(self, num_part, num_traj,
+                 filter='PF', filter_options=None,
+                 smoother='full', smoother_options=None,
+                 res=0.67, meas_first=False):
         """
         Solve the estimation problem
 
@@ -91,7 +93,8 @@ class Simulator():
 
         # Initialise a particle filter with our particle approximation of the initial state,
         # set the resampling threshold to 0.67 (effective particles / total particles )
-        self.pt = ParticleTrajectory(self.model, num_part, res, filter=filter)
+        self.pt = ParticleTrajectory(self.model, num_part, res, filter=filter,
+                                     filter_options=filter_options)
 
         offset = 0
         # Run particle filter

@@ -145,6 +145,142 @@ class ParticleFilter(object):
 
         return pa
 
+class CPFAS(object):
+    """
+    Particle Filter class, creates filter estimates by calling appropriate
+    methods in the supplied particle objects and handles resampling when
+    a specified threshold is reach.
+
+    Args:
+     - model (ParticleFiltering): object describing the model to be used
+     - res (float): 0 .. 1 , the ratio of effective number of particles that
+       triggers resampling. 0 disables resampling
+    """
+
+    def __init__(self, model, cond_traj):
+
+        self.ctraj = cond_traj
+        self.model = model
+        self.cur_ind = 0
+
+    def create_initial_estimate(self, N):
+        return self.model.create_initial_estimate(N)
+
+    def forward(self, traj, y):
+        """
+        Forward the estimate stored in pa from t to t+1 using the motion model
+        with input u at time time and measurement y at time t+1
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+
+        Returns (pa, resampled, ancestors)
+         - pa (ParticleApproximation): approximation for time t+1
+         - resampled (bool): were the particles resampled
+         - ancestors (array-like): anecstral indices for particles at time t+1
+        """
+        N = len(traj[-1].pa.part)
+        ancestors = numpy.empty((N,), dtype=int)
+        ancestors[:] = sample(numpy.exp(traj[-1].pa.w), N)
+
+        # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
+        (ut, yt, tt) = extract_signals(traj)
+
+        #select ancestor for conditional trajectory
+        pind = numpy.asarray(range(N))
+        find = numpy.zeros((N,), dtype=numpy.int)
+        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
+                                            find=find, ut=ut[-1:], yt=yt[-1:], tt=tt[-1:])
+        wanc = wtrans + traj[-1].pa.w
+        wanc -= numpy.max(wanc)
+        condind = sample(numpy.exp(wanc), 1)
+        ancestors[-1] = condind
+
+        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors),
+                                   traj[-1].pa.w[ancestors])
+
+
+        resampled = True
+
+        pa = self.update(traj, ancestors, pa, inplace=True)
+        pa.part[-1] = self.ctraj[self.cur_ind ]
+        pa.w[-1] = traj[-1].pa.w[ancestors[-1]]
+        if (y != None):
+            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
+        self.cur_ind += 1
+        return (pa, resampled, ancestors)
+
+    def update(self, traj, ancestors, pa, inplace=True):
+        """
+        Update particle approximation of x_t to x_{t+1} using u as input.
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - t (float): time stamp for time t
+         - inplace (bool): if True the particles are updated then returned,
+           otherwise a new ParticleApproximation is first created
+           leaving the original one intact
+
+        Returns:
+            ParticleApproximation for time t+1
+        """
+
+        # Prepare the particle for the update, eg. for
+        # mixed linear/non-linear calculate the variables that
+        # depend on the current state
+#        for k in range(pa.num):
+#            pa.part[k].prep_update(u)
+
+        if (not inplace):
+            pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors), traj[-1].pa.w)
+
+        v = self.model.sample_process_noise(particles=pa.part, u=traj[-1].u,
+                                            t=traj[-1].t)
+        self.model.update_full(particles=pa.part, traj=traj,
+                               ancestors=ancestors, noise=v)
+        return pa
+
+
+    def measure(self, traj, ancestors, pa, y, t, inplace=True):
+        """
+        Evaluate and update particle approximation using new measurement y
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+         - inplace (bool): if True the particles are updated then returned,
+           otherwise a new ParticleApproximation is first created
+           leaving the original one intact
+
+        Returns:
+            ParticleApproximation for time t
+        """
+
+        if (not inplace):
+            pa_out = copy.deepcopy(pa)
+            pa = pa_out
+
+        new_weights = self.model.measure_full(traj=traj, ancestors=ancestors,
+                                              particles=pa.part, y=y, t=t)
+
+        # Try to keep weights from going to -Inf
+        m = numpy.max(new_weights)
+        pa.w_offset += m
+        new_weights -= m
+
+        pa.w = pa.w + new_weights
+
+        # Keep the weights from going to -Inf
+        m = numpy.max(pa.w)
+        pa.w_offset += m
+        pa.w -= m
+
+        return pa
 
 class AuxiliaryParticleFilter(ParticleFilter):
     """ Auxiliary Particle Filer class, creates filter estimates by calling appropriate
@@ -192,6 +328,102 @@ class AuxiliaryParticleFilter(ParticleFilter):
             pa.w -= numpy.max(pa.w)
 
         return (pa, resampled, ancestors)
+
+class CPFYAS(object):
+    def __init__(self, model, N, cond_traj):
+        self.ctraj = numpy.copy(cond_traj)
+        self.model = model
+        self.N = N
+        self.cur_ind = 0
+
+
+    def create_initial_estimate(self, N):
+        self.N = N
+        part = self.model.create_initial_estimate(N)
+        part[-1] = self.ctraj[0]
+
+    def forward(self, traj, y):
+        """
+        Forward the estimate stored in pa from t to t+1 using the motion model
+        with input u at time time and measurement y at time t+1
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+
+        Returns (pa, resampled, ancestors)
+         - pa (ParticleApproximation): approximation for time t+1
+         - resampled (bool): were the particles resampled
+         - ancestors (array-like): anecstral indices for particles at time t+1
+        """
+        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part),
+                                   traj[-1].pa.w)
+
+        ancestors = numpy.empty((self.N), dtype=int)
+        ancestors[:-1] = sample(numpy.exp(pa.w), self.N - 1)
+        resampled = True
+
+        # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
+        (ut, yt, tt) = extract_signals(traj)
+
+        #select ancestor for conditional trajectory
+        pind = numpy.asarray(range(self.N))
+        find = numpy.zeros((self.N,), dtype=numpy.int)
+        wac = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind][numpy.newaxis],
+                                         find=find, ut=ut, yt=yt, tt=tt)
+        wac += pa.w
+        wac -= numpy.max(wac)
+        ancestors[-1] = sample(numpy.exp(wac), 1)
+
+        partn = self.model.propose_from_y(self.N, y=y, t=traj[-1].t + 1)
+        partn[-1] = self.ctraj[self.cur_ind, 0]
+        self.cur_ind += 1
+
+        find = numpy.asarray(range(self.N))
+
+        future_trajs = self.model.sample_smooth(partn, future_trajs=None,
+                                                ut=ut, yt=yt, tt=tt)
+        wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
+                                        find=find, ut=ut, yt=yt, tt=tt)
+        pa.part = partn
+        # Try to keep weights from going to -Inf
+        m = numpy.max(wn)
+        pa.w_offset += m
+        wn -= m
+
+        pa.w = pa.w + wn
+
+        # Keep the weights from going to -Inf
+        m = numpy.max(pa.w)
+        pa.w_offset += m
+        pa.w -= m
+
+        return (pa, resampled, ancestors)
+
+    def measure(self, traj, ancestors, pa, y, t, inplace=True):
+        """
+        Evaluate and update particle approximation using new measurement y
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+         - inplace (bool): if True the particles are updated then returned,
+           otherwise a new ParticleApproximation is first created
+           leaving the original one intact
+
+        Returns:
+            ParticleApproximation for time t
+        """
+
+        assert(not inplace)
+        part = self.model.propose_from_y(self.N, y=y, t=t)
+        part[-1] = self.ctraj[self.cur_ind]
+        self.cur_ind += 1
+        pa = ParticleApproximation(part)
+        return pa
 
 class FFPropY(object):
     """
@@ -245,11 +477,13 @@ class FFPropY(object):
         partn = self.model.propose_from_y(len(pa.part), y=y, t=traj[-1].t + 1)
 
         find = numpy.asarray(range(self.N))
-        # FIXME, send proper ut/ut/tt trajectories
-        future_trajs = self.model.sample_smooth(partn, future_trajs=None, ut=None, yt=None, tt=None)
+
+        # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
+        (ut, yt, tt) = extract_signals(traj)
+        future_trajs = self.model.sample_smooth(partn, future_trajs=None,
+                                                ut=ut, yt=yt, tt=tt)
         wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
-                                        find=find,
-                                        ut=(None,), yt=(None,), tt=(None,))
+                                        find=find, ut=ut, yt=yt, tt=tt)
         pa.part = partn
         # Try to keep weights from going to -Inf
         m = numpy.max(wn)
@@ -308,6 +542,28 @@ class TrajectoryStep(object):
         self.t = t
         self.ancestors = ancestors
 
+
+def extract_signals(traj):
+    """
+    Create seperate arrays containing particle estimates, inputs, outputs
+    and timestamps
+
+    Returns:
+     (ut, yt, tt)
+    """
+    T = len(traj)
+
+    ut = numpy.empty((T,), dtype=numpy.ndarray)
+    yt = numpy.empty((T,), dtype=numpy.ndarray)
+    tt = numpy.empty((T,))
+
+    for k in xrange(T):
+        ut[k] = traj[k].u
+        yt[k] = traj[k].y
+        tt[k] = traj[k].t
+
+    return (ut, yt, tt)
+
 class ParticleTrajectory(object):
     """
     Store particle trajectories, each time instance is saved
@@ -322,7 +578,7 @@ class ParticleTrajectory(object):
      - filter (string): Which filtering algorihms to use
     """
 
-    def __init__(self, model, N, resample=2.0 / 3.0, t0=0, filter='PF'):
+    def __init__(self, model, N, resample=2.0 / 3.0, t0=0, filter='PF', filter_options={}):
         self.t0 = t0
         sampleInitial = False
         self.using_pfy = False
@@ -336,6 +592,11 @@ class ParticleTrajectory(object):
         elif (filter.lower() == 'pfy'):
             self.pf = FFPropY(model=model, N=N, res=resample)
             self.using_pfy = True
+        elif (filter.lower() == 'cpfyas'):
+            self.pf = CPFYAS(model=model, N=N, cond_traj=filter_options['cond_traj'])
+            self.using_pfy = True
+        elif (filter.lower() == 'cpfas'):
+            self.pf = CPFAS(model=model, cond_traj=filter_options['cond_traj'])
         else:
             raise ValueError('Bad filter type')
 
@@ -420,20 +681,6 @@ class ParticleTrajectory(object):
         the current one
         """
         return ParticleTrajectory(copy.deepcopy(self.traj[-1].pa), resample=self.pf.res, t0=self.traj[-1].t, lp_hack=self.pf.lp_hack)
-
-    def extract_signals(self):
-        """
-        Throw away the particle approxmation and return a list contaning just
-        inputs, output and timestamps
-
-        Returns:
-         list of 'TrajectoryStep's with pa=None
-        """
-        signals = []
-        for k in range(len(self.traj)):
-            signals.append(TrajectoryStep(pa=None, u=self.traj[k].u, y=self.traj[k].y, t=self.traj[k].t))
-
-        return signals
 
     def perform_smoothing(self, M, method="full", smoother_options=None):
         """

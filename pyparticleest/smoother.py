@@ -285,23 +285,9 @@ class SmoothTrajectory(object):
             # Do e.g. constrained smoothing for RBPS models
             self.traj = self.model.post_smoothing(self)
 
-    def perform_ancestors_int(self, pt, M):
-        """
-        Create smoothed trajectories by taking the forward trajectories, don't
-        perform post processing
-
-        Args:
-         - pt (ParticleTrajectory): forward trajetories
-         - M (int): number of trajectories to createa
-        """
-
+    def calculate_ancestors(self, pt, ind):
         T = len(pt)
-
-        tmp = numpy.copy(pt[-1].pa.w)
-        tmp -= numpy.max(tmp)
-        tmp = numpy.exp(tmp)
-        tmp = tmp / numpy.sum(tmp)
-        ind = pf.sample(tmp, M)
+        M = len(ind)
         last_part = self.model.sample_smooth(pt[-1].pa.part[ind],
                                              future_trajs=None,
                                              ut=(pt[-1].u,), yt=(pt[-1].y,),
@@ -326,7 +312,23 @@ class SmoothTrajectory(object):
                                                           tt=self.t[t:]))
         return traj
 
+    def perform_ancestors_int(self, pt, M):
+        """
+        Create smoothed trajectories by taking the forward trajectories, don't
+        perform post processing
 
+        Args:
+         - pt (ParticleTrajectory): forward trajetories
+         - M (int): number of trajectories to createa
+        """
+
+        tmp = numpy.copy(pt[-1].pa.w)
+        tmp -= numpy.max(tmp)
+        tmp = numpy.exp(tmp)
+        tmp = tmp / numpy.sum(tmp)
+        ind = pf.sample(tmp, M)
+
+        return self.calculate_ancestors(pt, ind)
 
     def perform_bsi(self, pt, M, method, options):
         """

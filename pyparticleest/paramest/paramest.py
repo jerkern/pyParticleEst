@@ -3,6 +3,7 @@
 @author: Jerker Nordh
 """
 from pyparticleest.simulator import Simulator
+from pyparticleest.filter import sample
 import numpy
 import scipy.optimize
 import matplotlib.pyplot as plt
@@ -85,6 +86,11 @@ class ParamEstimation(Simulator):
         #return (params_local, Q)
         return (params_local, -numpy.Inf)
 
+def alpha_gen(it):
+    if (it < 2):
+        return 1
+    else :
+        return it ** (-0.7)
 
 class ParamEstimationSAEM(Simulator):
     """
@@ -95,7 +101,8 @@ class ParamEstimationSAEM(Simulator):
 
     def maximize(self, param0, num_part, max_iter=1000, tol=0.001,
                  callback=None, callback_sim=None, meas_first=False,
-                 filter='pf', smoother='full', smoother_options=None):
+                 filter='pf', filter_options=None,
+                 smoother='full', smoother_options=None, alpha_gen=alpha_gen):
         """
         Find the maximum likelihood estimate of the paremeters using an
         EM-algorihms combined with a gradient search algorithms
@@ -123,36 +130,52 @@ class ParamEstimationSAEM(Simulator):
         """
 
         params_local = numpy.copy(param0)
-        Q = -numpy.Inf
         alltrajs = None
-        weights = numpy.empty((max_iter,))
+        weights = numpy.empty((max_iter * num_part,))
 
+        ind = numpy.asarray(range(num_part), dtype=numpy.int)
+        datalen = 0
         for i in xrange(max_iter):
-            Q_old = Q
             self.set_params(params_local)
-            if (numpy.isscalar(num_part)):
-                nump = num_part
-            else:
-                if (i < len(num_part)):
-                    nump = num_part[i]
-                else:
-                    nump = num_part[-1]
 
-            w = 1.0 / (i + 1)
-            weights[:i] *= (1 - w)
-            weights[i] = w
+            self.simulate(num_part, 1, filter=filter, filter_options=filter_options,
+                          smoother='ancestor', smoother_options=smoother_options,
+                          meas_first=meas_first)
 
-            self.simulate(nump, 1, filter=filter, smoother=smoother,
-                          smoother_options=smoother_options, meas_first=meas_first)
+            newtrajs = self.straj.calculate_ancestors(self.pt, ind)
+            w = numpy.exp(self.pt.traj[-1].pa.w)
+            w = w / numpy.sum(w)
+
+#            newtrajs = numpy.copy(self.straj.traj)
+#            w = 1.0
+
+
+            alpha = alpha_gen(i)
+            weights[:datalen] *= (1.0 - alpha)
+            weights[datalen:datalen + num_part] = alpha * w
+
+#            weights[datalen:datalen + 1] = alpha * w
+
+            if (filter.lower() == 'cpfyas' or
+                filter.lower() == 'cpfas'):
+                filter_options['cond_traj'] = numpy.copy(self.straj.traj)
             if (callback_sim != None):
                 callback_sim(self)
 
             if (alltrajs == None):
-                alltrajs = numpy.copy(self.straj.traj)
+                alltrajs = numpy.copy(newtrajs)
             else:
-                alltrajs = numpy.concatenate((alltrajs, self.straj.traj), axis=1)
+                alltrajs = numpy.concatenate((alltrajs[:, :datalen], newtrajs), axis=1)
 
-            params_local = self.model.maximize_weighted(self.straj, alltrajs, weights[:i + 1])
+            datalen += num_part
+
+            zero_ind = (weights[:datalen] == 0.0)
+            zerolen = numpy.count_nonzero(zero_ind)
+            weights[:datalen - zerolen] = weights[:datalen][~zero_ind]
+            alltrajs[:, :datalen - zerolen] = alltrajs[:, :datalen][:, ~zero_ind]
+            datalen -= zerolen
+            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, :datalen], weights[:datalen])
+#            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, -1:], numpy.asarray((1.0,)))
 
             if (callback != None):
                 callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
