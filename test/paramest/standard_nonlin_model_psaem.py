@@ -99,6 +99,10 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
         return numpy.sum(kalman.lognormpdf_scalar(diff.ravel(), self.R)) / M
 
     def maximize_weighted(self, straj, alltrajs, weights):
+        return self.maximize_weighted_analytic(straj, alltrajs, weights)
+        #return self.maximize_weighted_numeric(straj, alltrajs, weights)
+
+    def maximize_weighted_analytic(self, straj, alltrajs, weights):
         M = alltrajs.shape[1]
 
         tt = straj.t
@@ -131,7 +135,7 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
         #newparams = numpy.asarray((Q,))
         return newparams
 
-    def maximize_weighted2(self, straj, alltrajs, weights):
+    def maximize_weighted_numeric(self, straj, alltrajs, weights):
         def fval(params_val):
             """ internal function """
             self.set_params(params_val)
@@ -210,18 +214,19 @@ if __name__ == '__main__':
     theta0 = numpy.asarray((2.0, 2.0))
     #theta0 = numpy.asarray((2.0,))
     model = Model(P0, Q, R)
-    estimator = param_est.ParamEstimationPSAEM2(model, u=None, y=y)
+    estimator = param_est.ParamEstimationPSAEM(model, u=None, y=y)
     plt.ion()
     callback(theta0, None)
     filter_options = {'cond_traj': numpy.zeros((steps + 1, 1, 1))}
 
-    param = estimator.maximize(theta0, num, filter='cpf', smoother='full',
+    param = estimator.maximize(theta0, num, filter='cpfas', smoother='full',
                        meas_first=True, max_iter=max_iter,
                        filter_options=filter_options,
                        callback=callback,
                        callback_sim=callback_sim)[0]
     plt.ioff()
     callback(param, None)
+
 #     plt.ion()
 #     estimator.maximize(theta0, num, M, smoother='full', meas_first=True, max_iter=len(iterations),
 #                        callback_sim=callback_sim, callback=callback)

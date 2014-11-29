@@ -99,7 +99,9 @@ class ParticleFilter(object):
 #            pa.part[k].prep_update(u)
 
         if (not inplace):
-            pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors), traj[-1].pa.w)
+            pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part,
+                                                           ancestors),
+                                       traj[-1].pa.w[ancestors])
 
         v = self.model.sample_process_noise(particles=pa.part, u=traj[-1].u,
                                             t=traj[-1].t)
@@ -186,12 +188,14 @@ class CPF(ParticleFilter):
         """
         N = len(traj[-1].pa.part)
         ancestors = numpy.empty((N,), dtype=int)
-        ancestors[:] = sample(numpy.exp(traj[-1].pa.w), N)
+        tmp = numpy.exp(traj[-1].pa.w)
+        tmp /= numpy.sum(tmp)
+        ancestors[:-1] = sample(tmp, N - 1)
 
         ancestors[-1] = N - 1 #condind
 
-        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors),
-                                   traj[-1].pa.w[ancestors])
+        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part,
+                                                       ancestors))
 
 
         resampled = True
@@ -234,30 +238,34 @@ class CPFAS(CPF):
         """
         N = len(traj[-1].pa.part)
         ancestors = numpy.empty((N,), dtype=int)
-        ancestors[:] = sample(numpy.exp(traj[-1].pa.w), N)
+        tmp = numpy.exp(traj[-1].pa.w)
+        tmp /= numpy.sum(tmp)
+        ancestors[:-1] = sample(tmp, N - 1)
 
         # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
         (ut, yt, tt) = extract_signals(traj)
 
         #select ancestor for conditional trajectory
-        pind = numpy.asarray(range(N))
+        pind = numpy.asarray(range(N), dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
         wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
                                             find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
-        wanc = wtrans + traj[-1].pa.w
-        #wanc -= numpy.max(wanc)
-        condind = sample(numpy.exp(wanc), 1)
-        ancestors[-1] = N - 1 #condind
+        wanc = wtrans + traj[-1].pa.w[pind]
+        wanc -= numpy.max(wanc)
+        tmp = numpy.exp(wanc)
+        tmp /= numpy.sum(tmp)
+        condind = sample(tmp, 1)
+        ancestors[-1] = condind
 
-        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors),
-                                   traj[-1].pa.w[ancestors])
+        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part,
+                                                       ancestors))
 
 
         resampled = True
 
         pa = self.update(traj, ancestors, pa, inplace=True)
-        pa.part[-1] = self.ctraj[self.cur_ind ]
-        pa.w[-1] = traj[-1].pa.w[ancestors[-1]]
+        pa.part[-1] = self.ctraj[self.cur_ind + 1]
+
         if (y != None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
         self.cur_ind += 1

@@ -93,7 +93,7 @@ def alpha_gen(it):
     else :
         return (it - offset) ** (-0.51)
 
-class ParamEstimationSAEM(Simulator):
+class ParamEstimationPSAEM(Simulator):
     """
     Extension of the Simulator class to iterative perform particle smoothing
     combined with a gradienst search algorithms for maximizing the likelihood
@@ -132,10 +132,9 @@ class ParamEstimationSAEM(Simulator):
 
         params_local = numpy.copy(param0)
         alltrajs = None
-        weights = numpy.empty((max_iter * num_part,))
+        weights = None
 
         ind = numpy.asarray(range(num_part), dtype=numpy.int)
-        datalen = 0
         for i in xrange(max_iter):
             self.set_params(params_local)
 
@@ -145,38 +144,30 @@ class ParamEstimationSAEM(Simulator):
 
             newtrajs = self.straj.calculate_ancestors(self.pt, ind)
             w = numpy.exp(self.pt.traj[-1].pa.w)
-            w = w / numpy.sum(w)
-
+            w = numpy.copy(w / numpy.sum(w))
 #            newtrajs = numpy.copy(self.straj.traj)
-#            w = 1.0
+#            w = numpy.ones((1,))
 
 
             alpha = alpha_gen(i)
-            weights[:datalen] *= (1.0 - alpha)
-            weights[datalen:datalen + num_part] = alpha * w
+            if (weights == None):
+                weights = w
+            else:
+                weights = numpy.concatenate(((1.0 - alpha) * weights, alpha * w))
 
-#            weights[datalen:datalen + 1] = alpha * w
-
-            if (filter.lower() == 'cpfyas' or
-                filter.lower() == 'cpfas'):
-                filter_options['cond_traj'] = numpy.copy(self.straj.traj)
+            filter_options['cond_traj'] = numpy.copy(self.straj.traj)
             if (callback_sim != None):
                 callback_sim(self)
 
             if (alltrajs == None):
                 alltrajs = numpy.copy(newtrajs)
             else:
-                alltrajs = numpy.concatenate((alltrajs[:, :datalen], newtrajs), axis=1)
+                alltrajs = numpy.concatenate((alltrajs, newtrajs), axis=1)
 
-            datalen += num_part
-
-            zero_ind = (weights[:datalen] == 0.0)
-            zerolen = numpy.count_nonzero(zero_ind)
-            weights[:datalen - zerolen] = weights[:datalen][~zero_ind]
-            alltrajs[:, :datalen - zerolen] = alltrajs[:, :datalen][:, ~zero_ind]
-            datalen -= zerolen
-            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, :datalen], weights[:datalen])
-#            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, -1:], numpy.asarray((1.0,)))
+            zero_ind = (weights == 0.0)
+            weights = weights[~zero_ind]
+            alltrajs = alltrajs[:, ~zero_ind]
+            params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback != None):
                 callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
