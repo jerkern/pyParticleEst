@@ -5,6 +5,7 @@ import pyparticleest.interfaces as interfaces
 import pyparticleest.paramest.paramest as param_est
 import pyparticleest.paramest.interfaces as pestint
 import matplotlib.pyplot as plt
+import scipy.optimize
 
 
 def generate_dataset(steps, P0, Q, R):
@@ -65,7 +66,7 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
     def set_params(self, params):
         """ New set of parameters for which the integral approximation terms will be evaluated"""
         self.Q = params[0] * numpy.eye(1)
-        #self.R = params[1] * numpy.eye(1)
+        self.R = params[1] * numpy.eye(1)
 
     def eval_logp_x0(self, particles, t):
         """ Calculate gradient of a term of the I1 integral approximation
@@ -81,8 +82,8 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
             return numpy.copy(particles)
 
     def eval_logp_xnext_fulltraj(self, straj, ut, tt):
-        M = straj.traj.shape[1]
-        part = straj.traj
+        M = straj.shape[1]
+        part = straj
         cost = 8.0 * numpy.cos(1.2 * numpy.asarray(tt, dtype=float))
         xp = 0.5 * part + 25.0 * part / (1 + part ** 2) + numpy.repeat(cost.reshape(-1, 1, 1), repeats=M, axis=1)
         diff = part[1:] - xp[:-1]
@@ -91,8 +92,8 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
 
 
     def eval_logp_y_fulltraj(self, straj, yt, tt):
-        M = straj.traj.shape[1]
-        yp = 0.05 * straj.traj ** 2
+        M = straj.shape[1]
+        yp = 0.05 * straj ** 2
         diff = yp - numpy.repeat(numpy.asarray(yt, dtype=float).reshape((-1, 1, 1)),
                                  repeats=M, axis=1)
         return numpy.sum(kalman.lognormpdf_scalar(diff.ravel(), self.R)) / M
@@ -126,17 +127,42 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
 
         R = numpy.mean(numpy.sum(werr, axis=1))
 
-        #newparams = numpy.asarray((Q, R))
-        newparams = numpy.asarray((Q,))
+        newparams = numpy.asarray((Q, R))
+        #newparams = numpy.asarray((Q,))
         return newparams
 
-def callback(params, Q):
-    print "params = %s" % params
+    def maximize_weighted2(self, straj, alltrajs, weights):
+        def fval(params_val):
+            """ internal function """
+            self.set_params(params_val)
+            log_py = 0.0
+            log_pxnext = 0.0
+            log_px0 = 0.0
+            for i in xrange(len(weights)):
+                log_py += weights[i] * self.eval_logp_y_fulltraj(alltrajs[:, i:i + 1],
+                                                                 straj.y,
+                                                                 straj.t)
+                log_pxnext += weights[i] * self.eval_logp_xnext_fulltraj(alltrajs[:, i:i + 1],
+                                                                         straj.u,
+                                                                         straj.t)
+                tmp = self.eval_logp_x0(alltrajs[0, i:i + 1],
+                                        straj.t[0])
+                log_px0 += weights[i] * numpy.mean(tmp)
+
+            val = -1.0 * (log_py + log_px0 + log_pxnext)
+            return val
+
+        x0 = numpy.asarray((self.Q, self.R))
+        param_bounds = ((0.00001, None), (0.00001, None))
+        res = scipy.optimize.minimize(fun=fval, x0=x0, method='l-bfgs-b', jac=False,
+                                      options=dict({'maxiter':10, 'maxfun':100}),
+                                      bounds=param_bounds,)
+        return res.x
 
 if __name__ == '__main__':
     numpy.random.seed(1)
-    steps = 49 #1499
-
+    steps = 1499
+    max_iter = 1000
     num = 15
     P0 = 5.0 * numpy.eye(1)
     Q = 1.0 * numpy.eye(1)
@@ -158,19 +184,44 @@ if __name__ == '__main__':
         plt.draw()
         plt.show()
 
-    #theta0 = numpy.asarray((2.0, 2.0))
-    theta0 = numpy.asarray((2.0,))
+    params_it = numpy.zeros((max_iter + 2, 2))
+    Q_it = numpy.zeros((max_iter + 2))
+    it = 0
+
+    theta_true = numpy.asarray((1.0, 0.1))
+
+    def callback(params, Q):
+        global it
+
+        params_it[it, :] = params
+        Q_it[it] = Q
+        it = it + 1
+
+        plt.figure(2)
+        plt.clf()
+        for i in xrange(len(theta_true)):
+            plt.plot((0.0, it), (theta_true[i], theta_true[i]), 'k--')
+
+        for i in xrange(len(params)):
+            plt.plot(range(it), params_it[:it, i], '-')
+        plt.draw()
+        plt.show()
+
+    theta0 = numpy.asarray((2.0, 2.0))
+    #theta0 = numpy.asarray((2.0,))
     model = Model(P0, Q, R)
-    estimator = param_est.ParamEstimationSAEM(model, u=None, y=y)
+    estimator = param_est.ParamEstimationPSAEM2(model, u=None, y=y)
+    plt.ion()
     callback(theta0, None)
     filter_options = {'cond_traj': numpy.zeros((steps + 1, 1, 1))}
-    plt.ion()
-    estimator.maximize(theta0, num, filter='cpfas', smoother='ancestor',
-                       meas_first=True, max_iter=2000,
+
+    param = estimator.maximize(theta0, num, filter='cpf', smoother='full',
+                       meas_first=True, max_iter=max_iter,
                        filter_options=filter_options,
                        callback=callback,
-                       callback_sim=callback_sim)
+                       callback_sim=callback_sim)[0]
     plt.ioff()
+    callback(param, None)
 #     plt.ion()
 #     estimator.maximize(theta0, num, M, smoother='full', meas_first=True, max_iter=len(iterations),
 #                        callback_sim=callback_sim, callback=callback)

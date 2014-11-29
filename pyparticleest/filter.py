@@ -145,7 +145,7 @@ class ParticleFilter(object):
 
         return pa
 
-class CPFAS(object):
+class CPF(ParticleFilter):
     """
     Particle Filter class, creates filter estimates by calling appropriate
     methods in the supplied particle objects and handles resampling when
@@ -164,7 +164,57 @@ class CPFAS(object):
         self.cur_ind = 0
 
     def create_initial_estimate(self, N):
-        return self.model.create_initial_estimate(N)
+        part = self.model.create_initial_estimate(N)
+        part[-1] = self.ctraj[0]
+        return part
+
+    def forward(self, traj, y):
+        """
+        Forward the estimate stored in pa from t to t+1 using the motion model
+        with input u at time time and measurement y at time t+1
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+
+        Returns (pa, resampled, ancestors)
+         - pa (ParticleApproximation): approximation for time t+1
+         - resampled (bool): were the particles resampled
+         - ancestors (array-like): anecstral indices for particles at time t+1
+        """
+        N = len(traj[-1].pa.part)
+        ancestors = numpy.empty((N,), dtype=int)
+        ancestors[:] = sample(numpy.exp(traj[-1].pa.w), N)
+
+        ancestors[-1] = N - 1 #condind
+
+        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors),
+                                   traj[-1].pa.w[ancestors])
+
+
+        resampled = True
+
+        pa = self.update(traj, ancestors, pa, inplace=True)
+        pa.part[-1] = self.ctraj[self.cur_ind + 1]
+
+        if (y != None):
+            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
+        self.cur_ind += 1
+        return (pa, resampled, ancestors)
+
+class CPFAS(CPF):
+    """
+    Particle Filter class, creates filter estimates by calling appropriate
+    methods in the supplied particle objects and handles resampling when
+    a specified threshold is reach.
+
+    Args:
+     - model (ParticleFiltering): object describing the model to be used
+     - res (float): 0 .. 1 , the ratio of effective number of particles that
+       triggers resampling. 0 disables resampling
+    """
 
     def forward(self, traj, y):
         """
@@ -193,11 +243,11 @@ class CPFAS(object):
         pind = numpy.asarray(range(N))
         find = numpy.zeros((N,), dtype=numpy.int)
         wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
-                                            find=find, ut=ut[-1:], yt=yt[-1:], tt=tt[-1:])
+                                            find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
         wanc = wtrans + traj[-1].pa.w
-        wanc -= numpy.max(wanc)
+        #wanc -= numpy.max(wanc)
         condind = sample(numpy.exp(wanc), 1)
-        ancestors[-1] = condind
+        ancestors[-1] = N - 1 #condind
 
         pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors),
                                    traj[-1].pa.w[ancestors])
@@ -213,74 +263,7 @@ class CPFAS(object):
         self.cur_ind += 1
         return (pa, resampled, ancestors)
 
-    def update(self, traj, ancestors, pa, inplace=True):
-        """
-        Update particle approximation of x_t to x_{t+1} using u as input.
 
-        Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - t (float): time stamp for time t
-         - inplace (bool): if True the particles are updated then returned,
-           otherwise a new ParticleApproximation is first created
-           leaving the original one intact
-
-        Returns:
-            ParticleApproximation for time t+1
-        """
-
-        # Prepare the particle for the update, eg. for
-        # mixed linear/non-linear calculate the variables that
-        # depend on the current state
-#        for k in range(pa.num):
-#            pa.part[k].prep_update(u)
-
-        if (not inplace):
-            pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part, ancestors), traj[-1].pa.w)
-
-        v = self.model.sample_process_noise(particles=pa.part, u=traj[-1].u,
-                                            t=traj[-1].t)
-        self.model.update_full(particles=pa.part, traj=traj,
-                               ancestors=ancestors, noise=v)
-        return pa
-
-
-    def measure(self, traj, ancestors, pa, y, t, inplace=True):
-        """
-        Evaluate and update particle approximation using new measurement y
-
-        Args:
-         - pa (ParticleApproximation): approximation for time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
-         - inplace (bool): if True the particles are updated then returned,
-           otherwise a new ParticleApproximation is first created
-           leaving the original one intact
-
-        Returns:
-            ParticleApproximation for time t
-        """
-
-        if (not inplace):
-            pa_out = copy.deepcopy(pa)
-            pa = pa_out
-
-        new_weights = self.model.measure_full(traj=traj, ancestors=ancestors,
-                                              particles=pa.part, y=y, t=t)
-
-        # Try to keep weights from going to -Inf
-        m = numpy.max(new_weights)
-        pa.w_offset += m
-        new_weights -= m
-
-        pa.w = pa.w + new_weights
-
-        # Keep the weights from going to -Inf
-        m = numpy.max(pa.w)
-        pa.w_offset += m
-        pa.w -= m
-
-        return pa
 
 class AuxiliaryParticleFilter(ParticleFilter):
     """ Auxiliary Particle Filer class, creates filter estimates by calling appropriate
@@ -597,6 +580,8 @@ class ParticleTrajectory(object):
             self.using_pfy = True
         elif (filter.lower() == 'cpfas'):
             self.pf = CPFAS(model=model, cond_traj=filter_options['cond_traj'])
+        elif (filter.lower() == 'cpf'):
+            self.pf = CPF(model=model, cond_traj=filter_options['cond_traj'])
         else:
             raise ValueError('Bad filter type')
 
