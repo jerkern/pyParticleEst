@@ -210,14 +210,9 @@ class SmoothTrajectory(object):
 
         self.traj = None
 
-        T = len(pt)
-        self.u = numpy.empty(T, dtype=object)
-        self.y = numpy.empty(T, dtype=object)
-        self.t = numpy.empty(T, dtype=object)
-        for i in xrange(T):
-            self.u[i] = pt[i].u
-            self.y[i] = pt[i].y
-            self.t[i] = pt[i].t
+        self.u = numpy.copy(pt.uvec)
+        self.y = numpy.copy(pt.yvec)
+        self.t = numpy.copy(pt.tvec)
 
         self.model = pt.pf.model
         if (method == 'full' or method == 'mcmc' or method == 'rs' or
@@ -290,8 +285,8 @@ class SmoothTrajectory(object):
         M = len(ind)
         last_part = self.model.sample_smooth(pt[-1].pa.part[ind],
                                              future_trajs=None,
-                                             ut=(pt[-1].u,), yt=(pt[-1].y,),
-                                             tt=(pt[-1].t,))
+                                             ut=None, yt=self.y[-1:],
+                                             tt=self.t[-1:])
 
         traj = numpy.zeros((T, M, last_part.shape[1]))
         traj[-1] = numpy.copy(last_part)

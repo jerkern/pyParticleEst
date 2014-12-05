@@ -15,7 +15,7 @@ except ImportError:
 
 from exceptions import ValueError
 
-class NonlinearGaussian(interfaces.FFBSiRS):
+class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
     """
     Base class for particles of the type mixed linear/non-linear with
     additive gaussian noise.

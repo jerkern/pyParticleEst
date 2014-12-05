@@ -10,11 +10,11 @@ class ParticleFilteringNonMarkov():
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def update_full(self, particles, traj, ancestors, noise):
+    def update_full(self, particles, traj, uvec, yvec, tvec, ancestors, noise):
         pass
 
     @abc.abstractmethod
-    def measure_full(self, particles, traj, ancestors, y, t):
+    def measure_full(self, particles, traj, uvec, yvec, tvec, ancestors):
         pass
 
     @abc.abstractmethod
@@ -102,11 +102,11 @@ class ParticleFiltering(ParticleFilteringNonMarkov):
     """
     __metaclass__ = abc.ABCMeta
 
-    def update_full(self, particles, traj, ancestors, noise):
-        return self.update(particles=particles, u=traj[-1].u, t=traj[-1].t, noise=noise)
+    def update_full(self, particles, traj, uvec, yvec, tvec, ancestors, noise):
+        return self.update(particles=particles, u=uvec[-1], t=tvec[-1], noise=noise)
 
-    def measure_full(self, particles, traj, ancestors, y, t):
-        return self.measure(particles, y, t)
+    def measure_full(self, particles, traj, uvec, yvec, tvec, ancestors):
+        return self.measure(particles, y=yvec[-1], t=tvec[-1])
 
     @abc.abstractmethod
     def update(self, particles, u, t, noise):
@@ -248,7 +248,7 @@ class FFBSiRSNonMarkov(FFBSi):
     """
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def logp_xnext_max_full(self, ptraj, u, t):
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec):
         """
         Return the max log-pdf value for all possible future states'
         given input u
@@ -291,8 +291,9 @@ class FFBSiRS(FFBSi):
         pass
 
 
-    def logp_xnext_max_full(self, ptraj, u, t):
-        return self.logp_xnext_max(ptraj[-1].pa.part, u, t)
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec):
+        return self.logp_xnext_max(ptraj[-1].pa.part, u=uvec[-1], t=tvec[-1])
+
 class SampleProposer(object):
     """
     Base class for models to be used with methods that require drawing of new
