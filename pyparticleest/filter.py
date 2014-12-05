@@ -320,18 +320,12 @@ class AuxiliaryParticleFilter(ParticleFilter):
 
         return (pa, resampled, ancestors)
 
-class CPFYAS(object):
+class CPFYAS(CPFAS):
     def __init__(self, model, N, cond_traj):
         self.ctraj = numpy.copy(cond_traj)
         self.model = model
         self.N = N
         self.cur_ind = 0
-
-
-    def create_initial_estimate(self, N):
-        self.N = N
-        part = self.model.create_initial_estimate(N)
-        part[-1] = self.ctraj[0]
 
     def forward(self, traj, y):
         """
@@ -352,24 +346,31 @@ class CPFYAS(object):
         pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part),
                                    traj[-1].pa.w)
 
-        ancestors = numpy.empty((self.N), dtype=int)
-        ancestors[:-1] = sample(numpy.exp(pa.w), self.N - 1)
-        resampled = True
+        N = len(traj[-1].pa.part)
+        ancestors = numpy.empty((N,), dtype=int)
+        tmp = numpy.exp(traj[-1].pa.w)
+        tmp /= numpy.sum(tmp)
+        ancestors[:-1] = sample(tmp, N - 1)
 
         # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
         (ut, yt, tt) = extract_signals(traj)
 
         #select ancestor for conditional trajectory
-        pind = numpy.asarray(range(self.N))
-        find = numpy.zeros((self.N,), dtype=numpy.int)
-        wac = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind][numpy.newaxis],
-                                         find=find, ut=ut, yt=yt, tt=tt)
-        wac += pa.w
-        wac -= numpy.max(wac)
-        ancestors[-1] = sample(numpy.exp(wac), 1)
+        pind = numpy.asarray(range(N), dtype=numpy.int)
+        find = numpy.zeros((N,), dtype=numpy.int)
+        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
+                                            find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
+        wanc = wtrans + traj[-1].pa.w[pind]
+        wanc -= numpy.max(wanc)
+        tmp = numpy.exp(wanc)
+        tmp /= numpy.sum(tmp)
+        condind = sample(tmp, 1)
+        ancestors[-1] = condind
+        resampled = True
 
         partn = self.model.propose_from_y(self.N, y=y, t=traj[-1].t + 1)
-        partn[-1] = self.ctraj[self.cur_ind, 0]
+        partn[-1] = self.ctraj[self.cur_ind + 1, 0]
+
         self.cur_ind += 1
 
         find = numpy.asarray(range(self.N))
@@ -377,19 +378,12 @@ class CPFYAS(object):
         future_trajs = self.model.sample_smooth(partn, future_trajs=None,
                                                 ut=ut, yt=yt, tt=tt)
         wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
-                                        find=find, ut=ut, yt=yt, tt=tt)
-        pa.part = partn
-        # Try to keep weights from going to -Inf
+                                        find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
+
         m = numpy.max(wn)
-        pa.w_offset += m
         wn -= m
-
-        pa.w = pa.w + wn
-
-        # Keep the weights from going to -Inf
-        m = numpy.max(pa.w)
+        pa = ParticleApproximation(partn, wn)
         pa.w_offset += m
-        pa.w -= m
 
         return (pa, resampled, ancestors)
 
@@ -412,7 +406,6 @@ class CPFYAS(object):
         assert(not inplace)
         part = self.model.propose_from_y(self.N, y=y, t=t)
         part[-1] = self.ctraj[self.cur_ind]
-        self.cur_ind += 1
         pa = ParticleApproximation(part)
         return pa
 
