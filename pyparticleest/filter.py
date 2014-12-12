@@ -248,13 +248,12 @@ class CPFAS(CPF):
         ancestors[:-1] = sample(tmp, N - 1)
 
         # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
-        (ut, yt, tt) = extract_signals(traj)
 
         #select ancestor for conditional trajectory
         pind = numpy.asarray(range(N), dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
         wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
-                                            find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
+                                            find=find, ut=traj.uvec, yt=traj.yvec, tt=traj.tvec, ind=self.cur_ind)
         wanc = wtrans + traj[-1].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)

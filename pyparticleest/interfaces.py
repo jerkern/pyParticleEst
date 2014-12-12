@@ -175,7 +175,7 @@ class FFBSiNonMarkov(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, ut, yt, tt):
+    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, ut, yt, tt, ind):
         pass
 
 class FFProposeFromMeasure(FFBSiNonMarkov):
@@ -196,7 +196,7 @@ class FFBSi(FFBSiNonMarkov):
     """
     __metaclass__ = abc.ABCMeta
 
-    def logp_xnext_full(self, past_trajs, pind, future_trajs, find, ut, yt, tt):
+    def logp_xnext_full(self, past_trajs, pind, future_trajs, find, ut, yt, tt, ind):
         """
         Return the log-pdf value for the entire future trajectory.
         Useful for non-markovian modeles, that result from e.g
@@ -221,7 +221,7 @@ class FFBSi(FFBSiNonMarkov):
         # Default implemenation for markovian models, just look at the next state
         return self.logp_xnext(particles=past_trajs[-1].pa.part[pind],
                                next_part=future_trajs[0][find],
-                               u=ut[0], t=tt[0])
+                               u=ut[ind], t=tt[ind])
 
     @abc.abstractmethod
     def logp_xnext(self, particles, next_part, u, t):
