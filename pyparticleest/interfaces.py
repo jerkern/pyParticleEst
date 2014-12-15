@@ -18,7 +18,7 @@ class ParticleFilteringNonMarkov():
         pass
 
     @abc.abstractmethod
-    def sample_process_noise(self, ptraj, ut, tt):
+    def sample_process_noise_full(self, ptraj, ancestors, ut, tt):
         """
         Sample process noise
 
@@ -102,11 +102,19 @@ class ParticleFiltering(ParticleFilteringNonMarkov):
     """
     __metaclass__ = abc.ABCMeta
 
+    def sample_process_noise_full(self, ptraj, ancestors, ut, tt):
+        return self.sample_process_noise(particles=ptraj[-1].pa.part[ancestors],
+                                         u=ut[-1], t=tt[-1])
+
     def update_full(self, particles, traj, uvec, yvec, tvec, ancestors, noise):
         return self.update(particles=particles, u=uvec[-1], t=tvec[-1], noise=noise)
 
     def measure_full(self, particles, traj, uvec, yvec, tvec, ancestors):
         return self.measure(particles, y=yvec[-1], t=tvec[-1])
+
+    @abc.abstractmethod
+    def sample_process_noise(self, particles, u, t):
+        pass
 
     @abc.abstractmethod
     def update(self, particles, u, t, noise):
@@ -248,7 +256,7 @@ class FFBSiRSNonMarkov(FFBSi):
     """
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec):
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, ind):
         """
         Return the max log-pdf value for all possible future states'
         given input u
@@ -291,8 +299,8 @@ class FFBSiRS(FFBSi):
         pass
 
 
-    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec):
-        return self.logp_xnext_max(ptraj[-1].pa.part, u=uvec[-1], t=tvec[-1])
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, ind):
+        return self.logp_xnext_max(ptraj[-1].pa.part, u=uvec[ind], t=tvec[ind])
 
 class SampleProposer(object):
     """
