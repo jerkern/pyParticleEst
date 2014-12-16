@@ -288,7 +288,7 @@ class CPF(ParticleFilter):
          - resampled (bool): were the particles resampled
          - ancestors (array-like): anecstral indices for particles at time t+1
         """
-        N = len(traj[-1].pa.part)
+        N = len(traj[cur_ind].pa.part)
         ancestors = numpy.empty((N,), dtype=int)
         tmp = numpy.exp(traj[-1].pa.w)
         tmp /= numpy.sum(tmp)
@@ -443,11 +443,11 @@ class CPFYAS(CPFAS):
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
          - resampled (bool): were the particles resampled
-         - ancestors (array-like): anecstral indices for particles at time t+1
+         - ancestors (array-like): ancestral indices for particles at time t+1
         """
 
         ancestors = numpy.empty((self.N,), dtype=int)
-        tmp = numpy.exp(traj[-1].pa.w)
+        tmp = numpy.exp(traj[cur_ind].pa.w)
         tmp /= numpy.sum(tmp)
         ancestors[:-1] = sample(tmp, self.N - 1)
 
@@ -457,7 +457,7 @@ class CPFYAS(CPFAS):
         wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[cur_ind + 1][numpy.newaxis],
                                             find=find, ut=uvec,
                                             yt=yvec, tt=tvec, cur_ind=cur_ind)
-        wanc = wtrans + traj[-1].pa.w[pind]
+        wanc = wtrans + traj[cur_ind].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)
         tmp /= numpy.sum(tmp)
@@ -470,7 +470,7 @@ class CPFYAS(CPFAS):
 
         find = numpy.asarray(range(self.N))
 
-        future_trajs = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
+        future_trajs = self.model.sample_smooth(part=partn, ptraj=traj,
                                                 anc=ancestors, future_trajs=None,
                                                 find=None,
                                                 ut=uvec, yt=yvec, tt=tvec,

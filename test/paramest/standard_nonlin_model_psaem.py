@@ -163,16 +163,6 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
                                       bounds=param_bounds,)
         return res.x
 
-    def propose_from_y(self, N, y, t):
-        yprop = y + numpy.random.normal(y, numpy.sqrt(self.R), (N,)).reshape((-1, 1))
-        # Hack
-        yprop[yprop < 0.0] = 0.0
-        tmp = numpy.sqrt(yprop / 0.05)
-        signprop = (numpy.random.randint(0, 2, size=(N,)) == 1)
-        xprop = numpy.empty((N, 1))
-        xprop[signprop] = tmp[signprop]
-        xprop[~signprop] = -tmp[~signprop]
-        return xprop
 
 if __name__ == '__main__':
     numpy.random.seed(2)
