@@ -204,13 +204,15 @@ class FFPropY(object):
 
         partn = self.model.propose_from_y(len(pa.part), y=yvec[-1], t=tvec[-1])
 
-        find = numpy.asarray(range(self.N))
+        future_trajs = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
+                                                anc=ancestors, future_trajs=None,
+                                                ut=uvec, yt=yvec, tt=tvec,
+                                                cur_ind=cur_ind)
 
-        # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
-        future_trajs = self.model.sample_smooth(partn, future_trajs=None,
-                                                ut=ut, yt=yt, tt=tt)
-        wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
-                                        find=find, ut=uvec, yt=yvec, tt=tvec, ind=len(yvec))
+        wn = self.model.logp_xnext_full(past_trajs=traj,
+                                        ancestors=ancestors,
+                                        future_trajs=future_trajs[numpy.newaxis],
+                                        ut=uvec, yt=yvec, tt=tvec, ind=cur_ind)
         pa.part = partn
         # Try to keep weights from going to -Inf
         m = numpy.max(wn)

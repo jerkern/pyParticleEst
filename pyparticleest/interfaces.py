@@ -65,7 +65,7 @@ class ParticleFilteringNonMarkov():
             return numpy.copy(particles)
 
 
-    def sample_smooth(self, ptraj, anc, future_trajs, ut, yt, tt, cur_ind):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, ut, yt, tt, cur_ind):
         """
         Create sampled estimates for the smoothed trajectory. Allows the update
         representation of the particles used in the forward step to include
@@ -91,7 +91,7 @@ class ParticleFilteringNonMarkov():
         # default implementation uses the same format as forward in time
         # Is part of the ParticleFiltering interface since it is used
         # also when calculating "ancestor trajectories"
-        return numpy.copy(ptraj[-1].pa.part[anc])
+        return numpy.copy(part)
 
 
 class ParticleFiltering(ParticleFilteringNonMarkov):
@@ -204,7 +204,7 @@ class FFBSi(FFBSiNonMarkov):
     """
     __metaclass__ = abc.ABCMeta
 
-    def logp_xnext_full(self, past_trajs, pind, future_trajs, find, ut, yt, tt, ind):
+    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, ut, yt, tt, ind):
         """
         Return the log-pdf value for the entire future trajectory.
         Useful for non-markovian modeles, that result from e.g
@@ -227,8 +227,8 @@ class FFBSi(FFBSiNonMarkov):
         """
 
         # Default implemenation for markovian models, just look at the next state
-        return self.logp_xnext(particles=past_trajs[-1].pa.part[pind],
-                               next_part=future_trajs[0][find],
+        return self.logp_xnext(particles=past_trajs[-1].pa.part[ancestors],
+                               next_part=future_trajs[0],
                                u=ut[ind], t=tt[ind])
 
     @abc.abstractmethod

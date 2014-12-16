@@ -54,8 +54,9 @@ class Model(interfaces.FFProposeFromMeasure,
 #            logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1, 1) - y, self.R)
 #        return logyprob
 #
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        return particles
+
+    def sample_smooth(self, part, ptraj, anc, future_trajs, ut, yt, tt, cur_ind):
+        return numpy.copy(part)
 
     def copy_ind(self, particles, new_ind=None):
 

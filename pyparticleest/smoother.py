@@ -283,7 +283,9 @@ class SmoothTrajectory(object):
     def calculate_ancestors(self, pt, ind):
         T = len(pt)
         M = len(ind)
-        last_part = self.model.sample_smooth(ptraj=pt, anc=ind,
+        ancestors = pt[-1].ancestors[ind]
+        last_part = self.model.sample_smooth(part=pt[-1].pa.part[ind],
+                                             ptraj=pt[:-1], anc=ancestors,
                                              future_trajs=None,
                                              ut=self.u, yt=self.y,
                                              tt=self.t, cur_ind=T - 1)
@@ -291,15 +293,14 @@ class SmoothTrajectory(object):
         traj = numpy.zeros((T, M, last_part.shape[1]))
         traj[-1] = numpy.copy(last_part)
 
-        ancestors = pt[-1].ancestors[ind]
-
         for t in reversed(xrange(T - 1)):
 
             ind = ancestors
             ancestors = pt[t].ancestors[ind]
             # Select 'previous' particle
-            traj[t] = numpy.copy(self.model.sample_smooth(ptraj=pt[:(t + 1)],
-                                                          anc=ind,
+            traj[t] = numpy.copy(self.model.sample_smooth(part=pt[t].pa.part[ind],
+                                                          ptraj=pt[:t],
+                                                          anc=ancestors,
                                                           future_trajs=traj[(t + 1):],
                                                           ut=self.u,
                                                           yt=self.y,
@@ -342,7 +343,9 @@ class SmoothTrajectory(object):
         tmp = numpy.exp(tmp)
         tmp = tmp / numpy.sum(tmp)
         ind = pf.sample(tmp, M)
-        last_part = self.model.sample_smooth(ptraj=pt, anc=ind,
+        ancestors = pt[-1].ancestors[ind]
+        last_part = self.model.sample_smooth(part=pt[-1].pa.part[ind],
+                                             ptraj=pt[:-1], anc=ancestors,
                                              future_trajs=None,
                                              ut=self.u, yt=self.y,
                                              tt=self, cur_ind=len(pt) - 1)
@@ -353,7 +356,7 @@ class SmoothTrajectory(object):
         if (method == 'full'):
             pass
         elif (method == 'mcmc' or method == 'ancestor' or method == 'mhips'):
-            ancestors = pt[-1].ancestors[ind]
+            pass
         elif (method == 'rs'):
             max_iter = options['R']
         elif (method == 'rsas'):
@@ -372,6 +375,8 @@ class SmoothTrajectory(object):
             yt = self.y
             tt = self.t
 
+
+
             if (method == 'rs'):
                 ind = bsi_rs(pt[:cur_ind + 1], self.model, ft, ut=ut, yt=yt, tt=tt, cur_ind=cur_ind,
                              maxpdf=options['maxpdf'][cur_ind],
@@ -388,10 +393,12 @@ class SmoothTrajectory(object):
                 ind = bsi_full(pt[:cur_ind + 1], self.model, ft, ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
             elif (method == 'ancestor'):
                 ind = ancestors
-                ancestors = pt[cur_ind].ancestors[ind]
+
+            ancestors = pt[cur_ind].ancestors[ind]
             # Select 'previous' particle
-            self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(ptraj=pt[:cur_ind + 1],
-                                                                     anc=ind,
+            self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(part=pt[cur_ind].pa.part[ind],
+                                                                     ptraj=pt[:cur_ind],
+                                                                     anc=ancestors,
                                                                      future_trajs=ft, ut=ut,
                                                                      yt=yt,
                                                                      tt=tt,
