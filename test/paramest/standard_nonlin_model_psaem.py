@@ -59,9 +59,9 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
     def logp_xnext_max(self, particles, u, t):
         return self.logxn_max
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        return particles.reshape((-1, 1))
+        return part.reshape((-1, 1))
 
     def set_params(self, params):
         """ New set of parameters for which the integral approximation terms will be evaluated"""
@@ -230,7 +230,7 @@ if __name__ == '__main__':
     callback(theta0, None)
     filter_options = {'cond_traj': numpy.zeros((steps + 1, 1, 1))}
 
-    param = estimator.maximize(theta0, num, filter='cpfyas', smoother='full',
+    param = estimator.maximize(theta0, num, filter='cpfas',
                        meas_first=True, max_iter=max_iter,
                        filter_options=filter_options,
                        callback=callback,

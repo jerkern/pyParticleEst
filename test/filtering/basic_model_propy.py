@@ -55,7 +55,7 @@ class Model(interfaces.FFProposeFromMeasure,
 #        return logyprob
 #
 
-    def sample_smooth(self, part, ptraj, anc, future_trajs, ut, yt, tt, cur_ind):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         return numpy.copy(part)
 
     def copy_ind(self, particles, new_ind=None):

@@ -29,7 +29,7 @@ def bsi_full(ptraj, model, future_trajs, ut, yt, tt, cur_ind):
         find = j * numpy.ones((N,), dtype=int)
         p_next = model.logp_xnext_full(ptraj, pind,
                                        future_trajs, find,
-                                       ut=ut, yt=yt, tt=tt, ind=cur_ind)
+                                       ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
 
         w = ptraj[-1].pa.w + p_next
         w = w - numpy.max(w)
@@ -69,7 +69,7 @@ def bsi_rs(ptraj, model, future_trajs, ut, yt, tt, cur_ind, maxpdf, max_iter):
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
         pn = model.logp_xnext_full(ptraj, ind,
                                    future_trajs, todo,
-                                   ut=ut, yt=yt, tt=tt, ind=cur_ind)
+                                   ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         res[todo[accept]] = ind[accept]
@@ -127,7 +127,7 @@ def bsi_rsas(ptraj, model, future_trajs, ut, yt, tt, cur_ind, maxpdf, x1, P1, sv
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
         pn = model.logp_xnext_full(ptraj, ind,
                                    future_trajs, todo,
-                                   ut=ut, yt=yt, tt=tt, ind=cur_ind)
+                                   ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
         test = numpy.log(numpy.random.uniform(size=len(todo)))
         accept = test < pn - maxpdf
         ak = numpy.sum(accept)
@@ -179,12 +179,12 @@ def bsi_mcmc(ptraj, model, future_trajs, ut, yt, tt, cur_ind, R, ancestors):
     weights /= numpy.sum(weights)
     pind = model.logp_xnext_full(ptraj, ind,
                                  future_trajs, find,
-                                 ut=ut, yt=yt, tt=tt, ind=cur_ind)
+                                 ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
     for _j in xrange(R):
         propind = numpy.random.permutation(pf.sample(weights, M))
         pprop = model.logp_xnext_full(ptraj, propind,
                                       future_trajs, find,
-                                      ut=ut, yt=yt, tt=tt, ind=cur_ind)
+                                      ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
         diff = pprop - pind
         diff[diff > 0.0] = 0.0
         test = numpy.log(numpy.random.uniform(size=M))
@@ -284,9 +284,10 @@ class SmoothTrajectory(object):
         T = len(pt)
         M = len(ind)
         ancestors = pt[-1].ancestors[ind]
+        find = numpy.arange(M, dtype=int)
         last_part = self.model.sample_smooth(part=pt[-1].pa.part[ind],
                                              ptraj=pt[:-1], anc=ancestors,
-                                             future_trajs=None,
+                                             future_trajs=None, find=None,
                                              ut=self.u, yt=self.y,
                                              tt=self.t, cur_ind=T - 1)
 
@@ -302,6 +303,7 @@ class SmoothTrajectory(object):
                                                           ptraj=pt[:t],
                                                           anc=ancestors,
                                                           future_trajs=traj[(t + 1):],
+                                                          find=find,
                                                           ut=self.u,
                                                           yt=self.y,
                                                           tt=self.t,
@@ -346,7 +348,7 @@ class SmoothTrajectory(object):
         ancestors = pt[-1].ancestors[ind]
         last_part = self.model.sample_smooth(part=pt[-1].pa.part[ind],
                                              ptraj=pt[:-1], anc=ancestors,
-                                             future_trajs=None,
+                                             future_trajs=None, find=None,
                                              ut=self.u, yt=self.y,
                                              tt=self, cur_ind=len(pt) - 1)
 
@@ -396,10 +398,13 @@ class SmoothTrajectory(object):
 
             ancestors = pt[cur_ind].ancestors[ind]
             # Select 'previous' particle
+            find = numpy.arange(M, dtype=int)
             self.traj[cur_ind] = numpy.copy(self.model.sample_smooth(part=pt[cur_ind].pa.part[ind],
                                                                      ptraj=pt[:cur_ind],
                                                                      anc=ancestors,
-                                                                     future_trajs=ft, ut=ut,
+                                                                     future_trajs=ft,
+                                                                     find=find,
+                                                                     ut=ut,
                                                                      yt=yt,
                                                                      tt=tt,
                                                                      cur_ind=cur_ind))

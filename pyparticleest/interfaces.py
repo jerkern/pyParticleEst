@@ -65,7 +65,7 @@ class ParticleFilteringNonMarkov():
             return numpy.copy(particles)
 
 
-    def sample_smooth(self, part, ptraj, anc, future_trajs, ut, yt, tt, cur_ind):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Create sampled estimates for the smoothed trajectory. Allows the update
         representation of the particles used in the forward step to include
@@ -183,7 +183,7 @@ class FFBSiNonMarkov(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, ut, yt, tt, ind):
+    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
         pass
 
 class FFProposeFromMeasure(FFBSiNonMarkov):
@@ -204,7 +204,7 @@ class FFBSi(FFBSiNonMarkov):
     """
     __metaclass__ = abc.ABCMeta
 
-    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, ut, yt, tt, ind):
+    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Return the log-pdf value for the entire future trajectory.
         Useful for non-markovian modeles, that result from e.g
@@ -228,8 +228,8 @@ class FFBSi(FFBSiNonMarkov):
 
         # Default implemenation for markovian models, just look at the next state
         return self.logp_xnext(particles=past_trajs[-1].pa.part[ancestors],
-                               next_part=future_trajs[0],
-                               u=ut[ind], t=tt[ind])
+                               next_part=future_trajs[0][find],
+                               u=ut[cur_ind], t=tt[cur_ind])
 
     @abc.abstractmethod
     def logp_xnext(self, particles, next_part, u, t):
@@ -256,7 +256,7 @@ class FFBSiRSNonMarkov(FFBSi):
     """
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, ind):
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, cur_ind):
         """
         Return the max log-pdf value for all possible future states'
         given input u
@@ -299,8 +299,9 @@ class FFBSiRS(FFBSi):
         pass
 
 
-    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, ind):
-        return self.logp_xnext_max(ptraj[-1].pa.part, u=uvec[ind], t=tvec[ind])
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, cur_ind):
+        return self.logp_xnext_max(ptraj[-1].pa.part, u=uvec[cur_ind],
+                                   t=tvec[cur_ind])
 
 class SampleProposer(object):
     """

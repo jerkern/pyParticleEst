@@ -73,18 +73,16 @@ class ParticleFilter(object):
 
 
         pa = self.update(traj=traj, ancestors=ancestors,
-                         uvec=uvec[:cur_ind + 1], yvec=yvec[:cur_ind + 1],
-                         tvec=tvec[:cur_ind + 1],
+                         uvec=uvec, yvec=yvec,
+                         tvec=tvec, cur_ind=cur_ind,
                          pa=pa, inplace=True,)
         if (yvec != None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa,
                               #There is no 'u' for last step yet
-                              uvec=uvec[:cur_ind + 1],
-                              yvec=yvec[:cur_ind + 2],
-                              tvec=tvec[:cur_ind + 2])
+                              uvec=uvec, yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
         return (pa, resampled, ancestors)
 
-    def update(self, traj, ancestors, uvec, yvec, tvec, pa, inplace=True):
+    def update(self, traj, ancestors, uvec, yvec, tvec, cur_ind, pa, inplace=True):
         """
         Update particle approximation of x_t to x_{t+1} using u as input.
 
@@ -106,14 +104,16 @@ class ParticleFilter(object):
                                        traj[-1].pa.w[ancestors])
 
         v = self.model.sample_process_noise_full(ptraj=traj, ancestors=ancestors,
-                                                 ut=uvec, tt=tvec)
+                                                 ut=uvec[:cur_ind + 1],
+                                                 tt=tvec[:cur_ind + 1])
         self.model.update_full(particles=pa.part, traj=traj,
-                               uvec=uvec, yvec=yvec, tvec=tvec,
+                               uvec=uvec[:cur_ind + 1], yvec=yvec[:cur_ind + 1],
+                               tvec=tvec[:cur_ind + 1],
                                ancestors=ancestors, noise=v)
         return pa
 
 
-    def measure(self, traj, ancestors, pa, uvec, yvec, tvec, inplace=True):
+    def measure(self, traj, ancestors, pa, uvec, yvec, tvec, cur_ind, inplace=True):
         """
         Evaluate and update particle approximation using new measurement y
 
@@ -135,8 +135,8 @@ class ParticleFilter(object):
 
         new_weights = self.model.measure_full(traj=traj, ancestors=ancestors,
                                               particles=pa.part, uvec=uvec,
-                                              yvec=yvec,
-                                              tvec=tvec)
+                                              yvec=yvec[:cur_ind + 1],
+                                              tvec=tvec[:cur_ind + 1])
 
         # Try to keep weights from going to -Inf
         m = numpy.max(new_weights)
@@ -203,16 +203,17 @@ class FFPropY(object):
             ancestors = numpy.arange(pa.num, dtype=int)
 
         partn = self.model.propose_from_y(len(pa.part), y=yvec[-1], t=tvec[-1])
-
+        find = numpy.asarray(range(self.N))
         future_trajs = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
                                                 anc=ancestors, future_trajs=None,
+                                                find=find,
                                                 ut=uvec, yt=yvec, tt=tvec,
                                                 cur_ind=cur_ind)
-
         wn = self.model.logp_xnext_full(past_trajs=traj,
                                         ancestors=ancestors,
                                         future_trajs=future_trajs[numpy.newaxis],
-                                        ut=uvec, yt=yvec, tt=tvec, ind=cur_ind)
+                                        find=find,
+                                        ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
         pa.part = partn
         # Try to keep weights from going to -Inf
         m = numpy.max(wn)
@@ -228,7 +229,7 @@ class FFPropY(object):
 
         return (pa, resampled, ancestors)
 
-    def measure(self, traj, ancestors, pa, uvec, yvec, tvec, inplace=True):
+    def measure(self, traj, ancestors, pa, uvec, yvec, tvec, cur_ind, inplace=True):
         """
         Evaluate and update particle approximation using new measurement y
 
@@ -245,7 +246,7 @@ class FFPropY(object):
         """
 
         assert(not inplace)
-        part = self.model.propose_from_y(self.N, y=yvec[-1], t=tvec[-1])
+        part = self.model.propose_from_y(self.N, y=yvec[cur_ind], t=tvec[cur_ind])
         pa = ParticleApproximation(part)
         return pa
 
@@ -265,14 +266,13 @@ class CPF(ParticleFilter):
 
         self.ctraj = cond_traj
         self.model = model
-        self.cur_ind = 0
 
     def create_initial_estimate(self, N):
         part = self.model.create_initial_estimate(N)
         part[-1] = self.ctraj[0]
         return part
 
-    def forward(self, traj, y):
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
         """
         Forward the estimate stored in pa from t to t+1 using the motion model
         with input u at time time and measurement y at time t+1
@@ -302,12 +302,14 @@ class CPF(ParticleFilter):
 
         resampled = True
 
-        pa = self.update(traj, ancestors, pa, inplace=True)
-        pa.part[-1] = self.ctraj[self.cur_ind + 1]
+        pa = self.update(traj=traj, ancestors=ancestors, uvec=uvec, yvec=yvec,
+                         tvec=tvec, cur_ind=cur_ind, pa=pa, inplace=True)
+        pa.part[-1] = self.ctraj[cur_ind + 1]
 
-        if (y != None):
-            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
-        self.cur_ind += 1
+        if (yvec != None and yvec[cur_ind + 1] != None):
+            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, uvec=uvec,
+                              yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
+
         return (pa, resampled, ancestors)
 
 class CPFAS(CPF):
@@ -322,7 +324,7 @@ class CPFAS(CPF):
        triggers resampling. 0 disables resampling
     """
 
-    def forward(self, traj, y):
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
         """
         Forward the estimate stored in pa from t to t+1 using the motion model
         with input u at time time and measurement y at time t+1
@@ -344,13 +346,11 @@ class CPFAS(CPF):
         tmp /= numpy.sum(tmp)
         ancestors[:-1] = sample(tmp, N - 1)
 
-        # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
-
         #select ancestor for conditional trajectory
         pind = numpy.asarray(range(N), dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
-        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
-                                            find=find, ut=traj.uvec, yt=traj.yvec, tt=traj.tvec, ind=self.cur_ind)
+        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[cur_ind + 1][numpy.newaxis],
+                                            find=find, ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
         wanc = wtrans + traj[-1].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)
@@ -364,12 +364,14 @@ class CPFAS(CPF):
 
         resampled = True
 
-        pa = self.update(traj, ancestors, pa, inplace=True)
-        pa.part[-1] = self.ctraj[self.cur_ind + 1]
+        pa = self.update(traj=traj, ancestors=ancestors, uvec=uvec, yvec=yvec,
+                         tvec=tvec, cur_ind=cur_ind, pa=pa, inplace=True)
+        pa.part[-1] = self.ctraj[cur_ind + 1]
 
-        if (y != None):
-            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, y=y, t=traj[-1].t + 1)
-        self.cur_ind += 1
+        if (yvec != None and yvec[cur_ind + 1] != None):
+            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, uvec=uvec,
+                              yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
+
         return (pa, resampled, ancestors)
 
 
@@ -426,9 +428,8 @@ class CPFYAS(CPFAS):
         self.ctraj = numpy.copy(cond_traj)
         self.model = model
         self.N = N
-        self.cur_ind = 0
 
-    def forward(self, traj, y):
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
         """
         Forward the estimate stored in pa from t to t+1 using the motion model
         with input u at time time and measurement y at time t+1
@@ -444,23 +445,18 @@ class CPFYAS(CPFAS):
          - resampled (bool): were the particles resampled
          - ancestors (array-like): anecstral indices for particles at time t+1
         """
-        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part),
-                                   traj[-1].pa.w)
 
-        N = len(traj[-1].pa.part)
-        ancestors = numpy.empty((N,), dtype=int)
+        ancestors = numpy.empty((self.N,), dtype=int)
         tmp = numpy.exp(traj[-1].pa.w)
         tmp /= numpy.sum(tmp)
-        ancestors[:-1] = sample(tmp, N - 1)
-
-        # TODO:This is ugly and slow, ut, yt, tt must be stored more efficiently
-        (ut, yt, tt) = extract_signals(traj)
+        ancestors[:-1] = sample(tmp, self.N - 1)
 
         #select ancestor for conditional trajectory
-        pind = numpy.asarray(range(N), dtype=numpy.int)
-        find = numpy.zeros((N,), dtype=numpy.int)
-        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[self.cur_ind + 1][numpy.newaxis],
-                                            find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
+        pind = numpy.arange(self.N, dtype=numpy.int)
+        find = numpy.zeros((self.N,), dtype=numpy.int)
+        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[cur_ind + 1][numpy.newaxis],
+                                            find=find, ut=uvec,
+                                            yt=yvec, tt=tvec, cur_ind=cur_ind)
         wanc = wtrans + traj[-1].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)
@@ -469,17 +465,18 @@ class CPFYAS(CPFAS):
         ancestors[-1] = condind
         resampled = True
 
-        partn = self.model.propose_from_y(self.N, y=y, t=traj[-1].t + 1)
-        partn[-1] = self.ctraj[self.cur_ind + 1, 0]
-
-        self.cur_ind += 1
+        partn = self.model.propose_from_y(self.N, y=yvec[cur_ind + 1], t=tvec[cur_ind + 1])
+        partn[-1] = self.ctraj[cur_ind + 1, 0]
 
         find = numpy.asarray(range(self.N))
 
-        future_trajs = self.model.sample_smooth(partn, future_trajs=None,
-                                                ut=ut, yt=yt, tt=tt)
+        future_trajs = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
+                                                anc=ancestors, future_trajs=None,
+                                                find=None,
+                                                ut=uvec, yt=yvec, tt=tvec,
+                                                cur_ind=cur_ind + 1)
         wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
-                                        find=find, ut=(None,), yt=yt[-1:], tt=tt[-1:])
+                                        find=find, ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
 
         m = numpy.max(wn)
         wn -= m
@@ -488,7 +485,7 @@ class CPFYAS(CPFAS):
 
         return (pa, resampled, ancestors)
 
-    def measure(self, traj, ancestors, pa, y, t, inplace=True):
+    def measure(self, traj, ancestors, pa, uvec, yvec, tvec, cur_ind, inplace=True):
         """
         Evaluate and update particle approximation using new measurement y
 
@@ -505,8 +502,8 @@ class CPFYAS(CPFAS):
         """
 
         assert(not inplace)
-        part = self.model.propose_from_y(self.N, y=y, t=t)
-        part[-1] = self.ctraj[self.cur_ind]
+        part = self.model.propose_from_y(self.N, y=yvec[cur_ind], t=tvec[cur_ind])
+        part[-1] = self.ctraj[cur_ind]
         pa = ParticleApproximation(part)
         return pa
 
@@ -566,7 +563,7 @@ class ParticleTrajectory(object):
             self.uvec = numpy.empty(1, dtype=utype)
             self.yvec = numpy.empty(1, dtype=ytype)
             self.tvec = numpy.empty(1, dtype=numpy.float)
-            self.T = T
+            self.T = 1
         self.tvec[0] = t0
         self.ind = -1
         if (filter.lower() == 'pf'):
@@ -601,21 +598,24 @@ class ParticleTrajectory(object):
         Returns:
          (bool) True if the particle approximation was resampled
         """
-        if (self.ind + 1 > self.T):
+        if (self.ind + 1 >= self.T):
             ushape = numpy.asarray(self.uvec.shape)
-            ushape[0] += 1
+            ushape[0] = self.ind + 2
             self.uvec.resize(ushape)
             yshape = numpy.asarray(self.yvec.shape)
-            yshape[0] += 1
+            yshape[0] = self.ind + 2
             self.yvec.resize(yshape)
             tshape = numpy.asarray(self.tvec.shape)
-            tshape[0] += 1
+            tshape[0] = self.ind + 2
             self.tvec.resize(tshape)
+            self.T = self.ind + 2
+
         if (len(self.traj) == 0):
             self.ind += 1
             particles = self.pf.create_initial_estimate(self.N)
             pa = ParticleApproximation(particles=particles)
             self.traj.append(TrajectoryStep(pa, ancestors=numpy.arange(self.N)))
+
         ind = self.ind
         self.uvec[ind] = u
         self.yvec[ind + 1] = y
@@ -642,53 +642,49 @@ class ParticleTrajectory(object):
          None
         """
 
+        if (self.ind + 1 >= self.T):
+            ushape = numpy.asarray(self.uvec.shape)
+            ushape[0] = self.ind + 2
+            self.uvec.resize(ushape)
+            yshape = numpy.asarray(self.yvec.shape)
+            yshape[0] = self.ind + 2
+            self.yvec.resize(yshape)
+            tshape = numpy.asarray(self.tvec.shape)
+            tshape[0] = self.ind + 2
+            self.tvec.resize(tshape)
+            self.T = self.ind + 2
+
         if (self.using_pfy):
-            if (self.ind + 1 > self.T):
-                ushape = numpy.asarray(self.uvec.shape)
-                ushape[0] += 1
-                self.uvec.resize(ushape)
-                yshape = numpy.asarray(self.yvec.shape)
-                yshape[0] += 1
-                self.yvec.resize(yshape)
-                tshape = numpy.asarray(self.tvec.shape)
-                tshape[0] += 1
-                self.tvec.resize(tshape)
+
             self.ind += 1
             self.yvec[self.ind] = y
             self.tvec[self.ind] = self.ind
+
+            ancestors = numpy.arange(self.N, dtype=int)
             pa = self.pf.measure(traj=self.traj,
-                                 ancestors=self.traj[-1].ancestors,
+                                 ancestors=ancestors,
                                  pa=None,
-                                 yvec=self.yvec[:self.ind + 1],
-                                 tvec=self.tvec[:self.ind + 1],
+                                 uvec=self.uvec,
+                                 yvec=self.yvec,
+                                 tvec=self.tvec,
+                                 cur_ind=self.ind,
                                  inplace=False)
-            self.traj.append(TrajectoryStep(pa,
-                                            ancestors=numpy.arange(pa.num,
-                                                                   dtype=int)))
+            self.traj.append(TrajectoryStep(pa, ancestors=ancestors))
         else:
             if (len(self.traj) == 0):
-                if (self.ind + 1 > self.T):
-                    ushape = numpy.asarray(self.uvec.shape)
-                    ushape[0] += 1
-                    self.uvec.resize(ushape)
-                    yshape = numpy.asarray(self.yvec.shape)
-                    yshape[0] += 1
-                    self.yvec.resize(yshape)
-                    tshape = numpy.asarray(self.tvec.shape)
-                    tshape[0] += 1
-                    self.tvec.resize(tshape)
                 self.ind += 1
-                self.yvec[self.ind] = y
-                self.tvec[self.ind] = self.ind
                 particles = self.pf.create_initial_estimate(self.N)
                 pa = ParticleApproximation(particles=particles)
-                self.traj.append(TrajectoryStep(pa,
-                                                ancestors=numpy.arange(self.N,
-                                                                       dtype=int)))
+                ancestors = numpy.arange(self.N, dtype=int)
+                self.traj.append(TrajectoryStep(pa, ancestors=ancestors))
+
+            self.yvec[self.ind] = y
+            self.tvec[self.ind] = self.ind
+
             self.pf.measure(traj=self.traj, ancestors=self.traj[-1].ancestors,
-                            pa=self.traj[-1].pa, uvec=self.uvec[:self.ind],
-                            yvec=self.yvec[:self.ind + 1],
-                            tvec=self.tvec[:self.ind + 1], inplace=True)
+                            pa=self.traj[-1].pa, uvec=self.uvec,
+                            yvec=self.yvec, tvec=self.tvec,
+                            cur_ind=self.ind, inplace=True)
 
     def __len__(self):
         return len(self.traj)
@@ -727,7 +723,7 @@ class ParticleTrajectory(object):
                                                               uvec=self.uvec,
                                                               yvec=self.tvec,
                                                               tvec=self.tvec,
-                                                              ind=k)
+                                                              cur_ind=k)
             options['maxpdf'] = coeffs
             if (method == 'rs'):
                 # Default for max number of attempts before resoriting to evaluate all weights
