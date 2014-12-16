@@ -65,7 +65,7 @@ class ParticleFilteringNonMarkov():
             return numpy.copy(particles)
 
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, ptraj, anc, future_trajs, ut, yt, tt, cur_ind):
         """
         Create sampled estimates for the smoothed trajectory. Allows the update
         representation of the particles used in the forward step to include
@@ -91,7 +91,7 @@ class ParticleFilteringNonMarkov():
         # default implementation uses the same format as forward in time
         # Is part of the ParticleFiltering interface since it is used
         # also when calculating "ancestor trajectories"
-        return numpy.copy(particles)
+        return numpy.copy(ptraj[-1].pa.part[anc])
 
 
 class ParticleFiltering(ParticleFilteringNonMarkov):
@@ -309,7 +309,7 @@ class SampleProposer(object):
     """
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
+    def propose_smooth(self, ptraj, anc, future_trajs, yt, ut, tt, cur_ind):
         """
         Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
 
@@ -329,7 +329,7 @@ class SampleProposer(object):
         pass
 
     @abc.abstractmethod
-    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, yt, ut, tt, cur_ind):
         """
         Eval the log-propability of the proposal distribution
 

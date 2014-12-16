@@ -286,31 +286,6 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
 
         return lpx
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        """
-        Create sampled estimates for the smoothed trajectory. Allows the update
-        representation of the particles used in the forward step to include
-        additional data in the backward step, can also for certain models be
-        used to update the points estimates based on the future information.
-
-        Default implementation uses the same format as forward in time it
-        ss part of the ParticleFiltering interface since it is used also when
-        calculating "ancestor" trajectories
-
-        Args:
-
-         - particles  (array-like): Model specific representation
-           of all particles, with first dimension = N (number of particles)
-         - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
-
-        Returns:
-         (array-like) with first dimension = N
-        """
-        return particles
-
     def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
         """
         Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)

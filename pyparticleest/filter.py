@@ -175,7 +175,7 @@ class FFPropY(object):
         self.N = N
         return self.model.create_initial_estimate(N)
 
-    def forward(self, traj, yvec, uvec, tvec):
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
         """
         Forward the estimate stored in pa from t to t+1 using the motion model
         with input u at time time and measurement y at time t+1
