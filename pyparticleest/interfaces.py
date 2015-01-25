@@ -250,7 +250,7 @@ class FFBSi(FFBSiNonMarkov):
         """
         pass
 
-class FFBSiRSNonMarkov(FFBSi):
+class FFBSiRSNonMarkov(FFBSiNonMarkov):
     """
     Base class for models to be used with rejection sampling methods
     """

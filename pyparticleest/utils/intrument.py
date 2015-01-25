@@ -61,20 +61,20 @@ class Instrumenter(object):
         """ Sample N particle from initial distribution """
         return self.model.create_initial_estimate(N)
 
-    def sample_process_noise(self, particles, u, t):
+    def sample_process_noise_full(self, ptraj, ancestors, ut, tt):
         """ Return process noise for input u """
-        self.cnt_sample += len(particles)
-        return self.model.sample_process_noise(particles, u, t)
+        self.cnt_sample += len(ancestors)
+        return self.model.sample_process_noise_full(ptraj, ancestors, ut, tt)
 
-    def update(self, particles, u, t, noise):
+    def update_full(self, particles, traj, uvec, yvec, tvec, ancestors, noise):
         """ Update estimate using 'data' as input """
         self.cnt_update += len(particles)
-        return self.model.update(particles, u, t, noise)
+        return self.model.update_full(particles, traj, uvec, yvec, tvec, ancestors, noise)
 
-    def measure(self, particles, y, t):
+    def measure_full(self, particles, traj, uvec, yvec, tvec, ancestors):
         """ Return the log-pdf value of the measurement """
         self.cnt_measure += len(particles)
-        return self.model.measure(particles, y, t)
+        return self.model.measure_full(particles, traj, uvec, yvec, tvec, ancestors)
 
     def copy_ind(self, particles, new_ind=None):
         return self.model.copy_ind(particles, new_ind)
@@ -84,14 +84,14 @@ class Instrumenter(object):
         self.cnt_pdfxn += max(len(particles), len(next_part))
         return self.model.logp_xnext(particles, next_part, u, t)
 
-    def logp_xnext_max(self, particles, u, t):
+    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, cur_ind):
         """ Return the log-pdf value for the possible future state 'next' given input u """
-        self.cnt_pdfxnmax += len(particles)
-        return self.model.logp_xnext_max(particles, u, t)
+        self.cnt_pdfxnmax += len(ptraj[-1].pa.part)
+        return self.model.logp_xnext_max_full(ptraj, uvec, yvec, tvec, cur_ind)
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        return self.model.sample_smooth(particles, future_trajs, ut, yt, tt)
+        return self.model.sample_smooth(part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind)
 
     def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
         """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
@@ -108,9 +108,9 @@ class Instrumenter(object):
         return self.model.logp_proposal(prop_part, partp, up, tp,
                                         ut, yt, tt, future_trajs)
 
-    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
-        self.cnt_pdfxn += max(len(particles), future_trajs.shape[1])
-        return self.model.logp_xnext_full(particles, future_trajs, ut, yt, tt)
+    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
+        self.cnt_pdfxn += max(len(ancestors), future_trajs.shape[1])
+        return self.model.logp_xnext_full(past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.cnt_eval1st += len(particles)
