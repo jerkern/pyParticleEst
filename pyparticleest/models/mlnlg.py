@@ -1177,6 +1177,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         return lpx
 
+#def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
     def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
         """
         Return the log-pdf value for the entire future trajectory.
@@ -1206,7 +1207,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         lpx = numpy.empty(N)
         # (_, zl, Pl) = self.get_states(particles)
 
-        (logZ, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0],
+        (logZ, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0].part,
                                                 ut[0], tt[0])
         (eta, L) = self.calc_prop3(particles, Omega, Lambda, ut[0], tt[0])
 
@@ -1216,7 +1217,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         return lpx
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Calculate statistics needed when evaluating the logp_xnext_full for
         the marginalized trajectory
@@ -1233,13 +1234,13 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         Returns:
          (array-like) with first dimension = N
         """
-        M = len(particles)
+        M = len(part)
         lxi = self.lxi
         lz = self.kf.lz
 
         if (future_trajs != None):
-            (_, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0],
-                                                 ut[0], tt[0])
+            (_, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].part,
+                                                 ut[cur_ind], tt[cur_ind])
 
         OHind = lxi
         OHlen = lz * lz
@@ -1248,9 +1249,9 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         LHind = lxi + OHlen
         res = numpy.zeros((M, lxi + OHlen + LHlen))
 
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=yt[0], t=tt[0])
+        (_, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=part, y=yt[cur_ind], t=tt[cur_ind])
 
-        res[:, :lxi] = particles[:, :lxi]
+        res[:, :lxi] = part[:, :lxi]
 
         if (future_trajs != None):
             for j in range(M):
@@ -1261,8 +1262,8 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
             if (Cz != None and Cz[j] != None):
                 tmp = numpy.linalg.solve(Rz[j], Cz[j])
                 res[j, OHind:OHind + OHlen] += (Cz[j].T.dot(tmp)).ravel()
-            if (yt != None and yt[0] != None):
-                res[j, LHind:] += (tmp.T.dot(numpy.asarray(yt[0]).reshape((-1, 1)) -
+            if (yt != None and yt[cur_ind] != None):
+                res[j, LHind:] += (tmp.T.dot(numpy.asarray(yt[cur_ind]).reshape((-1, 1)) -
                                              hz[j])).ravel()
 
         return res

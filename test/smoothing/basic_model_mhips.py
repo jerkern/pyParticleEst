@@ -51,7 +51,7 @@ if __name__ == '__main__':
     plt.plot(range(steps + 1), sim.get_smoothed_estimates()[:, :, 0], 'g.')
     plt.ion()
     plt.show()
-    time.sleep(5)
+    #time.sleep(5)
     for _ in xrange(30):
 
         plt.clf()
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         plt.plot(range(1, steps + 1), y, 'bx')
         plt.plot(range(steps + 1), sim.get_smoothed_estimates()[:, :, 0], 'g.')
         plt.draw()
-        sim.straj.perform_mhips_pass(None)
+        sim.straj.traj = sim.straj.perform_mhips_pass(None, reduced=True)
         time.sleep(1)
 
     plt.ioff()

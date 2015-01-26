@@ -109,7 +109,7 @@ class Instrumenter(object):
                                         ut, yt, tt, future_trajs)
 
     def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
-        self.cnt_pdfxn += max(len(ancestors), future_trajs.shape[1])
+        self.cnt_pdfxn += max(len(ancestors), len(find))
         return self.model.logp_xnext_full(past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind)
 
     def eval_1st_stage_weights(self, particles, u, y, t):

@@ -563,7 +563,7 @@ class ParticleTrajectory(object):
             self.uvec = numpy.empty(1, dtype=utype)
             self.yvec = numpy.empty(1, dtype=ytype)
             self.tvec = numpy.empty(1, dtype=numpy.float)
-            self.T = 1
+            self.T = 0
         self.tvec[0] = t0
         self.ind = -1
         if (filter.lower() == 'pf'):
@@ -598,6 +598,13 @@ class ParticleTrajectory(object):
         Returns:
          (bool) True if the particle approximation was resampled
         """
+
+        if (len(self.traj) == 0):
+            self.ind = 0
+            particles = self.pf.create_initial_estimate(self.N)
+            pa = ParticleApproximation(particles=particles)
+            self.traj.append(TrajectoryStep(pa, ancestors=numpy.arange(self.N)))
+
         if (self.ind + 1 >= self.T):
             ushape = numpy.asarray(self.uvec.shape)
             ushape[0] = self.ind + 2
@@ -609,12 +616,6 @@ class ParticleTrajectory(object):
             tshape[0] = self.ind + 2
             self.tvec.resize(tshape)
             self.T = self.ind + 2
-
-        if (len(self.traj) == 0):
-            self.ind += 1
-            particles = self.pf.create_initial_estimate(self.N)
-            pa = ParticleApproximation(particles=particles)
-            self.traj.append(TrajectoryStep(pa, ancestors=numpy.arange(self.N)))
 
         ind = self.ind
         self.uvec[ind] = u
@@ -672,7 +673,7 @@ class ParticleTrajectory(object):
             self.traj.append(TrajectoryStep(pa, ancestors=ancestors))
         else:
             if (len(self.traj) == 0):
-                self.ind += 1
+                self.ind = 0
                 particles = self.pf.create_initial_estimate(self.N)
                 pa = ParticleApproximation(particles=particles)
                 ancestors = numpy.arange(self.N, dtype=int)
@@ -719,7 +720,9 @@ class ParticleTrajectory(object):
             # Calculate coefficients needed for rejection sampling in the backward smoothing
             coeffs = numpy.empty(len(self.traj), dtype=float)
             for k in range(len(self.traj)):
-                coeffs[k] = self.pf.model.logp_xnext_max_full(ptraj=self.traj[:k + 1],
+                coeffs[k] = self.pf.model.logp_xnext_max_full(part=self.traj[k].pa.part,
+                                                              past_trajs=self.traj[:k],
+                                                              pind=self.traj[k].ancestors,
                                                               uvec=self.uvec,
                                                               yvec=self.tvec,
                                                               tvec=self.tvec,
