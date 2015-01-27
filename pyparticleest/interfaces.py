@@ -18,6 +18,7 @@ class ParticleFilteringNonMarkov():
         pass
 
     @abc.abstractmethod
+    # TODO: yt should be included here
     def sample_process_noise_full(self, ptraj, ancestors, ut, tt):
         """
         Sample process noise
@@ -309,7 +310,7 @@ class SampleProposer(object):
     """
     __metaclass__ = abc.ABCMeta
     @abc.abstractmethod
-    def propose_smooth(self, ptraj, anc, future_trajs, yt, ut, tt, cur_ind):
+    def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
         Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
 
@@ -329,7 +330,7 @@ class SampleProposer(object):
         pass
 
     @abc.abstractmethod
-    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, yt, ut, tt, cur_ind):
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
         Eval the log-propability of the proposal distribution
 

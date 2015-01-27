@@ -286,7 +286,7 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
 
         return lpx
 
-    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
+    def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
         Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
 
@@ -304,15 +304,15 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
          future_trajs (one of which may be 'None' at the start/end of the dataset)
         """
         # Trivial choice of q, discard y_T and x_{t+1}
-        if (partp != None):
-            noise = self.sample_process_noise(partp, up, tp)
-            prop_part = numpy.copy(partp)
-            prop_part = self.update(prop_part, up, tp, noise)
+        if (ptraj != None):
+            prop_part = numpy.copy(ptraj[-1].pa.part[anc])
+            noise = self.sample_process_noise(prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
+            prop_part = self.update(prop_part, ut[cur_ind - 1], tt[cur_ind - 1], noise)
         else:
-            prop_part = self.create_initial_estimate(future_trajs.shape[1])
+            prop_part = self.create_initial_estimate(len(find))
         return prop_part
 
-    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
         Eval the log-propability of the proposal distribution
 
@@ -331,10 +331,11 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
          (array-like) with first dimension = N,
          log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
         """
-        if (partp != None):
-            return self.logp_xnext(partp, prop_part, up, tp)
+        if (ptraj != None):
+            return self.logp_xnext(ptraj[-1].pa.part[anc], prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
         else:
             return self.eval_logp_x0(prop_part, t=tt[0])
+
 
     def set_params(self, params):
         """

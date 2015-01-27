@@ -236,7 +236,7 @@ class SmoothTrajectory(object):
                 # Recover filtering statistics for linear states
                 if hasattr(self.model, 'pre_mhips_pass'):
                     self.traj = self.model.pre_mhips_pass(self)
-                self.traj = self.perform_mhips_pass_reduced(options=options, reduced=reduced)
+                self.traj = self.perform_mhips_pass(options=options, reduced=reduced)
 
             if hasattr(self.model, 'post_smoothing'):
                 self.traj = self.model.post_smoothing(self)
@@ -270,17 +270,17 @@ class SmoothTrajectory(object):
     def calculate_ancestors(self, pt, ind):
         T = len(pt)
         M = len(ind)
-        ancestors = pt[-1].ancestors[ind]
+        ancestors = pt[T - 1].ancestors[ind]
         find = numpy.arange(M, dtype=int)
-        last_part = self.model.sample_smooth(part=pt[-1].pa.part[ind],
-                                             ptraj=pt[:-1], anc=ancestors,
+        last_part = self.model.sample_smooth(part=pt[T - 1].pa.part[ind],
+                                             ptraj=pt[:(T - 1)], anc=ancestors,
                                              future_trajs=None, find=None,
                                              ut=self.u, yt=self.y,
                                              tt=self.t, cur_ind=T - 1)
 
 
         traj = numpy.empty((len(pt),), dtype=object)
-        traj[-1] = TrajectoryStep(ParticleApproximation(last_part),
+        traj[T - 1] = TrajectoryStep(ParticleApproximation(last_part),
                                        numpy.arange(M, dtype=int))
 
         for t in reversed(xrange(T - 1)):
@@ -296,7 +296,8 @@ class SmoothTrajectory(object):
                                                           ut=self.u,
                                                           yt=self.y,
                                                           tt=self.t,
-                                                          cur_ind=t)))
+                                                          cur_ind=t)),
+                                     ancestors=find)
         return traj
 
     def perform_ancestors_int(self, pt, M):
@@ -516,11 +517,6 @@ class SmoothTrajectory(object):
          - options (None): Unused
         """
 
-        if (reduced):
-            mc = mc_step_red
-        else:
-            mc = mc_step
-
         T = len(self.traj)
         # Handle last time-step seperately
         ut = self.u
@@ -528,8 +524,19 @@ class SmoothTrajectory(object):
         tt = self.t
         pind = numpy.arange(self.M, dtype=numpy.int)
 
-        tmp = numpy.copy(self.model.sample_smooth(part=self.traj[T - 1].pa.part,
-                                                  ptraj=self.traj[:(T - 1)],
+        straj = numpy.empty((T,), dtype=object)
+        pt = self.traj[:T - 1]
+        (part, _acc) = mc_step(model=self.model,
+                              pa=self.traj[-1].pa,
+                              ptraj=pt,
+                              pind_prop=pind,
+                              pind_curr=pind,
+                              future_trajs=None, find=pind,
+                              ut=ut, yt=yt, tt=tt, cur_ind=T - 1,
+                              reduced=reduced)
+
+        tmp = numpy.copy(self.model.sample_smooth(part=part,
+                                                  ptraj=pt,
                                                   anc=pind,
                                                   future_trajs=None,
                                                   find=pind,
@@ -538,52 +545,20 @@ class SmoothTrajectory(object):
                                                   tt=tt,
                                                   cur_ind=T - 1))
 
-        straj = numpy.empty((T,), dtype=object)
         straj[T - 1] = TrajectoryStep(ParticleApproximation(tmp))
-
-        (prop, acc) = mc(model=self.model,
-                         pa=self.traj[-1].pa,
-                         ptraj=self.traj[:-1],
-                         pind_prop=pind,
-                         pind_curr=pind,
-                         future_trajs=None, find=pind,
-                         ut=ut, yt=yt, tt=tt, cur_ind=T - 1)
-
-        tmp = numpy.copy(self.model.sample_smooth(part=prop[acc],
-                                                  ptraj=self.traj[:-1],
-                                                  anc=pind[acc],
-                                                  future_trajs=None,
-                                                  find=pind[acc],
-                                                  ut=ut,
-                                                  yt=yt,
-                                                  tt=tt,
-                                                  cur_ind=T - 1))
-
-        straj[T - 1].pa.part[acc] = tmp
 
 
         for i in reversed(xrange(1, (T - 1))):
-
-            tmp = numpy.copy(self.model.sample_smooth(part=self.traj[i].pa.part,
-                                                  ptraj=self.traj[:i],
-                                                  anc=pind,
-                                                  future_trajs=straj[i + 1:],
-                                                  find=pind,
-                                                  ut=ut,
-                                                  yt=yt,
-                                                  tt=tt,
-                                                  cur_ind=i))
-
-            straj[i] = TrajectoryStep(ParticleApproximation(tmp))
-
-            (prop, acc) = mc(model=self.model,
-                             pa=self.traj[i].pa,
-                             ptraj=self.traj[:i],
-                             pind_prop=pind,
-                             pind_curr=pind,
-                             future_trajs=straj[(i + 1):], find=pind,
-                             ut=ut, yt=yt, tt=tt, cur_ind=i,
-                             )
+            ft = straj[(i + 1):]
+            pt = self.traj[:i]
+            (part, _acc) = mc_step(model=self.model,
+                                   pa=self.traj[i].pa,
+                                   ptraj=pt,
+                                   pind_prop=pind,
+                                   pind_curr=pind,
+                                   future_trajs=ft, find=pind,
+                                   ut=ut, yt=yt, tt=tt, cur_ind=i,
+                                   reduced=reduced)
 
             # The data dimension is not necessarily the same, since self.traj
             # contains data that has been processed by "post_smoothing".
@@ -592,58 +567,48 @@ class SmoothTrajectory(object):
             # model class should extend "pre_mhips_pass" to allocate a larger
             # array
             #self.traj[i].pa.part[acc] = prop[acc]
-            tmp = self.model.sample_smooth(part=prop[acc],
-                                           ptraj=self.traj[:i],
-                                           anc=pind[acc],
-                                           future_trajs=straj[(i + 1):],
-                                           find=pind[acc],
+            tmp = self.model.sample_smooth(part=part,
+                                           ptraj=pt,
+                                           anc=pind,
+                                           future_trajs=ft,
+                                           find=pind,
                                            ut=ut,
                                            yt=yt,
                                            tt=tt,
                                            cur_ind=i)
 
-            straj[i].pa.part[acc] = tmp
+            straj[i] = TrajectoryStep(ParticleApproximation(tmp))
 
-        # Handle last timestep seperately
-        tmp = numpy.copy(self.model.sample_smooth(part=self.traj[0].pa.part,
-                                                  ptraj=None,
-                                                  anc=pind,
-                                                  future_trajs=straj[1:],
-                                                  find=pind,
-                                                  ut=ut,
-                                                  yt=yt,
-                                                  tt=tt,
-                                                  cur_ind=0))
 
-        straj[0] = TrajectoryStep(ParticleApproximation(tmp))
+        ft = straj[1:]
 
-        (prop, acc) = mc(model=self.model,
-                         pa=self.traj[0].pa,
-                         ptraj=None,
-                         pind_prop=None,
-                         pind_curr=None,
-                         future_trajs=straj[1:],
-                         find=pind,
-                         ut=ut, yt=yt, tt=tt, cur_ind=i,
-                         )
+        (part, _acc) = mc_step(model=self.model,
+                               pa=self.traj[0].pa,
+                               ptraj=None,
+                               pind_prop=None,
+                               pind_curr=None,
+                               future_trajs=ft,
+                               find=pind,
+                               ut=ut, yt=yt, tt=tt, cur_ind=0,
+                               reduced=reduced)
 
-        tmp = self.model.sample_smooth(prop[acc],
+        tmp = self.model.sample_smooth(part,
                                        ptraj=None,
                                        anc=pind,
-                                       future_trajs=straj[1:],
+                                       future_trajs=ft,
                                        find=pind,
                                        ut=ut,
                                        yt=yt,
                                        tt=tt,
                                        cur_ind=0)
 
-        straj[0].pa.part[acc] = tmp
+        straj[0] = TrajectoryStep(ParticleApproximation(tmp))
 
         return straj
 
 
-#def bsi_full(ptraj, model, future_trajs, ut, yt, tt, cur_ind):
-def mc_step(model, ptraj, curpart, anc_cur, anc_prop, future_trajs, yt, ut, tt, cur_ind):
+def mc_step(model, pa, ptraj, pind_prop, pind_curr, future_trajs, find,
+            ut, yt, tt, cur_ind, reduced):
     """
     Perform a single iteration of the MCMC sampler used for MHIPS and MHBP
 
@@ -659,138 +624,72 @@ def mc_step(model, ptraj, curpart, anc_cur, anc_prop, future_trajs, yt, ut, tt, 
      - tt (array-like): timestamp at time t
      - future_trajs (array-like): particle approximations of {x_{t+1:T|T}}
     """
-    M = len(anc_prop)
+    if (reduced):
+        if (ptraj != None):
+            noise = model.sample_process_noise_full(ptraj=ptraj,
+                                                    ancestors=pind_prop,
+                                                    ut=ut[:cur_ind],
+                                                    tt=tt[:cur_ind])
 
-    xprop = model.propose_smooth(ptraj=ptraj,
-                                 anc=anc_prop,
-                                 future_trajs=future_trajs,
-                                 yt=yt,
-                                 ut=ut,
-                                 tt=tt,
-                                 cur_ind=cur_ind
-                                 )
+            xprop = numpy.copy(ptraj[-1].pa.part[pind_prop])
 
-    # Accept/reject new sample
-    logp_q_prop = model.logp_proposal(xprop,
-                                      ptraj=ptraj,
-                                      anc=anc_prop,
-                                      future_trajs=future_trajs,
-                                      yt=yt,
-                                      ut=ut,
-                                      tt=tt,
-                                      cur_ind=cur_ind)
-    logp_q_curr = model.logp_proposal(curpart,
-                                      ptraj=ptraj,
-                                      anc=anc_cur,
-                                      future_trajs=future_trajs,
-                                      yt=yt,
-                                      ut=ut,
-                                      tt=tt,
-                                      cur_ind=cur_ind)
+            model.update_full(particles=xprop, traj=ptraj,
+                              uvec=ut[:cur_ind], yvec=yt[:cur_ind],
+                              tvec=tt[:cur_ind],
+                              ancestors=pind_prop, noise=noise)
+        else:
+            xprop = model.create_initial_estimate(len(future_trajs[0].pa.part))
 
-    if (len(ptraj) > 0):
-        find = numpy.arange(M, dtype=int)
-        # TODO? Single step forward instead?
-        logp_prev_prop = model.logp_xnext_full(past_trajs=ptraj,
-                                               pind=anc_prop,
-                                               future_trajs=xprop[numpy.newaxis],
-                                               find=find,
-                                               yt=yt,
-                                               ut=ut,
-                                               tt=tt,
-                                               cur_ind=cur_ind)
-        logp_prev_prop = model.logp_xnext_full(past_trajs=ptraj,
-                                               pind=anc_cur,
-                                               future_trajs=curpart[numpy.newaxis],
-                                               find=find,
-                                               yt=yt,
-                                               ut=ut,
-                                               tt=tt,
-                                               cur_ind=cur_ind)
+        # Drawing from p(x_{t+1}|x_t), so these will be identical
+        logp_prev_prop = 0.0
+        logp_prev_curr = 0.0
+        logp_q_prop = 0.0
+        logp_q_curr = 0.0
     else:
-        logp_prev_prop = numpy.zeros(M)
-        logp_prev_curr = numpy.zeros(M)
+        xprop = model.propose_smooth(ptraj=ptraj,
+                                     anc=pind_prop,
+                                     future_trajs=future_trajs,
+                                     find=find,
+                                     yt=yt,
+                                     ut=ut,
+                                     tt=tt,
+                                     cur_ind=cur_ind)
+
+        # Accept/reject new sample
+        logp_q_prop = model.logp_proposal(prop_part=xprop,
+                                          ptraj=ptraj,
+                                          anc=pind_prop,
+                                          future_trajs=future_trajs,
+                                          find=find,
+                                          yt=yt,
+                                          ut=ut,
+                                          tt=tt,
+                                          cur_ind=cur_ind)
+        logp_q_curr = model.logp_proposal(prop_part=pa.part,
+                                          ptraj=ptraj,
+                                          anc=pind_curr,
+                                          future_trajs=future_trajs,
+                                          find=find,
+                                          yt=yt,
+                                          ut=ut,
+                                          tt=tt,
+                                          cur_ind=cur_ind)
+
+        if (ptraj != None):
+            logp_prev_prop = model.logp_xnext(particles=ptraj[-1].pa.part[pind_prop],
+                                              next_part=xprop,
+                                              u=ut[cur_ind - 1],
+                                              t=tt[cur_ind - 1])
+            logp_prev_curr = model.logp_xnext(particles=ptraj[-1].pa.part[pind_curr],
+                                              next_part=pa.part,
+                                              u=ut[cur_ind - 1],
+                                              t=tt[cur_ind - 1])
+        else:
+            logp_prev_prop = model.eval_logp_x0(xprop, tt[0])
+            logp_prev_curr = model.eval_logp_x0(pa.part, tt[0])
 
     xpropy = numpy.copy(xprop)
-    curparty = numpy.copy(curpart)
-    if (yt != None and yt[0] != None):
-        logp_y_prop = model.measure(particles=xpropy,
-                                    y=yt[cur_ind], t=tt[cur_ind])
-
-        logp_y_curr = model.measure(particles=curparty,
-                                    y=yt[cur_ind], t=tt[cur_ind])
-    else:
-        logp_y_prop = numpy.zeros(M)
-        logp_y_curr = numpy.zeros(M)
-
-    if (future_trajs != None):
-        logp_next_prop = model.logp_xnext_full(particles=xpropy,
-                                               future_trajs=future_trajs,
-                                               ut=ut,
-                                               yt=yt,
-                                               tt=tt)
-        logp_next_curr = model.logp_xnext_full(particles=curparty,
-                                               future_trajs=future_trajs,
-                                               ut=ut,
-                                               yt=yt,
-                                               tt=tt)
-    else:
-        logp_next_prop = numpy.zeros(M)
-        logp_next_curr = numpy.zeros(M)
-
-
-    # Calc ratio
-    ratio = ((logp_prev_prop - logp_prev_curr) +
-             (logp_y_prop - logp_y_curr) +
-             (logp_next_prop - logp_next_curr) +
-             (logp_q_curr - logp_q_prop))
-
-    test = numpy.log(numpy.random.uniform(size=M))
-    acc = test < ratio
-    return (xpropy, acc)
-
-
-def mc_step_red(model, pa, ptraj, pind_prop, pind_curr, future_trajs, find, ut, yt, tt,
-                cur_ind):
-    """
-    Perform a single iteration of the MCMC sampler used for MHIPS and MHBP
-
-    Args:
-     - model: model definition
-     - partp_prop (array-like): proposed previous particle
-     - partp_prop (array-like): current previous particle
-     - up (array-like): input at time t-1
-     - tp (array-like): timestamp at time t-1
-     - curpart: current accepted paricle
-     - yt (array-like): measurement at time t
-     - ut (array-like): input at time t
-     - tt (array-like): timestamp at time t
-     - future_trajs (array-like): particle approximations of {x_{t+1:T|T}}
-    """
-
-
-    if (ptraj != None):
-        M = len(pind_prop)
-
-        noise = model.sample_process_noise_full(ptraj=ptraj,
-                                                ancestors=pind_prop,
-                                                ut=ut[:cur_ind],
-                                                tt=tt[:cur_ind])
-
-        xprop = numpy.copy(pa.part[pind_prop])
-
-        model.update_full(particles=xprop, traj=ptraj,
-                          uvec=ut[:cur_ind], yvec=yt[:cur_ind],
-                          tvec=tt[:cur_ind],
-                          ancestors=pind_prop, noise=noise)
-    else:
-        M = len(future_trajs[0].pa.part)
-        xprop = model.create_initial_estimate(M)
-
-
-
-    xpropy = numpy.copy(xprop)
-    # TODO: Doesn't ptraj store particles updated with the new measurements=
+    # TODO: Doesn't ptraj store particles updated with the new measurements?
     curparty = numpy.copy(pa.part)
     if (yt[cur_ind] != None):
         logp_y_prop = model.measure_full(particles=xpropy, traj=ptraj,
@@ -801,11 +700,10 @@ def mc_step_red(model, pa, ptraj, pind_prop, pind_curr, future_trajs, find, ut, 
                                          uvec=ut[:cur_ind + 1], yvec=yt[:(cur_ind + 1)],
                                          tvec=tt[:cur_ind + 1], ancestors=pind_curr)
     else:
-        logp_y_prop = numpy.zeros(M)
-        logp_y_curr = numpy.zeros(M)
+        logp_y_prop = 0.0
+        logp_y_curr = 0.0
 
     if (future_trajs != None):
-#logp_xnext_full(self, part, past_trajs, pind, future_trajs, find, ut, yt, tt, cur_ind):
         logp_next_prop = model.logp_xnext_full(part=xpropy,
                                                past_trajs=ptraj,
                                                pind=pind_prop,
@@ -825,14 +723,17 @@ def mc_step_red(model, pa, ptraj, pind_prop, pind_curr, future_trajs, find, ut, 
                                                tt=tt,
                                                cur_ind=cur_ind)
     else:
-        logp_next_prop = numpy.zeros(M)
-        logp_next_curr = numpy.zeros(M)
+        logp_next_prop = 0.0
+        logp_next_curr = 0.0
 
 
     # Calc ratio
-    ratio = ((logp_y_prop - logp_y_curr) +
-             (logp_next_prop - logp_next_curr))
+    ratio = ((logp_prev_prop - logp_prev_curr) +
+             (logp_y_prop - logp_y_curr) +
+             (logp_next_prop - logp_next_curr) +
+             (logp_q_curr - logp_q_prop))
 
-    test = numpy.log(numpy.random.uniform(size=M))
+    test = numpy.log(numpy.random.uniform(size=len(ratio)))
     acc = test < ratio
-    return (xpropy, acc)
+    curparty[acc] = xpropy[acc]
+    return (curparty, acc)

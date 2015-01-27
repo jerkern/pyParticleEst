@@ -39,6 +39,7 @@ class Instrumenter(object):
         self.cnt_propsmooth = 0
         self.cnt_pdfsmooth = 0
         self.cnt_eval1st = 0
+        self.cnt_eval_logp_x0 = 0
 
     def print_statistics(self):
         print "Modelclass : %s" % type(self.model)
@@ -93,24 +94,25 @@ class Instrumenter(object):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
         return self.model.sample_smooth(part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind)
 
-    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
+    def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
-        if (partp != None):
-            N = len(partp)
+        if (ptraj != None):
+            N = len(anc)
         else:
-            N = future_trajs.shape[1]
+            N = len(find)
         self.cnt_propsmooth += N
-        return self.model.propose_smooth(partp, up, tp, ut, yt, tt, future_trajs)
+        return self.model.propose_smooth(ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind)
 
-    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
         self.cnt_pdfsmooth += len(prop_part)
-        return self.model.logp_proposal(prop_part, partp, up, tp,
-                                        ut, yt, tt, future_trajs)
+        return self.model.logp_proposal(prop_part, ptraj, anc,
+                                        future_trajs, find,
+                                        yt, ut, tt, cur_ind)
 
-    def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
-        self.cnt_pdfxn += max(len(ancestors), len(find))
-        return self.model.logp_xnext_full(past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind)
+    def logp_xnext_full(self, part, past_trajs, pind, future_trajs, find, ut, yt, tt, cur_ind):
+        self.cnt_pdfxn += max(len(part), len(find))
+        return self.model.logp_xnext_full(part, past_trajs, pind, future_trajs, find, ut, yt, tt, cur_ind)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.cnt_eval1st += len(particles)
@@ -121,3 +123,7 @@ class Instrumenter(object):
 
     def post_smoothing(self, st):
         return self.model.post_smoothing(st)
+
+    def eval_logp_x0(self, particles, t):
+        self.cnt_eval_logp_x0 += len(particles)
+        return self.model.eval_logp_x0(particles, t)
