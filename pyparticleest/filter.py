@@ -179,6 +179,7 @@ class FFPropY(object):
         """
         Forward the estimate stored in pa from t to t+1 using the motion model
         with input u at time time and measurement y at time t+1
+        cur_ind is at time t
 
         Args:
          - pa (ParticleApproximation): approximation for time t
@@ -203,15 +204,19 @@ class FFPropY(object):
             ancestors = numpy.arange(pa.num, dtype=int)
 
         partn = self.model.propose_from_y(len(pa.part), y=yvec[-1], t=tvec[-1])
-        find = numpy.asarray(range(self.N))
-        future_trajs = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
-                                                anc=ancestors, future_trajs=None,
-                                                find=find,
-                                                ut=uvec, yt=yvec, tt=tvec,
-                                                cur_ind=cur_ind)
-        wn = self.model.logp_xnext_full(past_trajs=traj,
-                                        ancestors=ancestors,
-                                        future_trajs=future_trajs[numpy.newaxis],
+        find = numpy.arange(self.N, dtype=int)
+
+        fpart = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
+                                         anc=ancestors, future_trajs=None,
+                                         find=find,
+                                         ut=uvec, yt=yvec, tt=tvec,
+                                         cur_ind=cur_ind)
+        future_trajs = numpy.array((TrajectoryStep(ParticleApproximation(fpart)),), dtype=object)
+
+        wn = self.model.logp_xnext_full(part=traj[cur_ind].pa.part[ancestors],
+                                        past_trajs=traj[:cur_ind],
+                                        pind=traj[cur_ind].ancestors[ancestors],
+                                        future_trajs=future_trajs,
                                         find=find,
                                         ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
         pa.part = partn
@@ -454,9 +459,14 @@ class CPFYAS(CPFAS):
         #select ancestor for conditional trajectory
         pind = numpy.arange(self.N, dtype=numpy.int)
         find = numpy.zeros((self.N,), dtype=numpy.int)
-        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[cur_ind + 1][numpy.newaxis],
+
+        wtrans = self.model.logp_xnext_full(traj[cur_ind].pa.part[pind], traj[:cur_ind],
+                                            traj[cur_ind].ancestors[pind],
+                                            # Single future timestep
+                                            self.ctraj[cur_ind + 1:cur_ind + 2],
                                             find=find, ut=uvec,
                                             yt=yvec, tt=tvec, cur_ind=cur_ind)
+
         wanc = wtrans + traj[cur_ind].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)
@@ -466,23 +476,26 @@ class CPFYAS(CPFAS):
         resampled = True
 
         partn = self.model.propose_from_y(self.N, y=yvec[cur_ind + 1], t=tvec[cur_ind + 1])
-        partn[-1] = self.ctraj[cur_ind + 1, 0]
+        partn[-1] = self.ctraj[cur_ind + 1].pa.part
 
         find = numpy.asarray(range(self.N))
 
-        future_trajs = self.model.sample_smooth(part=partn, ptraj=traj,
-                                                anc=ancestors, future_trajs=None,
-                                                find=None,
-                                                ut=uvec, yt=yvec, tt=tvec,
-                                                cur_ind=cur_ind + 1)
-        wn = self.model.logp_xnext_full(traj, ancestors, future_trajs[numpy.newaxis],
-                                        find=find, ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
-
+        fpart = self.model.sample_smooth(part=partn, ptraj=traj,
+                                         anc=ancestors, future_trajs=None,
+                                         find=None,
+                                         ut=uvec, yt=yvec, tt=tvec,
+                                         cur_ind=cur_ind + 1)
+        future_trajs = numpy.array((TrajectoryStep(ParticleApproximation(fpart)),), dtype=object)
+        wn = self.model.logp_xnext_full(part=traj[-1].pa.part[ancestors],
+                                        past_trajs=traj[:cur_ind],
+                                        pind=traj[cur_ind].ancestors[ancestors],
+                                        future_trajs=future_trajs,
+                                        find=find, ut=uvec, yt=yvec, tt=tvec,
+                                        cur_ind=cur_ind)
         m = numpy.max(wn)
         wn -= m
         pa = ParticleApproximation(partn, wn)
         pa.w_offset += m
-
         return (pa, resampled, ancestors)
 
     def measure(self, traj, ancestors, pa, uvec, yvec, tvec, cur_ind, inplace=True):
@@ -503,7 +516,7 @@ class CPFYAS(CPFAS):
 
         assert(not inplace)
         part = self.model.propose_from_y(self.N, y=yvec[cur_ind], t=tvec[cur_ind])
-        part[-1] = self.ctraj[cur_ind]
+        part[-1] = self.ctraj[cur_ind].pa.part
         pa = ParticleApproximation(part)
         return pa
 
@@ -564,6 +577,8 @@ class ParticleTrajectory(object):
             self.yvec = numpy.empty(1, dtype=ytype)
             self.tvec = numpy.empty(1, dtype=numpy.float)
             self.T = 0
+        #TODO, this isn't correctly used in the code, assumed = 0
+        assert(t0 == 0)
         self.tvec[0] = t0
         self.ind = -1
         if (filter.lower() == 'pf'):
@@ -656,7 +671,6 @@ class ParticleTrajectory(object):
             self.T = self.ind + 2
 
         if (self.using_pfy):
-
             self.ind += 1
             self.yvec[self.ind] = y
             self.tvec[self.ind] = self.ind

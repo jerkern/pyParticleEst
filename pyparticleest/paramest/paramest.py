@@ -230,7 +230,18 @@ class ParamEstimationPSAEM(Simulator):
             self.simulate(num_part, 1, filter=filter, filter_options=filter_options,
                           smoother='ancestor', meas_first=meas_first)
 
-            newtrajs = self.straj.calculate_ancestors(self.pt, ind)
+            tmp = self.straj.calculate_ancestors(self.pt, ind)
+
+            T = len(tmp)
+            N = tmp[0].pa.part.shape[0]
+            D = tmp[0].pa.part.shape[1]
+
+            newtrajs = numpy.empty((T, N, D))
+
+            for t in xrange(T):
+                newtrajs[t] = tmp[t].pa.part
+
+
             w = numpy.exp(self.pt.traj[-1].pa.w)
             w = numpy.copy(w / numpy.sum(w))
 
