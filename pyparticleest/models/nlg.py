@@ -135,11 +135,11 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
         Q = self.calc_Q(particles=particles, u=u, t=t)
         noise = numpy.random.normal(size=(self.lxi, N))
         if (Q == None):
-            noise = self.Qcholtri.dot(noise)
+            noise = self.Qcholtri.T.dot(noise)
         else:
             for i in xrange(N):
                 Qchol = numpy.triu(scipy.linalg.cho_factor(Q[i], check_finite=False)[0])
-                noise[:, i] = Qchol.dot(noise[:, i])
+                noise[:, i] = Qchol.T.dot(noise[:, i])
 
         return noise.T
 
@@ -178,13 +178,17 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
         Returns:
          (array-like) with first dimension = N, logp(y|x^i)
         """
-        g = self.calc_g(particles=particles, t=t)
-        R = self.calc_R(particles=particles, t=t)
         N = len(particles)
         lpy = numpy.empty(N)
+        g = self.calc_g(particles=particles, t=t)
+        R = self.calc_R(particles=particles, t=t)
+
         if (g == None):
-            g = numpy.repeat(self.g, N, 0)
-        diff = y - g
+            g = numpy.repeat(self.g.reshape((1, -1, 1)), N, 0)
+        else:
+            g = g.reshape((N, -1, 1))
+        yrep = numpy.repeat(numpy.asarray(y).reshape((1, -1, 1)), N, 0)
+        diff = yrep - g
         if (R == None):
             if (self.Rcholtri.shape[0] == 1):
                 lpy = kalman.lognormpdf_scalar(diff, self.Rcholtri)
