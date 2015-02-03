@@ -318,7 +318,16 @@ class ParamEstimationPSAEM2(Simulator):
                           smoother=smoother, smoother_options=smoother_options,
                           meas_first=meas_first)
 
-            newtrajs = numpy.copy(self.straj.traj)
+            tmp = numpy.copy(self.straj.traj)
+            T = len(tmp)
+            N = tmp[0].pa.part.shape[0]
+            D = tmp[0].pa.part.shape[1]
+
+            newtrajs = numpy.empty((T, N, D))
+
+            for t in xrange(T):
+                newtrajs[t] = tmp[t].pa.part
+
             w = 1.0
 
             alpha = alpha_gen(i)

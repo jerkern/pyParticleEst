@@ -118,6 +118,16 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
 
         self.lxi = lxi
 
+    def set_Q(self, Q):
+        self.Qchol = scipy.linalg.cho_factor(Q)
+        self.Qcholtri = numpy.triu(self.Qchol[0])
+        ld = numpy.sum(numpy.log(numpy.diag(self.Qchol[0]))) * 2
+        self.logpdfmax = -0.5 * (self.lxi * math.log(2 * math.pi) + ld)
+
+    def set_R(self, R):
+        self.Rchol = scipy.linalg.cho_factor(R)
+        self.Rcholtri = numpy.triu(self.Rchol[0])
+
     def sample_process_noise(self, particles, u, t):
         """
         Sample process noise

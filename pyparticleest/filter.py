@@ -274,7 +274,7 @@ class CPF(ParticleFilter):
 
     def create_initial_estimate(self, N):
         part = self.model.create_initial_estimate(N)
-        part[-1] = self.ctraj[0]
+        part[-1] = self.ctraj[0].pa.part[0]
         return part
 
     def forward(self, traj, yvec, uvec, tvec, cur_ind):
@@ -354,8 +354,12 @@ class CPFAS(CPF):
         #select ancestor for conditional trajectory
         pind = numpy.asarray(range(N), dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
-        wtrans = self.model.logp_xnext_full(traj, pind, self.ctraj[cur_ind + 1][numpy.newaxis],
-                                            find=find, ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
+        wtrans = self.model.logp_xnext_full(traj[cur_ind].pa.part[pind], traj[:cur_ind],
+                                            traj[cur_ind].ancestors[pind],
+                                            # Single future timestep
+                                            self.ctraj[cur_ind + 1:cur_ind + 2],
+                                            find=find, ut=uvec,
+                                            yt=yvec, tt=tvec, cur_ind=cur_ind)
         wanc = wtrans + traj[-1].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)
@@ -371,7 +375,7 @@ class CPFAS(CPF):
 
         pa = self.update(traj=traj, ancestors=ancestors, uvec=uvec, yvec=yvec,
                          tvec=tvec, cur_ind=cur_ind, pa=pa, inplace=True)
-        pa.part[-1] = self.ctraj[cur_ind + 1]
+        pa.part[-1] = self.ctraj[cur_ind + 1].pa.part[0]
 
         if (yvec != None and yvec[cur_ind + 1] != None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, uvec=uvec,
@@ -622,7 +626,7 @@ class ParticleTrajectory(object):
 
         if (self.ind + 1 >= self.T):
             ushape = numpy.asarray(self.uvec.shape)
-            ushape[0] = self.ind + 2
+            ushape[0] = self.ind + 1
             self.uvec.resize(ushape)
             yshape = numpy.asarray(self.yvec.shape)
             yshape[0] = self.ind + 2
