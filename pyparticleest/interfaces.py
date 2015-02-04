@@ -187,6 +187,10 @@ class FFBSiNonMarkov(object):
     def logp_xnext_full(self, part, past_trajs, pind, future_trajs, find, ut, yt, tt, cur_ind):
         pass
 
+    @abc.abstractmethod
+    def logp_xnext_singlestep(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        pass
+
 class FFProposeFromMeasure(FFBSiNonMarkov):
     __metaclass__ = abc.ABCMeta
 
@@ -230,6 +234,33 @@ class FFBSi(FFBSiNonMarkov):
 
         # Default implemenation for markovian models, just look at the next state
         return self.logp_xnext(particles=part, next_part=future_trajs[0].pa.part[find],
+                               u=ut[cur_ind], t=tt[cur_ind])
+
+    def logp_xnext_singlestep(self, part, past_trajs, pind,
+                              future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Return the log-pdf value for the entire future trajectory.
+        Useful for non-markovian modeles, that result from e.g
+        marginalized state-space models.
+
+        Default implemention just calls logp_xnext which is enough for
+        Markovian models
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - ut (array-like): input signals for {t:T}
+         - yt (array-like): measurements for {t:T}
+         - tt (array-like): time stamps for {t:T}
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
+        """
+
+        # Default implemenation for markovian models, just look at the next state
+        return self.logp_xnext(particles=part, next_part=future_parts[find],
                                u=ut[cur_ind], t=tt[cur_ind])
 
     @abc.abstractmethod

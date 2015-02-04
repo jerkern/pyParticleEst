@@ -130,9 +130,18 @@ class Instrumenter(object):
                                         future_trajs, find,
                                         yt, ut, tt, cur_ind)
 
-    def logp_xnext_full(self, part, past_trajs, pind, future_trajs, find, ut, yt, tt, cur_ind):
+    def logp_xnext_full(self, part, past_trajs, pind, future_trajs, find,
+                        ut, yt, tt, cur_ind):
         self.oc.cnt_pdfxn += max(len(part), len(find))
-        return self.model.logp_xnext_full(part, past_trajs, pind, future_trajs, find, ut, yt, tt, cur_ind)
+        return self.model.logp_xnext_full(part, past_trajs, pind, future_trajs,
+                                          find, ut, yt, tt, cur_ind)
+
+    def logp_xnext_singlestep(self, part, past_trajs, pind,
+                              future_parts, find, ut, yt, tt, cur_ind):
+        self.oc.cnt_pdfxn += max(len(part), len(find))
+        return self.model.logp_xnext_singlestep(part, past_trajs, pind,
+                                                future_parts, find,
+                                                ut, yt, tt, cur_ind)
 
     def eval_1st_stage_weights(self, particles, u, y, t):
         self.oc.cnt_eval1st += len(particles)

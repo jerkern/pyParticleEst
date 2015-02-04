@@ -206,19 +206,12 @@ class FFPropY(object):
         partn = self.model.propose_from_y(len(pa.part), y=yvec[-1], t=tvec[-1])
         find = numpy.arange(self.N, dtype=int)
 
-        fpart = self.model.sample_smooth(part=partn, ptraj=traj[:cur_ind],
-                                         anc=ancestors, future_trajs=None,
-                                         find=find,
-                                         ut=uvec, yt=yvec, tt=tvec,
-                                         cur_ind=cur_ind)
-        future_trajs = numpy.array((TrajectoryStep(ParticleApproximation(fpart)),), dtype=object)
-
-        wn = self.model.logp_xnext_full(part=traj[cur_ind].pa.part[ancestors],
-                                        past_trajs=traj[:cur_ind],
-                                        pind=traj[cur_ind].ancestors[ancestors],
-                                        future_trajs=future_trajs,
-                                        find=find,
-                                        ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
+        wn = self.model.logp_xnext_singlestep(part=traj[cur_ind].pa.part[ancestors],
+                                              past_trajs=traj[:cur_ind],
+                                              pind=traj[cur_ind].ancestors[ancestors],
+                                              future_parts=partn,
+                                              find=find,
+                                              ut=uvec, yt=yvec, tt=tvec, cur_ind=cur_ind)
         pa.part = partn
         # Try to keep weights from going to -Inf
         m = numpy.max(wn)
@@ -309,7 +302,7 @@ class CPF(ParticleFilter):
 
         pa = self.update(traj=traj, ancestors=ancestors, uvec=uvec, yvec=yvec,
                          tvec=tvec, cur_ind=cur_ind, pa=pa, inplace=True)
-        pa.part[-1] = self.ctraj[cur_ind + 1]
+        pa.part[-1] = self.ctraj[cur_ind + 1].pa.part[0]
 
         if (yvec != None and yvec[cur_ind + 1] != None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, uvec=uvec,
@@ -354,12 +347,15 @@ class CPFAS(CPF):
         #select ancestor for conditional trajectory
         pind = numpy.asarray(range(N), dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
-        wtrans = self.model.logp_xnext_full(traj[cur_ind].pa.part[pind], traj[:cur_ind],
-                                            traj[cur_ind].ancestors[pind],
-                                            # Single future timestep
-                                            self.ctraj[cur_ind + 1:cur_ind + 2],
-                                            find=find, ut=uvec,
-                                            yt=yvec, tt=tvec, cur_ind=cur_ind)
+
+        wtrans = self.model.logp_xnext_singlestep(part=traj[cur_ind].pa.part[pind],
+                                                  past_trajs=traj[:cur_ind],
+                                                  pind=traj[cur_ind].ancestors[pind],
+                                                  # Single future timestep
+                                                  future_parts=self.ctraj[cur_ind + 1].pa.part,
+                                                  find=find,
+                                                  ut=uvec, yt=yvec, tt=tvec,
+                                                  cur_ind=cur_ind)
         wanc = wtrans + traj[-1].pa.w[pind]
         wanc -= numpy.max(wanc)
         tmp = numpy.exp(wanc)
@@ -464,12 +460,14 @@ class CPFYAS(CPFAS):
         pind = numpy.arange(self.N, dtype=numpy.int)
         find = numpy.zeros((self.N,), dtype=numpy.int)
 
-        wtrans = self.model.logp_xnext_full(traj[cur_ind].pa.part[pind], traj[:cur_ind],
-                                            traj[cur_ind].ancestors[pind],
-                                            # Single future timestep
-                                            self.ctraj[cur_ind + 1:cur_ind + 2],
-                                            find=find, ut=uvec,
-                                            yt=yvec, tt=tvec, cur_ind=cur_ind)
+        wtrans = self.model.logp_xnext_singlestep(part=traj[cur_ind].pa.part[pind],
+                                                  past_trajs=traj[:cur_ind],
+                                                  pind=traj[cur_ind].ancestors[pind],
+                                                  # Single future timestep
+                                                  future_parts=self.ctraj[cur_ind + 1].pa.part,
+                                                  find=find,
+                                                  ut=uvec, yt=yvec, tt=tvec,
+                                                  cur_ind=cur_ind)
 
         wanc = wtrans + traj[cur_ind].pa.w[pind]
         wanc -= numpy.max(wanc)
@@ -484,18 +482,13 @@ class CPFYAS(CPFAS):
 
         find = numpy.asarray(range(self.N))
 
-        fpart = self.model.sample_smooth(part=partn, ptraj=traj,
-                                         anc=ancestors, future_trajs=None,
-                                         find=None,
-                                         ut=uvec, yt=yvec, tt=tvec,
-                                         cur_ind=cur_ind + 1)
-        future_trajs = numpy.array((TrajectoryStep(ParticleApproximation(fpart)),), dtype=object)
-        wn = self.model.logp_xnext_full(part=traj[-1].pa.part[ancestors],
-                                        past_trajs=traj[:cur_ind],
-                                        pind=traj[cur_ind].ancestors[ancestors],
-                                        future_trajs=future_trajs,
-                                        find=find, ut=uvec, yt=yvec, tt=tvec,
-                                        cur_ind=cur_ind)
+        wn = self.model.logp_xnext_singlestep(part=traj[-1].pa.part[ancestors],
+                                              past_trajs=traj[:cur_ind],
+                                              pind=traj[cur_ind].ancestors[ancestors],
+                                              future_parts=partn,
+                                              find=find,
+                                              ut=uvec, yt=yvec, tt=tvec,
+                                              cur_ind=cur_ind)
         m = numpy.max(wn)
         wn -= m
         pa = ParticleApproximation(partn, wn)

@@ -410,7 +410,8 @@ class SmoothTrajectory(object):
                                                              ut=ut,
                                                              yt=yt,
                                                              tt=tt,
-                                                             cur_ind=cur_ind)))
+                                                             cur_ind=cur_ind)),
+                                                numpy.arange(M, dtype=int))
 
 #        if hasattr(self.model, 'post_smoothing'):
 #            # Do e.g. constrained smoothing for RBPS models
@@ -544,8 +545,7 @@ class SmoothTrajectory(object):
                                                   yt=yt,
                                                   tt=tt,
                                                   cur_ind=T - 1))
-
-        straj[T - 1] = TrajectoryStep(ParticleApproximation(tmp))
+        straj[T - 1] = TrajectoryStep(ParticleApproximation(tmp), pind)
 
 
         for i in reversed(xrange(1, (T - 1))):
@@ -577,7 +577,7 @@ class SmoothTrajectory(object):
                                            tt=tt,
                                            cur_ind=i)
 
-            straj[i] = TrajectoryStep(ParticleApproximation(tmp))
+            straj[i] = TrajectoryStep(ParticleApproximation(tmp), pind)
 
 
         ft = straj[1:]
@@ -602,7 +602,7 @@ class SmoothTrajectory(object):
                                        tt=tt,
                                        cur_ind=0)
 
-        straj[0] = TrajectoryStep(ParticleApproximation(tmp))
+        straj[0] = TrajectoryStep(ParticleApproximation(tmp), pind)
 
         return straj
 
@@ -676,14 +676,21 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
                                           cur_ind=cur_ind)
 
         if (ptraj != None):
-            logp_prev_prop = model.logp_xnext(particles=ptraj[-1].pa.part[pind_prop],
-                                              next_part=xprop,
-                                              u=ut[cur_ind - 1],
-                                              t=tt[cur_ind - 1])
-            logp_prev_curr = model.logp_xnext(particles=ptraj[-1].pa.part[pind_curr],
-                                              next_part=part,
-                                              u=ut[cur_ind - 1],
-                                              t=tt[cur_ind - 1])
+            logp_prev_prop = model.logp_xnext_singlestep(part=ptraj[-1].pa.part[pind_prop],
+                                                         past_trajs=ptraj[:-1],
+                                                         pind=ptraj[-1].ancestors[pind_prop],
+                                                         future_parts=xprop,
+                                                         find=numpy.arange(len(xprop), dtype=int),
+                                                         ut=ut, yt=yt, tt=tt,
+                                                         cur_ind=cur_ind - 1)
+            logp_prev_curr = model.logp_xnext_singlestep(part=ptraj[-1].pa.part[pind_curr],
+                                                         past_trajs=ptraj[:-1],
+                                                         pind=ptraj[-1].ancestors[pind_curr],
+                                                         future_parts=part,
+                                                         find=numpy.arange(len(part), dtype=int),
+                                                         ut=ut, yt=yt, tt=tt,
+                                                         cur_ind=cur_ind - 1)
+
         else:
             logp_prev_prop = model.eval_logp_x0(xprop, tt[0])
             logp_prev_curr = model.eval_logp_x0(part, tt[0])
