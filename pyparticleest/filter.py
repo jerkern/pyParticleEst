@@ -730,12 +730,12 @@ class ParticleTrajectory(object):
         if (method == 'rs' or method == 'rsas'):
             # Calculate coefficients needed for rejection sampling in the backward smoothing
             coeffs = numpy.empty(len(self.traj), dtype=float)
-            for k in range(len(self.traj)):
+            for k in range(len(self.traj) - 1):
                 coeffs[k] = self.pf.model.logp_xnext_max_full(part=self.traj[k].pa.part,
                                                               past_trajs=self.traj[:k],
                                                               pind=self.traj[k].ancestors,
                                                               uvec=self.uvec,
-                                                              yvec=self.tvec,
+                                                              yvec=self.yvec,
                                                               tvec=self.tvec,
                                                               cur_ind=k)
             options['maxpdf'] = coeffs

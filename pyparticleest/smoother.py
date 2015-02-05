@@ -401,16 +401,16 @@ class SmoothTrajectory(object):
             ancestors = pt[cur_ind].ancestors[ind]
             # Select 'previous' particle
             find = numpy.arange(M, dtype=int)
-            self.traj[cur_ind] = TrajectoryStep(ParticleApproximation(
-                                    self.model.sample_smooth(part=pt[cur_ind].pa.part[ind],
-                                                             ptraj=pt[:cur_ind],
-                                                             anc=ancestors,
-                                                             future_trajs=ft,
-                                                             find=find,
-                                                             ut=ut,
-                                                             yt=yt,
-                                                             tt=tt,
-                                                             cur_ind=cur_ind)),
+            tmp = self.model.sample_smooth(part=pt[cur_ind].pa.part[ind],
+                                           ptraj=pt[:cur_ind],
+                                           anc=ancestors,
+                                           future_trajs=ft,
+                                           find=find,
+                                           ut=ut,
+                                           yt=yt,
+                                           tt=tt,
+                                           cur_ind=cur_ind)
+            self.traj[cur_ind] = TrajectoryStep(ParticleApproximation(tmp),
                                                 numpy.arange(M, dtype=int))
 
 #        if hasattr(self.model, 'post_smoothing'):
