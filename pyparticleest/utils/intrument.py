@@ -105,10 +105,10 @@ class Instrumenter(object):
         self.oc.cnt_pdfxn += max(len(particles), len(next_part))
         return self.model.logp_xnext(particles, next_part, u, t)
 
-    def logp_xnext_max_full(self, ptraj, uvec, yvec, tvec, cur_ind):
+    def logp_xnext_max_full(self, part, past_trajs, pind, uvec, yvec, tvec, cur_ind):
         """ Return the log-pdf value for the possible future state 'next' given input u """
-        self.oc.cnt_pdfxnmax += len(ptraj[-1].pa.part)
-        return self.model.logp_xnext_max_full(ptraj, uvec, yvec, tvec, cur_ind)
+        self.oc.cnt_pdfxnmax += len(part)
+        return self.model.logp_xnext_max_full(part, past_trajs, pind, uvec, yvec, tvec, cur_ind)
 
     def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
