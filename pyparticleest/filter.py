@@ -289,6 +289,74 @@ class SIR(object):
 
         return pa
 
+class CSIRAS(SIR):
+    def __init__(self, model, cond_traj):
+
+        self.ctraj = cond_traj
+        self.model = model
+
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
+        """
+        Forward the estimate stored in pa from t to t+1 using the motion model
+        with input u at time time and measurement y at time t+1
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+
+        Returns (pa, resampled, ancestors)
+         - pa (ParticleApproximation): approximation for time t+1
+         - resampled (bool): were the particles resampled
+         - ancestors (array-like): anecstral indices for particles at time t+1
+        """
+        N = len(traj[-1].pa.part)
+        ancestors = numpy.empty((N,), dtype=int)
+        tmp = numpy.exp(traj[-1].pa.w)
+        tmp /= numpy.sum(tmp)
+        ancestors[:-1] = sample(tmp, N - 1)
+
+        #select ancestor for conditional trajectory
+        pind = numpy.asarray(range(N), dtype=numpy.int)
+        find = numpy.zeros((N,), dtype=numpy.int)
+
+        wtrans = self.model.logp_xnext(particles=traj[cur_ind].pa.part,
+                                       next_part=self.ctraj[cur_ind + 1].pa.part[find],
+                                       u=uvec[cur_ind], t=tvec[cur_ind])
+
+        wanc = wtrans + traj[-1].pa.w[pind]
+        wanc -= numpy.max(wanc)
+        tmp = numpy.exp(wanc)
+        tmp /= numpy.sum(tmp)
+        condind = sample(tmp, 1)
+        ancestors[-1] = condind
+
+        pa = ParticleApproximation(self.model.copy_ind(traj[-1].pa.part,
+                                                       ancestors))
+
+        pnext = self.model.qsample(particles=pa.part, u=uvec[cur_ind],
+                                   y=yvec[cur_ind + 1], t=tvec[cur_ind])
+
+        pnext[-1] = self.ctraj[cur_ind + 1].pa.part[0]
+
+        qw = self.model.logp_q(particles=pa.part, next_part=pnext,
+                               u=uvec[cur_ind], y=yvec[cur_ind + 1],
+                               t=tvec[cur_ind])
+        nw = self.model.logp_xnext(particles=pa.part, next_part=pnext,
+                                   u=uvec[cur_ind], t=tvec[cur_ind])
+
+        yw = self.model.measure(particles=pnext, y=yvec[cur_ind + 1],
+                                     t=tvec[cur_ind + 1])
+
+
+        pa.w = yw + nw - qw
+
+        pa.part[:] = pnext
+        resampled = True
+
+        return (pa, resampled, ancestors)
+
 class FFPropY(object):
     """
     Particle Filter class, creates filter estimates by calling appropriate
@@ -730,6 +798,8 @@ class ParticleTrajectory(object):
             self.pf = CPF(model=model, cond_traj=filter_options['cond_traj'])
         elif (filter.lower() == 'sir'):
             self.pf = SIR(model=model, res=resample)
+        elif (filter.lower() == 'csiras'):
+            self.pf = CSIRAS(model=model, cond_traj=filter_options['cond_traj'])
         else:
             raise ValueError('Bad filter type')
 
