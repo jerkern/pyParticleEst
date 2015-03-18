@@ -152,6 +152,142 @@ class ParticleFilter(object):
 
         return pa
 
+class SIR(object):
+    """
+    Particle Filter class, creates filter estimates by calling appropriate
+    methods in the supplied particle objects and handles resampling when
+    a specified threshold is reach.
+
+    Args:
+     - model (ParticleFiltering): object describing the model to be used
+     - res (float): 0 .. 1 , the ratio of effective number of particles that
+       triggers resampling. 0 disables resampling
+    """
+
+    def __init__(self, model, res=0):
+
+        self.res = res
+        self.model = model
+
+
+    def create_initial_estimate(self, N):
+        return self.model.create_initial_estimate(N)
+
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
+        """
+        Forward the estimate stored in pa from t to t+1 using the motion model
+        with input u=uvec[cur_ind] at time t=tvec[cur_ind] and measurement
+        y=yvec[cur_ind+1] at t=tvec[cur_ind+1]
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+
+        Returns (pa, resampled, ancestors)
+         - pa (ParticleApproximation): approximation for time t+1
+         - resampled (bool): were the particles resampled
+         - ancestors (array-like): anecstral indices for particles at time t+1
+        """
+        pa = ParticleApproximation(traj[-1].pa.part, traj[-1].pa.w)
+
+        resampled = False
+        if (self.res > 0 and pa.calc_Neff() < self.res * pa.num):
+            # Store the ancestor of each resampled particle
+            ancestors = pa.resample(self.model, pa.num)
+            resampled = True
+        else:
+            ancestors = numpy.arange(pa.num, dtype=int)
+
+        pnext = self.model.qsample(particles=pa.part, u=uvec[cur_ind],
+                                   y=yvec[cur_ind + 1], t=tvec[cur_ind])
+
+
+        qw = self.model.logp_q(particles=pa.part, next_part=pnext,
+                               u=uvec[cur_ind], y=yvec[cur_ind + 1],
+                               t=tvec[cur_ind])
+        nw = self.model.logp_xnext(particles=pa.part, next_part=pnext,
+                                   u=uvec[cur_ind], t=tvec[cur_ind])
+
+        yw = self.model.measure(particles=pnext, y=yvec[cur_ind + 1],
+                                     t=tvec[cur_ind + 1])
+
+        new_weights = yw + nw - qw
+
+        # Try to keep weights from going to -Inf
+        m = numpy.max(new_weights)
+        pa.w_offset += m
+        new_weights -= m
+
+        pa.w = pa.w + new_weights
+
+        # Keep the weights from going to -Inf
+        m = numpy.max(pa.w)
+        pa.w_offset += m
+        pa.w -= m
+        pa.part = pnext
+
+        return (pa, resampled, ancestors)
+
+    def update(self, traj, ancestors, uvec, yvec, tvec, cur_ind, pa, inplace=True):
+        """
+        Update particle approximation of x_t to x_{t+1} using u as input.
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - u (array-like): input at time t
+         - t (float): time stamp for time t
+         - inplace (bool): if True the particles are updated then returned,
+           otherwise a new ParticleApproximation is first created
+           leaving the original one intact
+
+        Returns:
+            ParticleApproximation for time t+1
+        """
+
+
+        return pa
+
+
+    def measure(self, traj, ancestors, pa, uvec, yvec, tvec, cur_ind, inplace=True):
+        """
+        Evaluate and update particle approximation using new measurement y
+
+        Args:
+         - pa (ParticleApproximation): approximation for time t
+         - y (array-like): measurement at time t +1
+         - t (float): time stamp for time t
+         - inplace (bool): if True the particles are updated then returned,
+           otherwise a new ParticleApproximation is first created
+           leaving the original one intact
+
+        Returns:
+            ParticleApproximation for time t
+        """
+
+        if (not inplace):
+            pa_out = copy.deepcopy(pa)
+            pa = pa_out
+
+        new_weights = self.model.measure_full(traj=traj, ancestors=ancestors,
+                                              particles=pa.part, uvec=uvec,
+                                              yvec=yvec[:cur_ind + 1],
+                                              tvec=tvec[:cur_ind + 1])
+
+        # Try to keep weights from going to -Inf
+        m = numpy.max(new_weights)
+        pa.w_offset += m
+        new_weights -= m
+
+        pa.w = pa.w + new_weights
+
+        # Keep the weights from going to -Inf
+        m = numpy.max(pa.w)
+        pa.w_offset += m
+        pa.w -= m
+
+        return pa
 
 class FFPropY(object):
     """
@@ -592,6 +728,8 @@ class ParticleTrajectory(object):
             self.pf = CPFAS(model=model, cond_traj=filter_options['cond_traj'])
         elif (filter.lower() == 'cpf'):
             self.pf = CPF(model=model, cond_traj=filter_options['cond_traj'])
+        elif (filter.lower() == 'sir'):
+            self.pf = SIR(model=model, res=resample)
         else:
             raise ValueError('Bad filter type')
 

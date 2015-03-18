@@ -6,6 +6,60 @@ classes of algorithms present in the framework
 import abc
 import numpy
 
+class SIR():
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def measure(self, particles, y, t):
+        pass
+
+    @abc.abstractmethod
+    def qsample(self, particles, u, y, t):
+        pass
+
+    @abc.abstractmethod
+    def logp_q(self, particles, next_part, u, y, t):
+        pass
+
+    @abc.abstractmethod
+    def logp_xnext(self, particles, next_part, u, t):
+        pass
+
+    @abc.abstractmethod
+    def create_initial_estimate(self, N):
+        """Sample particles from initial distribution
+
+        Args:
+         - N (int): Number of particles to sample
+
+        Returns:
+         (array-like) with first dimension = N, model specific representation
+         of all particles """
+        pass
+
+    def copy_ind(self, particles, new_ind=None):
+        """
+        Copy select particles, can be overriden for models that require
+        special handling of the particle representations when copying them
+
+        Args:
+
+         - particles  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - new_ind (array-like): Array of ints, specifying indices to copy
+
+        Returns:
+         (array-like) with first dimension = len(new_ind)
+        """
+        if (new_ind != None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
+
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
+        return numpy.copy(part)
+
+
 class ParticleFilteringNonMarkov():
     __metaclass__ = abc.ABCMeta
 
