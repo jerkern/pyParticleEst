@@ -35,21 +35,24 @@ class Model(interfaces.SIR):
         pnext = numpy.empty_like(particles)
         err = y - particles
         C = numpy.eye(1)
-        Pn = scipy.linalg.inv(scipy.linalg.inv(self.Q) + C.T.dot(scipy.linalg.solve(self.R, C)))
+        P = self.Q
+        S = C.dot(P).dot(C.T) + self.R
+        Pn = P - P.dot(C.T).dot(scipy.linalg.solve(S, C.dot(P)))
         for i in xrange(len(pnext)):
-            m = Pn.dot(C.T.dot(scipy.linalg.solve(self.R, y.reshape((-1, 1)))) +
-                       scipy.linalg.solve(self.Q, particles[i].reshape((-1, 1))))
-            pnext[i] = numpy.random.multivariate_normal(m.ravel(), Pn).ravel()
+            m = particles[i] + P.dot(C.T).dot(scipy.linalg.solve(S, err[i].reshape((-1, 1)))).ravel()
+            pnext[i] = numpy.random.multivariate_normal(m, Pn).ravel()
 
         return pnext
 
     def logp_q(self, particles, next_part, u, y, t):
         logpq = numpy.empty(len(particles), dtype=float)
+        err = y - particles
         C = numpy.eye(1)
-        Pn = scipy.linalg.inv(scipy.linalg.inv(self.Q) + C.T.dot(scipy.linalg.solve(self.R, C)))
+        P = self.Q
+        S = C.dot(P).dot(C.T) + self.R
+        Pn = P - P.dot(C.T).dot(scipy.linalg.solve(S, C.dot(P)))
         for i in xrange(len(logpq)):
-            m = Pn.dot(C.T.dot(scipy.linalg.solve(self.R, y.reshape((-1, 1)))) +
-                       scipy.linalg.solve(self.Q, particles[i].reshape((-1, 1))))
+            m = particles[i] + P.dot(C.T).dot(scipy.linalg.solve(S, err[i].reshape((-1, 1)))).ravel()
             logpq[i] = kalman.lognormpdf(m.reshape((-1, 1)) - next_part[i].reshape((-1, 1)), Pn).ravel()
 
         return logpq
