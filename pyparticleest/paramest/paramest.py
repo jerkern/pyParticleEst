@@ -192,7 +192,8 @@ class ParamEstimationPSAEM(Simulator):
     def maximize(self, param0, num_part, max_iter=1000, tol=0.001,
                  callback=None, callback_sim=None, meas_first=False,
                  filter='cpfas', filter_options=None,
-                 alpha_gen=alpha_gen):
+                 alpha_gen=alpha_gen, discard_eps=0.0, discard_percentile=0,
+                 M=1, smoother='ancestor', raoblackwell=False):
         """
         Find the maximum likelihood estimate of the paremeters using an
         EM-algorihms combined with a gradient search algorithms
@@ -223,29 +224,37 @@ class ParamEstimationPSAEM(Simulator):
         alltrajs = None
         weights = None
 
+        def default_callback(params, Q, cur_iter):
+            if (cur_iter >= max_iter):
+                return True
+
+        if (callback == None):
+            callback = default_callback
+
         ind = numpy.asarray(range(num_part), dtype=numpy.int)
-        for i in xrange(max_iter):
+        i = 0;
+        while (True):
+            i += 1
             self.set_params(params_local)
 
-            self.simulate(num_part, 1, filter=filter, filter_options=filter_options,
-                          smoother='ancestor', meas_first=meas_first)
+            self.simulate(num_part, M, filter=filter, filter_options=filter_options,
+                          smoother=smoother, meas_first=meas_first)
 
-            tmp = self.straj.calculate_ancestors(self.pt, ind)
+            if (raoblackwell == True):
+                tmp = self.straj.calculate_ancestors(self.pt, ind)
+                w = numpy.exp(self.pt.traj[-1].pa.w)
+                w = numpy.copy(w / numpy.sum(w))
+                N = tmp[0].pa.part.shape[0]
+                T = len(tmp)
+                D = tmp[0].pa.part.shape[1]
+                newtrajs = numpy.empty((T, N, D))
 
-            T = len(tmp)
-            N = tmp[0].pa.part.shape[0]
-            D = tmp[0].pa.part.shape[1]
+            else:
+                newtrajs = self.get_smoothed_estimates()
+                N = newtrajs.shape[1]
+                w = numpy.ones((N,)) / float(N)
 
-            newtrajs = numpy.empty((T, N, D))
-
-            for t in xrange(T):
-                newtrajs[t] = tmp[t].pa.part
-
-
-            w = numpy.exp(self.pt.traj[-1].pa.w)
-            w = numpy.copy(w / numpy.sum(w))
-
-            alpha = alpha_gen(i)
+            alpha = alpha_gen(i - 1)
             if (weights == None):
                 weights = w
             else:
@@ -260,13 +269,19 @@ class ParamEstimationPSAEM(Simulator):
             else:
                 alltrajs = numpy.concatenate((alltrajs, newtrajs), axis=1)
 
-            zero_ind = (weights == 0.0)
+            # Discard at max the lowest 'discard_percentile' of the weights
+            tmp = numpy.percentile(weights, discard_percentile)
+            wlow = numpy.max(numpy.hstack((weights[weights < tmp], 0.0)))
+            threshold = min(discard_eps, wlow)
+            zero_ind = (weights <= threshold)
             weights = weights[~zero_ind]
+            # Make sure weights sum to one
+            weights /= numpy.sum(weights)
             alltrajs = alltrajs[:, ~zero_ind]
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback != None):
-                callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i) #, Q=Q)
         return (params_local, -numpy.Inf)
 
 class ParamEstimationPSAEM2(Simulator):
@@ -278,8 +293,9 @@ class ParamEstimationPSAEM2(Simulator):
 
     def maximize(self, param0, num_part, max_iter=1000, tol=0.001,
                  callback=None, callback_sim=None, meas_first=False,
-                 filter='pf', filter_options=None,
-                 smoother='full', smoother_options=None, alpha_gen=alpha_gen):
+                 filter='cpfas', filter_options=None,
+                 smoother='full', smoother_options=None, alpha_gen=alpha_gen,
+                 discard_eps=0.0, discard_percentile=0):
         """
         Find the maximum likelihood estimate of the paremeters using an
         EM-algorihms combined with a gradient search algorithms
@@ -347,16 +363,22 @@ class ParamEstimationPSAEM2(Simulator):
 
             datalen += 1
 
-            zero_ind = (weights[:datalen] == 0.0)
+            # Discard at max the lowest 'discard_percentile' of the weights
+            tmp = numpy.percentile(weights[:datalen], discard_percentile)
+            wlow = numpy.max(numpy.hstack((weights[:datalen][weights[:datalen] < tmp], 0.0)))
+            threshold = min(discard_eps, wlow)
+
+            zero_ind = (weights[:datalen] <= threshold)
             zerolen = numpy.count_nonzero(zero_ind)
             weights[:datalen - zerolen] = weights[:datalen][~zero_ind]
             alltrajs[:, :datalen - zerolen] = alltrajs[:, :datalen][:, ~zero_ind]
             datalen -= zerolen
+            weights[:datalen] /= numpy.sum(weights[:datalen])
             params_local = self.model.maximize_weighted(self.straj, alltrajs[:, :datalen], weights[:datalen])
 #            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, -1:], numpy.asarray((1.0,)))
 
             if (callback != None):
-                callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i + 1) #, Q=Q)
         return (params_local, -numpy.Inf)
 
 class GradPlot():
