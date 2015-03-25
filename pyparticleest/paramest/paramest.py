@@ -281,7 +281,9 @@ class ParamEstimationPSAEM(Simulator):
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback != None):
-                callback(params=params_local, Q=-numpy.Inf, cur_iter=i) #, Q=Q)
+                rval = callback(params=params_local, Q=-numpy.Inf, cur_iter=i)
+                if (rval):
+                    break
         return (params_local, -numpy.Inf)
 
 class ParamEstimationPSAEM2(Simulator):
