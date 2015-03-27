@@ -193,7 +193,7 @@ class ParamEstimationPSAEM(Simulator):
                  callback=None, callback_sim=None, meas_first=False,
                  filter='cpfas', filter_options=None,
                  alpha_gen=alpha_gen, discard_eps=0.0, discard_percentile=0,
-                 M=1, smoother='ancestor', raoblackwell=False):
+                 M=1, smoother='ancestor', raoblackwell=False, max_traj=0):
         """
         Find the maximum likelihood estimate of the paremeters using an
         EM-algorihms combined with a gradient search algorithms
@@ -275,9 +275,14 @@ class ParamEstimationPSAEM(Simulator):
             threshold = min(discard_eps, wlow)
             zero_ind = (weights <= threshold)
             weights = weights[~zero_ind]
+            alltrajs = alltrajs[:, ~zero_ind]
+
+            if (max_traj > 0 and len(weights) > max_traj):
+                weights = weights[-max_traj:]
+                alltrajs = alltrajs[:, -max_traj:]
             # Make sure weights sum to one
             weights /= numpy.sum(weights)
-            alltrajs = alltrajs[:, ~zero_ind]
+
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback != None):
