@@ -92,6 +92,7 @@ if __name__ == '__main__':
     # Plot "smoothed" trajectories to illustrate that the particle filter
     # suffers from degeneracy when considering the full trajectories
     plt.plot(range(steps + 1), svals[:, :, 0], 'b--')
+    plt.plot(range(steps + 1), x, 'r-')
     plt.xlabel('t')
     plt.ylabel('x')
 

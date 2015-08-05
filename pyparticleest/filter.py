@@ -590,7 +590,7 @@ class AuxiliaryParticleFilter(ParticleFilter):
         methods in the supplied particle objects and handles resampling when
         a specified threshold is reach """
 
-    def forward(self, pa, u, y, t):
+    def forward(self, traj, yvec, uvec, tvec, cur_ind):
         """
         Use the first stage weights to try to predict which particles will be in
         regions of high likely hood at time t+1, use this information to resample
@@ -608,11 +608,15 @@ class AuxiliaryParticleFilter(ParticleFilter):
          - ancestors (array-like): anecstral indices for particles at time t+1
         """
 
-        pa = copy.deepcopy(pa)
+        pa = ParticleApproximation(traj[-1].pa.part, traj[-1].pa.w)
+
         resampled = False
 
-        if (y != None):
-            l1w = self.model.eval_1st_stage_weights(pa.part, u, y, t)
+        if (yvec != None and yvec[cur_ind + 1] != None):
+            # TODO Generalize to non-Markovian
+            l1w = self.model.eval_1st_stage_weights(pa.part, uvec[cur_ind],
+                                                    yvec[cur_ind + 1],
+                                                    tvec[cur_ind])
             pa.w += l1w
             pa.w -= numpy.max(pa.w)
 
@@ -623,14 +627,21 @@ class AuxiliaryParticleFilter(ParticleFilter):
         else:
             ancestors = numpy.arange(pa.num, dtype=int)
 
-        pa = self.update(pa, u=u, t=t)
+        pa = self.update(traj=traj, ancestors=ancestors,
+                         uvec=uvec, yvec=yvec,
+                         tvec=tvec, cur_ind=cur_ind,
+                         pa=pa, inplace=True,)
 
-        if (y != None):
-            pa.w += self.model.measure(particles=pa.part, y=y, t=t + 1)
+        if (yvec != None):
+            pa = self.measure(traj=traj, ancestors=ancestors, pa=pa,
+                              #There is no 'u' for last step yet
+                              uvec=uvec, yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
             pa.w -= l1w
             pa.w -= numpy.max(pa.w)
 
         return (pa, resampled, ancestors)
+
+
 
 class CPFYAS(CPFAS):
     def __init__(self, model, N, cond_traj):

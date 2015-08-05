@@ -46,6 +46,17 @@ class Model(interfaces.ParticleFiltering):
             logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1, 1) - y, self.R)
         return logyprob
 
+    def logp_xnext_full(self, part, past_trajs, pind,
+                        future_trajs, find, ut, yt, tt, cur_ind):
+
+        diff = future_trajs[0].pa.part[find] - part
+
+        logpxnext = numpy.empty(len(diff), dtype=float)
+        for k in range(len(logpxnext)):
+            logpxnext[k] = kalman.lognormpdf(diff[k].reshape(-1, 1), numpy.asarray(self.Q).reshape(1, 1))
+        return logpxnext
+
+
 
 if __name__ == '__main__':
     steps = 50
@@ -74,6 +85,7 @@ if __name__ == '__main__':
     # Plot "smoothed" trajectories to illustrate that the particle filter
     # suffers from degeneracy when considering the full trajectories
     plt.plot(range(steps + 1), svals[:, :, 0], 'b--')
+    plt.plot(range(steps + 1), x, 'r-')
     plt.xlabel('t')
     plt.ylabel('x')
 
