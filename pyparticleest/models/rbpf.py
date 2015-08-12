@@ -6,6 +6,8 @@
 
 import abc
 import pyparticleest.interfaces as interfaces
+from pyparticleest.filter import ParticleApproximation, TrajectoryStep
+
 try:
     import pyparticleest.utils.ckalman as kalman
 except ImportError:
@@ -305,41 +307,58 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
          (array-like): Smoothed estimate with sufficient statistics for linear
          states
         """
-        T = st.traj.shape[0]
-        M = st.traj.shape[1]
+        T = len(st.traj)
+        M = len(st.traj[0].pa.part)
 
-        lx = self.lxi + self.kf.lz + self.kf.lz ** 2
+
+        lx_filt = self.lxi + self.kf.lz + self.kf.lz ** 2
         # Allocate extra space for Mz
-        straj = numpy.zeros((T, M, lx + self.kf.lz ** 2))
+        lx = lx_filt + self.kf.lz ** 2
+
+
+        straj = numpy.empty((T,), dtype=object)
 
         # Forward filtering
-        straj[:, :, :lx] = self.pre_mhips_pass(st)
+        ftraj = self.pre_mhips_pass(st)
+
+        particles = numpy.zeros((M, lx))
+        particles[:, :lx_filt] = ftraj[-1].pa.part
+
+        straj[-1] = TrajectoryStep(ParticleApproximation(particles),
+                                      ftraj[-1].ancestors)
 
         # Backward smoothing
         for i in reversed(xrange(T - 1)):
-            (xin, zn, Pn) = self.get_states(straj[i + 1])
-            particles = straj[i]
+            (xin, zn, Pn) = self.get_states(straj[i + 1].pa.part)
+            particles = numpy.zeros((M, lx))
+            particles[:, :lx_filt] = ftraj[i].pa.part
+            straj[i] = TrajectoryStep(ParticleApproximation(particles),
+                                      ftraj[i].ancestors)
+
+            # Condition on future nonlinear state
             self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
             (xi, z, P) = self.get_states(particles)
             (Al, fl, Ql) = self.calc_cond_dynamics(particles, xin, u=st.u[i], t=st.t[i])
+            # Update distribution for linear states
             for j in xrange(M):
-
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
                                               Al[j], fl[j], Ql[j])
-                self.set_states(straj[i, j:j + 1, :], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
-                self.set_Mz(straj[i, j:j + 1, :], Ms[numpy.newaxis])
+                self.set_states(straj[i].pa.part[j:j + 1, :], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
+                self.set_Mz(straj[i].pa.part[j:j + 1, :], Ms[numpy.newaxis])
 
         return straj
 
     def pre_mhips_pass(self, st):
-        T = st.traj.shape[0]
-        M = st.traj.shape[1]
+        T = len(st.traj)
+        M = len(st.traj[0].pa.part)
 
         lx = self.lxi + self.kf.lz + self.kf.lz ** 2
-        straj = numpy.zeros((T, M, lx))
+
+        straj = numpy.empty((T,), dtype=object)
+
         particles = numpy.empty((M, lx))
         #(xil, _zl, _Pl) = self.get_states(particles)
-        xil = straj[0, :, :self.lxi].reshape((M, self.lxi, 1))
+        xil = st.traj[0].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
 
         (z0, P0) = self.get_rb_initial(xil)
         self.set_states(particles, xil, z0, P0)
@@ -347,16 +366,19 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
         for i in xrange(T - 1):
             if (st.y[i] != None):
                 self.measure(particles, y=st.y[i], t=st.t[i])
-            straj[i] = particles
+
+            straj[i] = TrajectoryStep(ParticleApproximation(particles),
+                                      st.traj[i].ancestors)
 
             #(xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
-            xin = st.traj[i + 1, :, :self.lxi].reshape((M, self.lxi, 1))
+            xin = st.traj[i + 1].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
 
         if (st.y[-1] != None):
             self.measure(particles, y=st.y[-1], t=st.t[-1])
 
-        straj[-1] = particles
+        straj[-1] = TrajectoryStep(ParticleApproximation(particles),
+                                   st.traj[-1].ancestors)
         return straj
 
     def set_states(self, particles, xi_list, z_list, P_list):

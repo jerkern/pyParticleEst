@@ -158,6 +158,7 @@ class Simulator():
             mean[t] = numpy.sum((w[t].ravel() * est[t].T).T, 0)
 
         return mean
+
     def get_smoothed_estimates(self):
         """
         Return smoothed estimates (must first have called 'simulate')
@@ -169,16 +170,7 @@ class Simulator():
         N is the number of particles
         D is the dimension of each particle
         """
-        T = len(self.straj.traj)
-        N = self.straj.traj[0].pa.part.shape[0]
-        D = self.straj.traj[0].pa.part.shape[1]
-
-        est = numpy.empty((T, N, D))
-
-        for t in xrange(T):
-            est[t] = self.straj.traj[t].pa.part
-
-        return est
+        return self.straj.get_smoothed_estimates()
 
     def get_smoothed_mean(self):
         """

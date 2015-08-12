@@ -238,9 +238,6 @@ class SmoothTrajectory(object):
                     self.traj = self.model.pre_mhips_pass(self)
                 self.traj = self.perform_mhips_pass(options=options, reduced=reduced)
 
-            if hasattr(self.model, 'post_smoothing'):
-                self.traj = self.model.post_smoothing(self)
-
         elif (method == 'mhbp'):
             if 'R' in options:
                 R = options['R']
@@ -249,6 +246,9 @@ class SmoothTrajectory(object):
             self.perform_mhbp(pt=pt, M=M, R=R)
         else:
             raise ValueError('Unknown smoother: %s' % method)
+
+        if hasattr(self.model, 'post_smoothing'):
+            self.traj = self.model.post_smoothing(self)
 
     def __len__(self):
         return len(self.traj)
@@ -605,6 +605,28 @@ class SmoothTrajectory(object):
         straj[0] = TrajectoryStep(ParticleApproximation(tmp), pind)
 
         return straj
+
+    def get_smoothed_estimates(self):
+        """
+        Return smoothed estimates (must first have called 'simulate')
+
+        Returns:
+         - (T, N, D) array
+
+        T is the length of the dataset,
+        N is the number of particles
+        D is the dimension of each particle
+        """
+        T = len(self.traj)
+        N = self.traj[0].pa.part.shape[0]
+        D = self.traj[0].pa.part.shape[1]
+
+        est = numpy.empty((T, N, D))
+
+        for t in xrange(T):
+            est[t] = self.traj[t].pa.part
+
+        return est
 
 
 def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,

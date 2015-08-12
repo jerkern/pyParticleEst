@@ -477,7 +477,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
         return lpx
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Create sampled estimates for the smoothed trajectory. Allows the update
         representation of the particles used in the forward step to include
@@ -500,19 +500,19 @@ class MixedNLGaussianSampled(RBPSBase):
         Returns:
          (array-like) with first dimension = N
         """
-        M = len(particles)
+        M = len(part)
         res = numpy.zeros((M, self.lxi + self.kf.lz))
-        part = numpy.copy(particles)
+        part = numpy.copy(part)
         (xil, zl, Pl) = self.get_states(part)
 
         if (future_trajs != None):
-            xinl = future_trajs[0, :, :self.lxi].reshape((M, self.lxi, 1))
-            znl = future_trajs[0, :, self.lxi:].reshape((M, self.kf.lz, 1))
+            xinl = future_trajs[0].pa.part[find, :self.lxi].reshape((M, self.lxi, 1))
+            znl = future_trajs[0].pa.part[find, self.lxi:].reshape((M, self.kf.lz, 1))
             #(xinl, znl, _unused) = self.get_states(future_trajs[0])
-            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=ut[0],
-                                                            t=tt[0])
+            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=ut[cur_ind],
+                                                            t=tt[cur_ind])
 
-            self.meas_xi_next(part, xinl, u=ut[0], t=tt[0])
+            self.meas_xi_next(part, xinl, u=ut[cur_ind], t=tt[cur_ind])
 
             (xil, zl, Pl) = self.get_states(part)
 
@@ -1138,47 +1138,9 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
                        tmp.T.dot(numpy.linalg.solve(L[j], tmp)))
         return (eta, L)
 
-    def logp_xnext(self, particles, next_part, u, t):
-        """
-        Return the log-pdf value for the possible future nonlinear state
-        given input u
-
-        Args:
-
-         - particles  (array-like): Model specific representation
-           of all particles, with first dimension = N (number of particles)
-         - next_part (array-like): particle estimate for t+1
-         - u (array-like): input signal
-         - t (float): time stamps
-
-        Returns:
-         (array-like) with first dimension = N, logp(x_{t+1}|x_t^i)
-        """
-
-        # During the backward smoothing the next_part contain sampled
-        # z-variables, the full distrubition for the z_1:T conditioned on xi_1:T
-        # is recovered in the post_smooting step
-
-        N = len(particles)
-        Nn = len(next_part)
-        if (N > 1 and Nn == 1):
-            next_part = numpy.repeat(next_part, N, 0)
-        lpx = numpy.empty(N)
-        (_, _, Pl) = self.get_states(particles)
-        (Axi, _, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
-
-        xp = self.pred_xi(particles, u, t)
-
-        for i in xrange(N):
-            x_next = next_part[i, :self.lxi].reshape((self.lxi, 1))
-            Sigma = Axi[i].dot(Pl[i]).dot(Axi[i].T) + Qxi[i]
-            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
-            lpx[i] = kalman.lognormpdf_cho(x_next - xp[i], Schol)
-
-        return lpx
-
-#def logp_xnext_full(self, past_trajs, ancestors, future_trajs, find, ut, yt, tt, cur_ind):
-    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+    def logp_xnext_full(self, part, past_trajs, pind,
+                        future_trajs, find, ut, yt, tt, cur_ind):
+    #def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
         """
         Return the log-pdf value for the entire future trajectory.
         Useful for non-markovian modeles, that result from e.g
@@ -1200,16 +1162,14 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
          (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
         """
 
-        N = len(particles)
-        Nn = future_trajs.shape[1]
-        if (N > 1 and Nn == 1):
-            future_trajs = numpy.repeat(future_trajs[0:1], N, 1)
+        N = len(part)
+
         lpx = numpy.empty(N)
         # (_, zl, Pl) = self.get_states(particles)
 
-        (logZ, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0].part,
-                                                ut[0], tt[0])
-        (eta, L) = self.calc_prop3(particles, Omega, Lambda, ut[0], tt[0])
+        (logZ, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].pa.part[find],
+                                                ut[cur_ind], tt[cur_ind])
+        (eta, L) = self.calc_prop3(part, Omega, Lambda, ut[cur_ind], tt[cur_ind])
 
         for i in xrange(N):
             lpx[i] = logZ[i] - 0.5 * (numpy.linalg.slogdet(L[i])[1] + eta[i])
@@ -1239,7 +1199,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         lz = self.kf.lz
 
         if (future_trajs != None):
-            (_, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].part,
+            (_, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].pa.part[find],
                                                  ut[cur_ind], tt[cur_ind])
 
         OHind = lxi
