@@ -646,6 +646,18 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
      - tt (array-like): timestamp at time t
      - future_trajs (array-like): particle approximations of {x_{t+1:T|T}}
     """
+    # The previously stored values for part already include the measurment from
+    # cur_ind, we therefore need to recomputed the sufficient statistics
+    # (for Rao-Blackwellized models)
+    if (not ptraj is None):
+        oldpart = numpy.copy(ptraj[-1].pa.part[pind_curr])
+        part = model.cond_predict_single_step(part=oldpart, past_trajs=ptraj[:-1],
+                                              pind=ptraj[-1].ancestors[pind_curr],
+                                              future_parts=part, find=numpy.arange(len(pind_curr)),
+                                              ut=ut, yt=yt, tt=tt, cur_ind=cur_ind - 1)
+    else:
+        part = model.cond_sampled_initial(part, tt[cur_ind])
+
     if (reduced):
         if (ptraj != None):
             noise = model.sample_process_noise_full(ptraj=ptraj,
@@ -718,7 +730,6 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
             logp_prev_curr = model.eval_logp_x0(part, tt[0])
 
     xpropy = numpy.copy(xprop)
-    # TODO: Doesn't ptraj store particles updated with the new measurements?
     curparty = numpy.copy(part)
     if (yt[cur_ind] != None):
         logp_y_prop = model.measure_full(particles=xpropy, traj=ptraj,

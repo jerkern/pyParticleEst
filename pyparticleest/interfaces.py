@@ -293,21 +293,23 @@ class FFBSi(FFBSiNonMarkov):
     def logp_xnext_singlestep(self, part, past_trajs, pind,
                               future_parts, find, ut, yt, tt, cur_ind):
         """
-        Return the log-pdf value for the entire future trajectory.
-        Useful for non-markovian modeles, that result from e.g
-        marginalized state-space models.
-
-        Default implemention just calls logp_xnext which is enough for
-        Markovian models
+        Return the log-pdf value for the first step of the future trajectory.
+        Needed in e.g MHIPS
 
         Args:
 
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
-         - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - past_trajs: Trajectory leading up to current time
+         - pind: Indices relating part to past_trajs
+         - future_parts (array-like): particle estimate for {t+1},
+           stored using 'filtered' particle representation, ie. sample_smooth
+           has not been performed on them
+         - find: Indices relatin part and future_parts
+         - ut (array-like): input signals for {1:T}
+         - yt (array-like): measurements for {1:T}
+         - tt (array-like): time stamps for {1:T}
+         - cur_ind: index for current time
 
         Returns:
          (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
@@ -359,6 +361,30 @@ class FFBSiRSNonMarkov(FFBSiNonMarkov):
          (array-like) with first dimension = N, argmax_{x_{t+1}} logp(x_{t+1}|x_t)
         """
         pass
+
+    def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Propagate states in 'part' conditioned on that the future state is
+        'future_parts'. This is used for e.g. Rao-Blackwellized MHIPS, where
+        we need to propagate forward in time conditioned on the nonlinear state,
+        but we want to recompute the additional data stored, e.g to exclude
+        measurements present in the sufficient statistics for future_parts.
+        """
+
+        # Just return the conditional values, if some others statistics need to
+        # be recomputed this method has to be overriden
+        return future_parts
+
+    def cond_sampled_initial(self, part, t):
+        """
+        Sample from initial distribution conditioned on the states being 'part'
+        This is used for e.g. Rao-Blackwellized MHIPS, where we need to recompute
+        the sufficient statistics without being affected by the intial measurement
+        """
+
+        # Just return the conditional values, if some others statistics need to
+        # be recomputed this method has to be overriden
+        return part
 
 class FFBSiRS(FFBSi):
     """

@@ -477,6 +477,55 @@ class MixedNLGaussianSampled(RBPSBase):
 
         return lpx
 
+    def logp_xnext_singlestep(self, part, past_trajs, pind,
+                              future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Return the log-pdf value for the first step of the future trajectory.
+        Needed in e.g MHIPS
+
+        Args:
+
+         - part  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - past_trajs: Trajectory leading up to current time
+         - pind: Indices relating part to past_trajs
+         - future_parts (array-like): particle estimate for {t+1},
+           stored using 'filtered' particle representation, ie. sample_smooth
+           has not been performed on them
+         - find: Indices relatin part and future_parts
+         - ut (array-like): input signals for {1:T}
+         - yt (array-like): measurements for {1:T}
+         - tt (array-like): time stamps for {1:T}
+         - cur_ind: index for current time
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
+        """
+
+        # This only needs to consider the future nonlinear state
+        # Default implemenation for markovian models, just look at the next state
+        particles = part
+        next_part = future_parts[find]
+        u = ut[cur_ind]
+        t = tt[cur_ind]
+
+        N = len(particles)
+
+        lpx = numpy.empty(N)
+        (_, zl, Pl) = self.get_states(particles)
+
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        N = len(particles)
+
+        for i in xrange(N):
+            x_next = next_part[i, :self.lxi].reshape((self.lxi, 1))
+            xp = fxi[i] + Axi[i].dot(zl[i])
+            Sigma = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
+            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
+            lpx[i] = kalman.lognormpdf_cho(x_next - xp, Schol)
+
+        return lpx
+
     def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Create sampled estimates for the smoothed trajectory. Allows the update
@@ -532,23 +581,62 @@ class MixedNLGaussianSampled(RBPSBase):
             res[j] = numpy.hstack((xi, z))
         return res
 
-    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
-        """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
-        # Trivial choice of q, discard y_T and x_{t+1}
-        if (partp != None):
-            noise = self.sample_process_noise(partp, up, tp)
-            prop_part = numpy.copy(partp)
-            self.update(prop_part, up, tp, noise)
-        else:
-            M = future_trajs.shape[1]
-            prop_part = self.create_initial_estimate(M)
+    def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
+        """
+        Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
 
+        Args:
+         - partp (array-like): particle estimate of t-1
+         - up (array-like): input signal at time t-1
+         - tp (float): time stamp for time t-1
+         - ut (array-like): input signal at time t
+         - yt (array-like): measurement at time t
+         - tt (array-like): time stamps for {t+1:T}
+         - future_trajs (array-like): particle estimate for {t+1:T}
+
+        Returns:
+         (array-like) of dimension N, wher N is the dimension of partp and/or
+         future_trajs (one of which may be 'None' at the start/end of the dataset)
+        """
+        # Trivial choice of q, discard y_T and x_{t+1}
+        if (ptraj != None):
+            prop_part = numpy.copy(ptraj[-1].pa.part[anc])
+            noise = self.sample_process_noise(prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
+            prop_part = self.update(prop_part, ut[cur_ind - 1], tt[cur_ind - 1], noise)
+        else:
+            prop_part = self.create_initial_estimate(len(find))
         return prop_part
 
-    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
-        """ Eval log q(x_t | x_{t-1}, x_{t+1}, y_t) """
-        if (partp != None):
-            return self.logp_xnext(partp, prop_part, up, tp)
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
+        """
+        Eval the log-propability of the proposal distribution
+
+        Args:
+         - prop_part (array-like): Proposed particle estimate, first dimension
+           has length = N
+         - partp (array-like): particle estimate of t-1
+         - up (array-like): input signal at time t-1
+         - tp (float): time stamp for time t-1
+         - ut (array-like): input signal at time t
+         - yt (array-like): measurement at time t
+         - tt (array-like): time stamps for {t+1:T}
+         - future_trajs (array-like): particle estimate for {t+1:T}
+
+        Returns
+         (array-like) with first dimension = N,
+         log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
+        """
+
+
+
+        if (ptraj != None):
+            return self.logp_xnext_singlestep(part=ptraj[-1].pa.part[anc],
+                                              past_trajs=ptraj[:-1],
+                                              pind=ptraj[-1].ancestors[anc],
+                                              future_parts=prop_part,
+                                              find=find,
+                                              ut=ut, yt=yt, tt=tt,
+                                              cur_ind=cur_ind - 1)
         else:
             return self.eval_logp_x0(prop_part, t=tt[0])
 
@@ -990,6 +1078,13 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
         P_list = numpy.repeat(self.Pz0.reshape((1, self.kf.lz, self.kf.lz)), N, 0)
         return (z_list, P_list)
 
+    def cond_sampled_initial(self, part, t):
+        xi = part[:, :self.lxi]
+        (z, P) = self.get_rb_initial(xi)
+        particles = numpy.zeros_like(part)
+        self.set_states(particles, xi, z, P)
+        return particles
+
     def get_rb_initial_grad(self, xi0):
         """
         Default implementation has no dependence on xi, override if needed
@@ -1227,6 +1322,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
                                              hz[j])).ravel()
 
         return res
+
 
 class MixedNLGaussianMarginalizedInitialGaussian(MixedNLGaussianMarginalized,
                                                  MixedNLGaussianSampledInitialGaussian):

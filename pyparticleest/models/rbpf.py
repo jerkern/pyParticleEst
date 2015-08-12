@@ -16,6 +16,7 @@ except ImportError:
 import numpy
 
 
+
 class RBPFBase(interfaces.ParticleFiltering):
     """
     Base class for Rao-Blackwellized models
@@ -248,10 +249,19 @@ class RBPFBase(interfaces.ParticleFiltering):
         Returns:
          (array-like) with first dimension = N, particle estimate at time t+1
         """
+
         # Calc (xi_{t+1} | xi_t, z_t, y_t)
         xin = self.calc_xi_next(particles=particles, u=u, t=t, noise=noise)
         # Calc (z_{t+1} | xi_{t+1}, y_t)
         self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
+        return particles
+
+    def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        xin = future_parts[find, :self.lxi]
+        particles = numpy.copy(part)
+        self.cond_predict(particles=particles, xi_next=xin,
+                          u=ut[cur_ind], t=tt[cur_ind])
+        return particles
 
     def cond_predict(self, particles, xi_next, u, t):
         """

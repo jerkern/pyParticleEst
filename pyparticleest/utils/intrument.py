@@ -156,3 +156,9 @@ class Instrumenter(object):
     def eval_logp_x0(self, particles, t):
         self.oc.cnt_eval_logp_x0 += len(particles)
         return self.model.eval_logp_x0(particles, t)
+
+    def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        return self.model.cond_predict_single_step(part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind)
+
+    def cond_sampled_initial(self, part, t):
+        return self.model.cond_sampled_initial(part, t)
