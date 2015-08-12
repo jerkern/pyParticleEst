@@ -148,6 +148,30 @@ class ParticleFilteringNonMarkov():
         # also when calculating "ancestor trajectories"
         return numpy.copy(part)
 
+    def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Propagate states in 'part' conditioned on that the future state is
+        'future_parts'. This is used for e.g. Rao-Blackwellized MHIPS, where
+        we need to propagate forward in time conditioned on the nonlinear state,
+        but we want to recompute the additional data stored, e.g to exclude
+        measurements present in the sufficient statistics for future_parts.
+        """
+
+        # Just return the conditional values, if some others statistics need to
+        # be recomputed this method has to be overriden
+        return numpy.copy(future_parts)
+
+    def cond_sampled_initial(self, part, t):
+        """
+        Sample from initial distribution conditioned on the states being 'part'
+        This is used for e.g. Rao-Blackwellized MHIPS, where we need to recompute
+        the sufficient statistics without being affected by the intial measurement
+        """
+
+        # Just return the conditional values, if some others statistics need to
+        # be recomputed this method has to be overriden
+        return numpy.copy(part)
+
 
 class ParticleFiltering(ParticleFilteringNonMarkov):
     """
@@ -362,29 +386,6 @@ class FFBSiRSNonMarkov(FFBSiNonMarkov):
         """
         pass
 
-    def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
-        """
-        Propagate states in 'part' conditioned on that the future state is
-        'future_parts'. This is used for e.g. Rao-Blackwellized MHIPS, where
-        we need to propagate forward in time conditioned on the nonlinear state,
-        but we want to recompute the additional data stored, e.g to exclude
-        measurements present in the sufficient statistics for future_parts.
-        """
-
-        # Just return the conditional values, if some others statistics need to
-        # be recomputed this method has to be overriden
-        return future_parts
-
-    def cond_sampled_initial(self, part, t):
-        """
-        Sample from initial distribution conditioned on the states being 'part'
-        This is used for e.g. Rao-Blackwellized MHIPS, where we need to recompute
-        the sufficient statistics without being affected by the intial measurement
-        """
-
-        # Just return the conditional values, if some others statistics need to
-        # be recomputed this method has to be overriden
-        return part
 
 class FFBSiRS(FFBSi):
     """
