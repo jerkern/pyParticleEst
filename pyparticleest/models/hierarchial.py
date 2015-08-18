@@ -135,7 +135,7 @@ class HierarchicalBase(RBPSBase):
 
         return lpxi + lpz
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Sampled linear state conditioned on future_trajs
 
@@ -150,17 +150,17 @@ class HierarchicalBase(RBPSBase):
         Returns:
          (array-like) with first dimension = N
         """
-        M = len(particles)
+        M = len(part)
         res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
         for j in range(M):
-            part = numpy.copy(particles[j:j + 1])
+            partj = numpy.copy(part[j:j + 1])
             (xil, zl, Pl) = self.get_states(part,)
             if (future_trajs is not None):
-                (A, f, Q, _, _, _) = self.get_lin_pred_dynamics_int(part,
-                                                                    ut[0],
-                                                                    tt[0])
+                (A, f, Q, _, _, _) = self.get_lin_pred_dynamics_int(partj,
+                                                                    ut[cur_ind],
+                                                                    tt[cur_ind])
                 # Measure the sampled next state,
-                self.kf.measure_full(future_trajs[0, j, self.lxi:(self.lxi + self.kf.lz)].reshape((-1, 1)),
+                self.kf.measure_full(future_trajs[0].pa.part[find[j], self.lxi:(self.lxi + self.kf.lz)].reshape((-1, 1)),
                                      zl[0], Pl[0], C=A[0], h_k=f[0], R=Q[0])
 
             xi = copy.copy(xil[0]).ravel()
