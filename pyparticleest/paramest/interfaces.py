@@ -243,7 +243,7 @@ class ParamEstBaseNumeric(ParamEstIntFullTraj):
             log_pxnext = self.eval_logp_xnext_fulltraj(straj,
                                                        straj.u,
                                                        straj.t)
-            tmp = self.eval_logp_x0(straj.traj[0],
+            tmp = self.eval_logp_x0(straj.traj[0].pa.part,
                                     straj.t[0])
             log_px0 = numpy.mean(tmp)
 

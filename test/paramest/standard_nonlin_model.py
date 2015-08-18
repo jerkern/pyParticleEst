@@ -23,7 +23,8 @@ def wmean(logw, val):
     w = w / sum(w)
     return numpy.sum(w * val.ravel())
 
-class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
+class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
+            pestint.ParamEstInterface, pestint.ParamEstBaseNumeric):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """
@@ -33,6 +34,7 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
         self.Q = numpy.copy(Q)
         self.R = numpy.copy(R)
         self.logxn_max = kalman.lognormpdf_scalar(numpy.zeros((1,)), self.Q)
+        super(Model, self).__init__()
 
     def create_initial_estimate(self, N):
         return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,))
@@ -58,12 +60,13 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
     def logp_xnext_max(self, particles, u, t):
         return self.logxn_max
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """ Update ev. Rao-Blackwellized states conditioned on "next_part" """
-        return particles.reshape((-1, 1))
+        return part.reshape((-1, 1))
 
     def set_params(self, params):
         """ New set of parameters for which the integral approximation terms will be evaluated"""
+        self.params = numpy.copy(params)
         self.Q = math.exp(params[0]) * numpy.eye(1)
         self.R = math.exp(params[1]) * numpy.eye(1)
 
@@ -81,8 +84,8 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
             return numpy.copy(particles)
 
     def eval_logp_xnext_fulltraj(self, straj, ut, tt):
-        M = straj.traj.shape[1]
-        part = straj.traj
+        part = straj.get_smoothed_estimates()
+        M = part.shape[1]
         cost = 8.0 * numpy.cos(1.2 * numpy.asarray(tt, dtype=float))
         xp = 0.5 * part + 25.0 * part / (1 + part ** 2) + numpy.repeat(cost.reshape(-1, 1, 1), repeats=M, axis=1)
         diff = part[1:] - xp[:-1]
@@ -91,8 +94,9 @@ class Model(interfaces.FFBSiRS, pestint.ParamEstInterface):
 
 
     def eval_logp_y_fulltraj(self, straj, yt, tt):
-        M = straj.traj.shape[1]
-        yp = 0.05 * straj.traj ** 2
+        sest = straj.get_smoothed_estimates()
+        M = sest.shape[1]
+        yp = 0.05 * sest ** 2
         diff = yp - numpy.repeat(numpy.asarray(yt, dtype=float).reshape((-1, 1, 1)),
                                  repeats=M, axis=1)
         return numpy.sum(kalman.lognormpdf_scalar(diff.ravel(), self.R)) / M
