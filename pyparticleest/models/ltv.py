@@ -1,7 +1,7 @@
 """Model definition for base class for Linear Time-varying systems
 @author: Jerker Nordh
 """
-from pyparticleest.interfaces import FFBSi
+from pyparticleest.interfaces import FFBSi, ParticleFiltering
 
 try:
     import pyparticleest.utils.ckalman as kalman
@@ -14,7 +14,7 @@ except ImportError:
 import numpy
 import scipy.linalg
 
-class LTV(FFBSi):
+class LTV(FFBSi, ParticleFiltering):
     """
     Base class for particles of the type linear time varying with additive gaussian noise.
 
@@ -245,7 +245,7 @@ class LTV(FFBSi):
         """
         return None
 
-    def sample_smooth(self, particle, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Update sufficient statistics based on the future states
 
@@ -262,15 +262,15 @@ class LTV(FFBSi):
          (array-like) with first dimension = N
         """
 
-        (zl, Pl) = self.get_states(particle)
-        M = len(particle)
+        (zl, Pl) = self.get_states(part)
+        M = len(part)
         lz = len(self.z0)
         lzP = lz + lz * lz
         res = numpy.empty((M, lz + 2 * lz ** 2))
         for j in xrange(M):
             if (future_trajs is not None):
-                zn = future_trajs[0, j, :lz].reshape((lz, 1))
-                Pn = future_trajs[0, j, lz:lzP].reshape((lz, lz))
+                zn = future_trajs[0].pa.part[j, :lz].reshape((lz, 1))
+                Pn = future_trajs[0].pa.part[j, lz:lzP].reshape((lz, lz))
                 (A, f, Q) = self.get_pred_dynamics(u=ut[0], t=tt[0])
                 self.kf.set_dynamics(A=A, Q=Q, f_k=f)
                 (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A,
