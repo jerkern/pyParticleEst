@@ -184,7 +184,7 @@ if __name__ == '__main__':
                 plt.clf()
                 plt.plot(range(it), params_it[:it], 'b-')
                 plt.plot((0.0, it), (ptrue, ptrue), 'b--')
-                if (Q != None):
+                if (Q is not None):
                     plt.figure(4)
                     plt.plot(range(it), Q_it[:it], 'r-')
                 plt.show()

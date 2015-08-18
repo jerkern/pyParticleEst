@@ -21,7 +21,7 @@ class Simulator():
     """
 
     def __init__(self, model, u, y):
-        if (u != None):
+        if (u is not None):
             self.u = u
         else:
             self.u = [None] * len(y)
@@ -107,7 +107,7 @@ class Simulator():
                 resamplings = resamplings + 1
 
         # Use the filtered estimates above to created smoothed estimates
-        if (smoother != None and num_traj > 0):
+        if (smoother is not None and num_traj > 0):
             self.straj = self.pt.perform_smoothing(num_traj, method=smoother,
                                                    smoother_options=smoother_options)
         return resamplings

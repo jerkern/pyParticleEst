@@ -60,7 +60,7 @@ class Model(interfaces.FFProposeFromMeasure,
 
     def copy_ind(self, particles, new_ind=None):
 
-        if (new_ind != None):
+        if (new_ind is not None):
             return numpy.copy(particles[new_ind])
         else:
             return numpy.copy(particles)

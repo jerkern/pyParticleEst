@@ -72,7 +72,7 @@ class ParamEstInterface(ParamEstIntFullTraj):
         M = straj.traj.shape[1]
         T = straj.traj.shape[0]
         for i in xrange(T):
-            if (yt[i] != None):
+            if (yt[i] is not None):
                 val = self.eval_logp_y(straj.traj[i], yt[i], tt[i])
                 logp_y += numpy.sum(val)
 
@@ -140,7 +140,7 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
         M = straj.traj.shape[1]
         T = len(straj)
         for t in xrange(T):
-            if (straj.y[t] != None):
+            if (straj.y[t] is not None):
                 (val, grad) = self.eval_logp_y_val_grad(straj.traj[t],
                                                         straj.y[t],
                                                         straj.t[t])

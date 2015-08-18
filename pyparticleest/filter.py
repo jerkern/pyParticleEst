@@ -76,7 +76,7 @@ class ParticleFilter(object):
                          uvec=uvec, yvec=yvec,
                          tvec=tvec, cur_ind=cur_ind,
                          pa=pa, inplace=True,)
-        if (yvec != None):
+        if (yvec is not None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa,
                               #There is no 'u' for last step yet
                               uvec=uvec, yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
@@ -508,7 +508,7 @@ class CPF(ParticleFilter):
                          tvec=tvec, cur_ind=cur_ind, pa=pa, inplace=True)
         pa.part[-1] = self.ctraj[cur_ind + 1].pa.part[0]
 
-        if (yvec != None and yvec[cur_ind + 1] != None):
+        if (yvec is not None and yvec[cur_ind + 1] is not None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, uvec=uvec,
                               yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
 
@@ -577,7 +577,7 @@ class CPFAS(CPF):
                          tvec=tvec, cur_ind=cur_ind, pa=pa, inplace=True)
         pa.part[-1] = self.ctraj[cur_ind + 1].pa.part[0]
 
-        if (yvec != None and yvec[cur_ind + 1] != None):
+        if (yvec is not None and yvec[cur_ind + 1] is not None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa, uvec=uvec,
                               yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
 
@@ -612,7 +612,7 @@ class AuxiliaryParticleFilter(ParticleFilter):
 
         resampled = False
 
-        if (yvec != None and yvec[cur_ind + 1] != None):
+        if (yvec is not None and yvec[cur_ind + 1] is not None):
             # TODO Generalize to non-Markovian
             l1w = self.model.eval_1st_stage_weights(pa.part, uvec[cur_ind],
                                                     yvec[cur_ind + 1],
@@ -632,7 +632,7 @@ class AuxiliaryParticleFilter(ParticleFilter):
                          tvec=tvec, cur_ind=cur_ind,
                          pa=pa, inplace=True,)
 
-        if (yvec != None):
+        if (yvec is not None):
             pa = self.measure(traj=traj, ancestors=ancestors, pa=pa,
                               #There is no 'u' for last step yet
                               uvec=uvec, yvec=yvec, tvec=tvec, cur_ind=cur_ind + 1)
@@ -777,9 +777,9 @@ class ParticleTrajectory(object):
 
         self.using_pfy = False
         self.N = N
-        if (T != None):
-            assert(utype != None)
-            assert(ytype != None)
+        if (T is not None):
+            assert(utype is not None)
+            assert(ytype is not None)
             self.uvec = numpy.empty(T, dtype=utype)
             self.yvec = numpy.empty(T, dtype=ytype)
             self.tvec = numpy.asarray(range(T))
@@ -973,7 +973,7 @@ class ParticleTrajectory(object):
         if (method == 'mcmc' or method == 'mhips' or method == 'mhbp'):
             # Default value for number of iterations to run the sampler for
             options['R'] = 30
-        if (smoother_options != None):
+        if (smoother_options is not None):
             options.update(smoother_options)
 
         return SmoothTrajectory(self, M=M, method=method, options=options)
@@ -994,7 +994,7 @@ class ParticleApproximation(object):
 
     """
     def __init__(self, particles=None, logw=None, seed=None, num=None):
-        if (particles != None):
+        if (particles is not None):
             self.part = numpy.copy(numpy.asarray(particles))
             num = len(particles)
         else:
@@ -1002,7 +1002,7 @@ class ParticleApproximation(object):
             for k in range(num):
                 self.part[k] = copy.deepcopy(seed)
 
-        if (logw != None):
+        if (logw is not None):
             self.w = numpy.copy(logw)
         else:
             self.w = -math.log(num) * numpy.ones(num)
@@ -1038,7 +1038,7 @@ class ParticleApproximation(object):
            particles remains the same
         """
 
-        if (N == None):
+        if (N is None):
             N = self.num
 
         # Alwyays keep the largest weight at 0 in logaritmic representation

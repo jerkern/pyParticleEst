@@ -16,7 +16,7 @@ def compute_logprod_derivative(Alup, dA, B, dB):
 
 #def compute_l2_grad_f_slow(N, lenp, dim, out, perr, f_grad, tmp):
 #    diff_l2 = np.zeros((N, lenp, dim, dim))
-#    if (f_grad != None):
+#    if (f_grad is not None):
 #        for i in xrange(N):
 #            for j in xrange(lenp):
 #                tmp = f_grad[i][j].dot(perr[i].T)

@@ -79,7 +79,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianSampledInitialGaussian):
         return (None, None, None)
 
     def get_meas_dynamics(self, particles, y, t):
-        if (y == None):
+        if (y is None):
             return (y, None, None, None)
 
         N = len(particles)

@@ -17,7 +17,7 @@ class GradPlot():
         fig = plt.figure(fig_id)
         fig.clf()
         plt.plot(self.params, self.vals)
-        if (self.diff != None):
+        if (self.diff is not None):
             for k in range(len(self.params)):
                 if (k % 10 == 1):
                     self.draw_gradient(self.params[k], self.vals[k], self.params[k] - self.params[k - 1], self.diff[k])

@@ -659,7 +659,7 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
         part = model.cond_sampled_initial(part, tt[cur_ind])
 
     if (reduced):
-        if (ptraj != None):
+        if (ptraj is not None):
             noise = model.sample_process_noise_full(ptraj=ptraj,
                                                     ancestors=pind_prop,
                                                     ut=ut[:cur_ind],
@@ -709,7 +709,7 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
                                           tt=tt,
                                           cur_ind=cur_ind)
 
-        if (ptraj != None):
+        if (ptraj is not None):
             logp_prev_prop = model.logp_xnext_singlestep(part=ptraj[-1].pa.part[pind_prop],
                                                          past_trajs=ptraj[:-1],
                                                          pind=ptraj[-1].ancestors[pind_prop],
@@ -731,7 +731,7 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
 
     xpropy = numpy.copy(xprop)
     curparty = numpy.copy(part)
-    if (yt[cur_ind] != None):
+    if (yt[cur_ind] is not None):
         logp_y_prop = model.measure_full(particles=xpropy, traj=ptraj,
                                          uvec=ut[:cur_ind + 1], yvec=yt[:(cur_ind + 1)],
                                          tvec=tt[:cur_ind + 1], ancestors=pind_prop)
@@ -743,7 +743,7 @@ def mc_step(model, part, ptraj, pind_prop, pind_curr, future_trajs, find,
         logp_y_prop = 0.0
         logp_y_curr = 0.0
 
-    if (future_trajs != None):
+    if (future_trajs is not None):
         logp_next_prop = model.logp_xnext_full(part=xpropy,
                                                past_trajs=ptraj,
                                                pind=pind_prop,

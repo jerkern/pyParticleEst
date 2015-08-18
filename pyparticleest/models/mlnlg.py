@@ -45,19 +45,19 @@ class MixedNLGaussianSampled(RBPSBase):
     """
     def __init__(self, lxi, lz, Az=None, C=None, Qz=None, R=None, fz=None,
                  Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None):
-        if (Axi != None):
+        if (Axi is not None):
             self.Axi = numpy.copy(Axi)
         else:
             self.Axi = None
-        if (fxi != None):
+        if (fxi is not None):
             self.fxi = numpy.copy(fxi)
         else:
             self.fxi = numpy.zeros((lxi, 1))
-        if (Qxi != None):
+        if (Qxi is not None):
             self.Qxi = numpy.copy(Qxi)
         else:
             self.Qxi = None
-        if (Qxiz != None):
+        if (Qxiz is not None):
             self.Qxiz = numpy.copy(Qxiz)
         else:
             self.Qxiz = None
@@ -92,19 +92,19 @@ class MixedNLGaussianSampled(RBPSBase):
         """
         super(MixedNLGaussianSampled, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, fz=fz, hz=h)
 
-        if (Axi != None):
+        if (Axi is not None):
             self.Axi = numpy.copy(Axi)
-        if (Az != None):
+        if (Az is not None):
             self.Az = numpy.copy(Az)
-        if (Qxi != None):
+        if (Qxi is not None):
             self.Qxi = numpy.copy(Qxi)
-        if (Qxiz != None):
+        if (Qxiz is not None):
             self.Qxiz = numpy.copy(Qxiz)
-        if (Qz != None):
+        if (Qz is not None):
             self.Qz = numpy.copy(self.kf.Q)
-        if (fz != None):
+        if (fz is not None):
             self.fz = numpy.copy(self.kf.f_k)
-        if (fxi != None):
+        if (fxi is not None):
             self.fxi = numpy.copy(fxi)
 
     def sample_process_noise(self, particles, u, t):
@@ -248,9 +248,9 @@ class MixedNLGaussianSampled(RBPSBase):
         (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u, t=t)
 
         Qxiz = self.get_cross_covariance(particles=particles, u=u, t=t)
-        if (Qxiz == None and self.Qxiz == None):
+        if (Qxiz is None and self.Qxiz is None):
             return (Az, fz, Qz)
-        if (Qxiz == None):
+        if (Qxiz is None):
             Qxiz = N * (self.Qxiz,)
 
         (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
@@ -313,7 +313,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
         lyz = numpy.empty(N)
         if (Rz_identical):
-            if (Cz_identical and Cz[0] == None):
+            if (Cz_identical and Cz[0] is None):
                 diff = y - hz
                 dim = Rz[0].shape[0]
                 if (dim == 1):
@@ -374,9 +374,9 @@ class MixedNLGaussianSampled(RBPSBase):
         f_identical = False
         Q_identical = False
 
-        if (Qxiz == None):
+        if (Qxiz is None):
             Qxiz_identical = True
-            if (self.Qxiz == None):
+            if (self.Qxiz is None):
                 Qxiz = N * (numpy.zeros((Qxi[0].shape[0], Qz[0].shape[0])),)
             else:
                 Qxiz = N * (self.Qxiz,)
@@ -554,7 +554,7 @@ class MixedNLGaussianSampled(RBPSBase):
         part = numpy.copy(part)
         (xil, zl, Pl) = self.get_states(part)
 
-        if (future_trajs != None):
+        if (future_trajs is not None):
             xinl = future_trajs[0].pa.part[find, :self.lxi].reshape((M, self.lxi, 1))
             znl = future_trajs[0].pa.part[find, self.lxi:].reshape((M, self.kf.lz, 1))
             #(xinl, znl, _unused) = self.get_states(future_trajs[0])
@@ -599,7 +599,7 @@ class MixedNLGaussianSampled(RBPSBase):
          future_trajs (one of which may be 'None' at the start/end of the dataset)
         """
         # Trivial choice of q, discard y_T and x_{t+1}
-        if (ptraj != None):
+        if (ptraj is not None):
             prop_part = numpy.copy(ptraj[-1].pa.part[anc])
             noise = self.sample_process_noise(prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
             prop_part = self.update(prop_part, ut[cur_ind - 1], tt[cur_ind - 1], noise)
@@ -629,7 +629,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
 
 
-        if (ptraj != None):
+        if (ptraj is not None):
             return self.logp_xnext_singlestep(part=ptraj[-1].pa.part[anc],
                                               past_trajs=ptraj[:-1],
                                               pind=ptraj[-1].ancestors[anc],
@@ -793,10 +793,10 @@ class MixedNLGaussianSampled(RBPSBase):
         diff_l2 = numpy.zeros((N, len(self.params), perr.shape[1], perr.shape[1]), dtype=numpy.double, order='C')
         tmp1 = numpy.zeros((self.lxi + self.kf.lz, self.lxi + self.kf.lz), dtype=numpy.double, order='C')
         tmp2 = numpy.zeros((self.lxi + self.kf.lz, self.kf.lz), dtype=numpy.double, order='C')
-        if (f_grad != None):
+        if (f_grad is not None):
             mlnlg_compute.compute_l2_grad_f(N, len(self.params), self.lxi + self.kf.lz, diff_l2,
                               perr, f_grad, tmp1)
-        if (A_grad != None):
+        if (A_grad is not None):
             mlnlg_compute.compute_l2_grad_A(N, len(self.params), self.lxi + self.kf.lz, diff_l2,
                               perr, self.lxi, Pn, zl, Pl, M, A, A_grad, tmp1, tmp2)
         return (l2, diff_l2)
@@ -862,7 +862,7 @@ class MixedNLGaussianSampled(RBPSBase):
         lpxn_grad = numpy.zeros(self.params.shape)
 
         (A_grad, f_grad, Q_grad) = self.get_pred_dynamics_grad(particles=particles, u=u, t=t)
-        if (A_grad == None and f_grad == None and Q_grad == None):
+        if (A_grad is None and f_grad is None and Q_grad is None):
             lpxn = self.eval_logp_xnext(particles, x_next, u, t)
         else:
 
@@ -875,7 +875,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
             dim = self.lxi + self.kf.lz
 
-            if (Q_grad == None):
+            if (Q_grad is None):
                 Q_grad = N * (numpy.zeros((len(self.params), dim, dim)),)
 
             (l2, l2_grad) = self.calc_l2_grad(xin, zn, Pn, zl, Pl, A, f, Mzl, f_grad, A_grad)
@@ -921,13 +921,13 @@ class MixedNLGaussianSampled(RBPSBase):
             meas_diff = self.kf.measurement_diff(y, zl[i], Cl[i], hl[i])
             l3[i] = meas_diff.dot(meas_diff.T) + Cl[i].dot(Pl[i]).dot(Cl[i].T)
 
-            if (C_grad != None):
+            if (C_grad is not None):
                 C_grad = N * (numpy.zeros((len(self.params), len(y), self.kf.lz)),)
                 for j in xrange(len(self.params)):
                     tmp2 = C_grad[i][j].dot(Pl[i]).dot(Cl[i].T)
                     tmp = C_grad[i][j].dot(zl[i]).dot(meas_diff.T)
                     diff_l3[i][j] += -tmp - tmp.T + tmp2 + tmp2.T
-            if (h_grad != None):
+            if (h_grad is not None):
                 for j in xrange(len(self.params)):
                     tmp = h_grad[i][j].dot(meas_diff.T)
                     diff_l3[i][j] += -tmp - tmp.T
@@ -987,10 +987,10 @@ class MixedNLGaussianSampled(RBPSBase):
         lpy_grad = numpy.zeros(self.params.shape)
         (y, Cz, hz, Rz, _, _, Rz_identical) = self.get_meas_dynamics_int(particles, y, t)
         (C_grad, h_grad, R_grad) = self.get_meas_dynamics_grad(particles=particles, y=y, t=t)
-        if (C_grad == None and h_grad == None and R_grad == None):
+        if (C_grad is None and h_grad is None and R_grad is None):
             logpy = self.eval_logp_y(particles, y, t)
         else:
-            if (R_grad == None):
+            if (R_grad is None):
                 R_grad = N * (numpy.zeros((len(self.params), len(y), len(y))),)
 
             (_xil, zl, Pl) = self.get_states(particles)
@@ -1026,11 +1026,11 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
 
                 # No uncertainty in initial state
         self.xi0 = numpy.copy(xi0).reshape((-1, 1))
-        if (Pxi0 == None):
+        if (Pxi0 is None):
             self.Pxi0 = numpy.zeros((len(self.xi0), len(self.xi0)))
         else:
             self.Pxi0 = numpy.copy((Pxi0))
-        if (Pz0 == None):
+        if (Pz0 is None):
             self.Pz0 = numpy.zeros((len(self.z0), len(self.z0)))
         else:
             self.Pz0 = numpy.copy((Pz0))
@@ -1293,7 +1293,7 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         lxi = self.lxi
         lz = self.kf.lz
 
-        if (future_trajs != None):
+        if (future_trajs is not None):
             (_, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].pa.part[find],
                                                  ut[cur_ind], tt[cur_ind])
 
@@ -1308,16 +1308,16 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         res[:, :lxi] = part[:, :lxi]
 
-        if (future_trajs != None):
+        if (future_trajs is not None):
             for j in range(M):
                 res[j, OHind:OHind + OHlen] = Omega[j].ravel()
                 res[j, LHind:] = Lambda[j].ravel()
 
         for j in range(M):
-            if (Cz != None and Cz[j] != None):
+            if (Cz is not None and Cz[j] is not None):
                 tmp = numpy.linalg.solve(Rz[j], Cz[j])
                 res[j, OHind:OHind + OHlen] += (Cz[j].T.dot(tmp)).ravel()
-            if (yt != None and yt[cur_ind] != None):
+            if (yt is not None and yt[cur_ind] is not None):
                 res[j, LHind:] += (tmp.T.dot(numpy.asarray(yt[cur_ind]).reshape((-1, 1)) -
                                              hz[j])).ravel()
 

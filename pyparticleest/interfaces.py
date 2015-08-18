@@ -51,7 +51,7 @@ class SIR():
         Returns:
          (array-like) with first dimension = len(new_ind)
         """
-        if (new_ind != None):
+        if (new_ind is not None):
             return numpy.copy(particles[new_ind])
         else:
             return numpy.copy(particles)
@@ -114,7 +114,7 @@ class ParticleFilteringNonMarkov():
         Returns:
          (array-like) with first dimension = len(new_ind)
         """
-        if (new_ind != None):
+        if (new_ind is not None):
             return numpy.copy(particles[new_ind])
         else:
             return numpy.copy(particles)

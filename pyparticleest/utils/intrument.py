@@ -116,7 +116,7 @@ class Instrumenter(object):
 
     def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """ Sample from a distrubtion q(x_t | x_{t-1}, x_{t+1}, y_t) """
-        if (ptraj != None):
+        if (ptraj is not None):
             N = len(anc)
         else:
             N = len(find)

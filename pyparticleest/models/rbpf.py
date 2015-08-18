@@ -100,13 +100,13 @@ class RBPFBase(interfaces.ParticleFiltering):
         Qxi_identical = False
         # This is probably not so nice performance-wise, but will
         # work initially to profile where the bottlenecks are.
-        if (Axi == None):
+        if (Axi is None):
             Axi = N * (self.Axi,)
             Axi_identical = True
-        if (fxi == None):
+        if (fxi is None):
             fxi = N * (self.fxi,)
             fxi_identical = True
-        if (Qxi == None):
+        if (Qxi is None):
             Qxi = N * (self.Qxi,)
             Qxi_identical = True
         return (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical)
@@ -155,15 +155,15 @@ class RBPFBase(interfaces.ParticleFiltering):
         Az_identical = False
         fz_identical = False
         Qz_identical = False
-        if (Az == None):
+        if (Az is None):
             # Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
             Az = N * (self.kf.A,)
             Az_identical = True
-        if (fz == None):
+        if (fz is None):
             # fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
             fz = N * (self.kf.f_k,)
             fz_identical = True
-        if (Qz == None):
+        if (Qz is None):
             # Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
             Qz = N * (self.kf.Q,)
             Qz_identical = True
@@ -215,17 +215,17 @@ class RBPFBase(interfaces.ParticleFiltering):
         Cz_identical = False
         hz_identical = False
         Rz_identical = False
-        if (Cz == None):
-            if (self.kf.C == None and hz != None):
+        if (Cz is None):
+            if (self.kf.C is None and hz is not None):
                 Cz = N * (numpy.zeros((len(hz[0]), self.kf.lz)),)
             else:
                 Cz = N * (self.kf.C,)
             # Cz=N*(self.kf.C,)
             Cz_identical = True
-        if (hz == None):
+        if (hz is None):
             hz = N * (self.kf.h_k,)
             hz_identical = True
-        if (Rz == None):
+        if (Rz is None):
             Rz = N * (self.kf.R,)
             Rz_identical = True
         return (y, Cz, hz, Rz, Cz_identical, hz_identical, Rz_identical)
@@ -374,7 +374,7 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
         self.set_states(particles, xil, z0, P0)
 
         for i in xrange(T - 1):
-            if (st.y[i] != None):
+            if (st.y[i] is not None):
                 self.measure(particles, y=st.y[i], t=st.t[i])
 
             straj[i] = TrajectoryStep(ParticleApproximation(particles),
@@ -384,7 +384,7 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
             xin = st.traj[i + 1].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
 
-        if (st.y[-1] != None):
+        if (st.y[-1] is not None):
             self.measure(particles, y=st.y[-1], t=st.t[-1])
 
         straj[-1] = TrajectoryStep(ParticleApproximation(particles),

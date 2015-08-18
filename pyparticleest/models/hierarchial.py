@@ -50,11 +50,11 @@ class HierarchicalBase(RBPSBase):
         (xil, zl, Pl) = self.get_states(particles)
         N = len(particles)
         (y, Cz, hz, Rz) = self.get_lin_meas_dynamics(particles, y, t)
-        if (Cz == None):
+        if (Cz is None):
             Cz = numpy.repeat(self.kf.C[numpy.newaxis, :, :], N, axis=0)
-        if (hz == None):
+        if (hz is None):
             hz = numpy.repeat(self.kf.h_k[numpy.newaxis, :, :], N, axis=0)
-        if (Rz == None):
+        if (Rz is None):
             Rz = numpy.repeat(self.kf.R[numpy.newaxis, :, :], N, axis=0)
 
         lyz = numpy.empty_like(lyxi)
@@ -155,7 +155,7 @@ class HierarchicalBase(RBPSBase):
         for j in range(M):
             part = numpy.copy(particles[j:j + 1])
             (xil, zl, Pl) = self.get_states(part,)
-            if (future_trajs != None):
+            if (future_trajs is not None):
                 (A, f, Q, _, _, _) = self.get_lin_pred_dynamics_int(part,
                                                                     ut[0],
                                                                     tt[0])

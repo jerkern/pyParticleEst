@@ -64,7 +64,7 @@ class ParamEstimation(Simulator):
 
             self.simulate(nump, numt, filter=filter, smoother=smoother,
                           smoother_options=smoother_options, meas_first=meas_first)
-            if (callback_sim != None):
+            if (callback_sim is not None):
                 callback_sim(self)
 
             params_local = self.model.maximize(self.straj)
@@ -76,7 +76,7 @@ class ParamEstimation(Simulator):
             #Q = fval(params_local)
             #Q = -Q
             # Q_grad = -Q_grad
-            if (callback != None):
+            if (callback is not None):
                 callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
 #            if (numpy.abs(Q - Q_old) < tol):
 #                break
@@ -157,15 +157,15 @@ class ParamEstimationSAEM(Simulator):
             w = numpy.ones((numt,)) / numt
             newtrajs = numpy.copy(self.straj.traj)
             alpha = alpha_gen(i)
-            if (weights == None):
+            if (weights is None):
                 weights = w
             else:
                 weights = numpy.concatenate(((1.0 - alpha) * weights, alpha * w))
 
-            if (callback_sim != None):
+            if (callback_sim is not None):
                 callback_sim(self)
 
-            if (alltrajs == None):
+            if (alltrajs is None):
                 alltrajs = numpy.copy(newtrajs)
             else:
                 alltrajs = numpy.concatenate((alltrajs, newtrajs), axis=1)
@@ -175,7 +175,7 @@ class ParamEstimationSAEM(Simulator):
             alltrajs = alltrajs[:, ~zero_ind]
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
-            if (callback != None):
+            if (callback is not None):
                 callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
         return (params_local, -numpy.Inf)
 
@@ -225,7 +225,7 @@ class ParamEstimationPSAEM(Simulator):
             if (cur_iter >= max_iter):
                 return True
 
-        if (callback == None):
+        if (callback is None):
             callback = default_callback
 
         ind = numpy.asarray(range(num_part), dtype=numpy.int)
@@ -252,16 +252,16 @@ class ParamEstimationPSAEM(Simulator):
                 w = numpy.ones((N,)) / float(N)
 
             alpha = alpha_gen(i - 1)
-            if (weights == None):
+            if (weights is None):
                 weights = w
             else:
                 weights = numpy.concatenate(((1.0 - alpha) * weights, alpha * w))
 
             filter_options['cond_traj'] = numpy.copy(self.straj.traj)
-            if (callback_sim != None):
+            if (callback_sim is not None):
                 callback_sim(self)
 
-            if (alltrajs == None):
+            if (alltrajs is None):
                 alltrajs = numpy.copy(newtrajs)
             else:
                 alltrajs = numpy.concatenate((alltrajs, newtrajs), axis=1)
@@ -282,7 +282,7 @@ class ParamEstimationPSAEM(Simulator):
 
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
-            if (callback != None):
+            if (callback is not None):
                 rval = callback(params=params_local, Q=-numpy.Inf, cur_iter=i)
                 if (rval):
                     break
@@ -357,10 +357,10 @@ class ParamEstimationPSAEM2(Simulator):
 #            weights[datalen:datalen + 1] = alpha * w
 
             filter_options['cond_traj'] = numpy.copy(self.straj.traj)
-            if (callback_sim != None):
+            if (callback_sim is not None):
                 callback_sim(self)
 
-            if (alltrajs == None):
+            if (alltrajs is None):
                 alltrajs = numpy.copy(newtrajs)
             else:
                 alltrajs = numpy.concatenate((alltrajs[:, :datalen], newtrajs), axis=1)
@@ -381,7 +381,7 @@ class ParamEstimationPSAEM2(Simulator):
             params_local = self.model.maximize_weighted(self.straj, alltrajs[:, :datalen], weights[:datalen])
 #            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, -1:], numpy.asarray((1.0,)))
 
-            if (callback != None):
+            if (callback is not None):
                 callback(params=params_local, Q=-numpy.Inf, cur_iter=i + 1) #, Q=Q)
         return (params_local, -numpy.Inf)
 
