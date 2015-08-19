@@ -44,7 +44,8 @@ class MixedNLGaussianSampled(RBPSBase):
      - params (array-like): model parameters (if any)
     """
     def __init__(self, lxi, lz, Az=None, C=None, Qz=None, R=None, fz=None,
-                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None):
+                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None,
+                 **kwargs):
         if (Axi is not None):
             self.Axi = numpy.copy(Axi)
         else:
@@ -67,7 +68,7 @@ class MixedNLGaussianSampled(RBPSBase):
         return super(MixedNLGaussianSampled, self).__init__(lz=lz,
                                                      Az=Az, C=C,
                                                      Qz=Qz, R=R,
-                                                     hz=h, fz=fz)
+                                                     hz=h, fz=fz, **kwargs)
 
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Axi=None, fxi=None, Qxi=None, Qxiz=None,

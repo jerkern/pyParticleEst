@@ -46,7 +46,7 @@ class LTV(FFBSi, ParticleFiltering):
                                         A=A, C=C,
                                         Q=Q, R=R,
                                         f_k=f, h_k=h)
-        super(LTV, self).__init__(*kwargs)
+        super(LTV, self).__init__(**kwargs)
 
     def create_initial_estimate(self, N):
         """Sample particles from initial distribution

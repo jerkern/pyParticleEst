@@ -33,11 +33,12 @@ class RBPFBase(interfaces.ParticleFiltering):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, lz, Az=None, fz=None, Qz=None,
-                 C=None , hz=None, R=None):
+                 C=None , hz=None, R=None, **kwargs):
 
         self.kf = kalman.KalmanSmoother(lz, A=Az, C=C,
                                         Q=Qz, R=R,
                                         f_k=fz, h_k=hz)
+        super(RBPFBase, self).__init__(**kwargs)
 
     def set_dynamics(self, Az=None, C=None, Qz=None, R=None, fz=None, hz=None):
         """

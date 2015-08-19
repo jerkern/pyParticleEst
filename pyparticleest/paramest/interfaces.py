@@ -232,7 +232,7 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
 class ParamEstBaseNumeric(ParamEstIntFullTraj):
     def __init__(self, param_bounds=None, **kwargs):
         self.param_bounds = param_bounds
-        super(ParamEstBaseNumeric, self).__init__(*kwargs)
+        super(ParamEstBaseNumeric, self).__init__(**kwargs)
 
     def set_param_bounds(self, bounds):
         self.param_bounds = bounds
@@ -262,7 +262,7 @@ class ParamEstBaseNumeric(ParamEstIntFullTraj):
 class ParamEstBaseNumericGrad(ParamEstInterface_GradientSearchFullTraj):
     def __init__(self, param_bounds=None, **kwargs):
         self.param_bounds = param_bounds
-        super(ParamEstBaseNumericGrad, self).__init__(*kwargs)
+        super(ParamEstBaseNumericGrad, self).__init__(**kwargs)
 
     def set_param_bounds(self, bounds):
         self.param_bounds = bounds
