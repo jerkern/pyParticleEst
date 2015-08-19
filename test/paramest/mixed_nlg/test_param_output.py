@@ -4,8 +4,10 @@ import numpy
 import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
 import pyparticleest.paramest.paramest as param_est
+import pyparticleest.paramest.interfaces as pestinf
+import pyparticleest.paramest.gradienttest as gradienttest
 
-gradient_test = True
+gradient_test = False
 
 x0 = numpy.array([[1.0, ], [1.0, ]])
 P0 = numpy.eye(2)
@@ -36,7 +38,9 @@ def generate_reference(uvec, steps, c_true):
     return (u, y, x)
 
 
-class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian):
+class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian,
+                          pestinf.ParamEstBaseNumericGrad,
+                          pestinf.ParamEstInterface_GradientSearch):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """
@@ -99,7 +103,7 @@ if __name__ == '__main__':
         # numpy.random.seed(1)
         model = ParticleParamOutput((theta_true,))
         (u, y, x) = generate_reference(uvec, steps, theta_true)
-        gt = param_est.GradientTest(model, u=u, y=y)
+        gt = gradienttest.GradientTest(model, u=u, y=y)
         gt.set_params(numpy.array((theta_true,)))
         gt.simulate(num, nums)
         param_steps = 101
@@ -112,11 +116,12 @@ if __name__ == '__main__':
         plt.plot(range(steps + 1), x[:, 1], 'b-')
 
 
+        sest = gt.straj.get_smoothed_estimates()
         for j in xrange(nums):
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 0], 'g--')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1], 'k--')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1] - numpy.sqrt(gt.straj.traj[:, j, 2]), 'k-.')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1] + numpy.sqrt(gt.straj.traj[:, j, 2]), 'k-.')
+            plt.plot(range(steps + 1), sest[:, j, 0], 'g--')
+            plt.plot(range(steps + 1), sest[:, j, 1], 'k--')
+            plt.plot(range(steps + 1), sest[:, j, 1] - numpy.sqrt(sest[:, j, 2]), 'k-.')
+            plt.plot(range(steps + 1), sest[:, j, 1] + numpy.sqrt(sest[:, j, 2]), 'k-.')
 
         plt.show()
 
@@ -182,7 +187,6 @@ if __name__ == '__main__':
                                         num_part=num,
                                         num_traj=nums,
                                         callback=callback,
-                                        analytic_gradient=True,
                                         max_iter=max_iter,
                                         )
             estimate[0, k] = param
@@ -193,11 +197,12 @@ if __name__ == '__main__':
             plt.plot(range(steps + 1), x[:, 1], 'b-')
 
 
+            sest = pe.straj.get_smoothed_estimates()
             for j in xrange(nums[-1]):
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 0], 'g--')
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 1], 'k--')
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 1] - numpy.sqrt(pe.straj.traj[:, j, 2]), 'k-.')
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 1] + numpy.sqrt(pe.straj.traj[:, j, 2]), 'k-.')
+                plt.plot(range(steps + 1), sest[:, j, 0], 'g--')
+                plt.plot(range(steps + 1), sest[:, j, 1], 'k--')
+                plt.plot(range(steps + 1), sest[:, j, 1] - numpy.sqrt(sest[:, j, 2]), 'k-.')
+                plt.plot(range(steps + 1), sest[:, j, 1] + numpy.sqrt(sest[:, j, 2]), 'k-.')
 
             plt.show()
 

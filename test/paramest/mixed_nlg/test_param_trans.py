@@ -12,7 +12,7 @@ Q = numpy.diag([ 0.1, 0.1])
 xi0_true = numpy.array([0.0, ])
 z0_true = numpy.array([1.0, ])
 P0 = numpy.eye(1)
-gradient_test = False
+gradient_test = True
 
 def generate_reference(z0, P0, theta_true, steps):
     A = numpy.asarray(((1.0, theta_true), (0.0, 1.0)))
@@ -113,9 +113,8 @@ if __name__ == '__main__':
         plt.plot(range(steps + 1), x[:, 0], 'r-')
         plt.plot(range(steps + 1), x[:, 1], 'b-')
 
-
+        sest = gt.straj.get_smoothed_estimates()
         for j in xrange(nums):
-            sest = gt.straj.get_smoothed_estimates()
             plt.plot(range(steps + 1), sest[:, j, 0], 'g--')
             plt.plot(range(steps + 1), sest[:, j, 1], 'k--')
             plt.plot(range(steps + 1), sest[:, j, 1] - numpy.sqrt(sest[:, j, 2]), 'k-.')
