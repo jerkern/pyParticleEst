@@ -58,22 +58,24 @@ class ParamEstInterface(ParamEstIntFullTraj):
 
     def eval_logp_xnext_fulltraj(self, straj, ut, tt):
         logp_xnext = 0.0
-        M = straj.traj.shape[1]
+        sest = straj.get_smoothed_estimates()
+        M = sest.shape[1]
         T = straj.traj.shape[0]
         for i in xrange(T - 1):
-            val = self.eval_logp_xnext(straj.traj[i],
-                                       straj.traj[i + 1],
+            val = self.eval_logp_xnext(sest[i],
+                                       sest[i + 1],
                                        ut[i], tt[i])
             logp_xnext += numpy.sum(val)
         return logp_xnext / M
 
     def eval_logp_y_fulltraj(self, straj, yt, tt):
         logp_y = 0.0
-        M = straj.traj.shape[1]
+        sest = straj.get_smoothed_estimates()
+        M = sest.shape[1]
         T = straj.traj.shape[0]
         for i in xrange(T):
             if (yt[i] is not None):
-                val = self.eval_logp_y(straj.traj[i], yt[i], tt[i])
+                val = self.eval_logp_y(sest[i], yt[i], tt[i])
                 logp_y += numpy.sum(val)
 
         return logp_y / M
@@ -137,11 +139,12 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
     def eval_logp_y_val_grad_fulltraj(self, straj, yt, tt):
         logp_y_grad = numpy.zeros((len(self.params)))
         logp_y = 0.0
-        M = straj.traj.shape[1]
+        sest = straj.get_smoothed_estimates()
+        M = sest.shape[1]
         T = len(straj)
         for t in xrange(T):
             if (straj.y[t] is not None):
-                (val, grad) = self.eval_logp_y_val_grad(straj.traj[t],
+                (val, grad) = self.eval_logp_y_val_grad(sest[t],
                                                         straj.y[t],
                                                         straj.t[t])
                 logp_y += val
@@ -151,11 +154,12 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
     def eval_logp_xnext_val_grad_fulltraj(self, straj, ut, tt):
         logp_xnext_grad = numpy.zeros((len(self.params)))
         logp_xnext = 0.0
-        M = straj.traj.shape[1]
+        sest = straj.get_smoothed_estimates()
+        M = sest.shape[1]
         T = len(straj)
         for t in xrange(T - 1):
-            (val, grad) = self.eval_logp_xnext_val_grad(straj.traj[t],
-                                                        straj.traj[t + 1],
+            (val, grad) = self.eval_logp_xnext_val_grad(sest[t],
+                                                        sest[t + 1],
                                                         straj.u[t],
                                                         straj.t[t])
             logp_xnext += val
@@ -275,7 +279,7 @@ class ParamEstBaseNumericGrad(ParamEstInterface_GradientSearchFullTraj):
                                                                                    straj.u,
                                                                                    straj.t)
 
-            (tmp1, tmp2) = self.eval_logp_x0_val_grad(straj.traj[0],
+            (tmp1, tmp2) = self.eval_logp_x0_val_grad(straj.traj[0].pa.part,
                                                       straj.t[0])
             (logp_x0, grad_logp_x0) = (numpy.mean(tmp1), numpy.mean(tmp2))
             val = -1.0 * (logp_y + logp_x0 + logp_xnext)

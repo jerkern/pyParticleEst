@@ -37,7 +37,7 @@ class LTV(FFBSi, ParticleFiltering):
     """
 
     def __init__(self, z0, P0, A=None, C=None, Q=None,
-             R=None, f=None, h=None, params=None):
+                 R=None, f=None, h=None, params=None, **kwargs):
         self.z0 = numpy.copy(z0).reshape((-1, 1))
         self.P0 = numpy.copy(P0)
         if (f is None):
@@ -46,6 +46,7 @@ class LTV(FFBSi, ParticleFiltering):
                                         A=A, C=C,
                                         Q=Q, R=R,
                                         f_k=f, h_k=h)
+        super(LTV, self).__init__(*kwargs)
 
     def create_initial_estimate(self, N):
         """Sample particles from initial distribution

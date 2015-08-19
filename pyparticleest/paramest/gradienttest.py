@@ -49,7 +49,7 @@ class GradientTest(ParamEstimation):
             logpxn[k] = self.model.eval_logp_xnext_fulltraj(self.straj,
                                                              self.straj.u,
                                                              self.straj.t)
-            tmp = self.model.eval_logp_x0(self.straj.traj[0],
+            tmp = self.model.eval_logp_x0(self.straj.traj[0].pa.part,
                                           self.straj.t[0])
             logpx0[k] = numpy.mean(tmp)
 
@@ -60,7 +60,7 @@ class GradientTest(ParamEstimation):
                 (_, grad_logp_xnext) = self.model.eval_logp_xnext_val_grad_fulltraj(self.straj,
                                                                                      self.straj.u,
                                                                                      self.straj.t)
-                (tmp1, tmp2) = self.model.eval_logp_x0_val_grad(self.straj.traj[0],
+                (tmp1, tmp2) = self.model.eval_logp_x0_val_grad(self.straj.traj[0].pa.part,
                                                                 self.straj.t[0])
                 (_, grad_logp_x0) = (numpy.mean(tmp1), numpy.mean(tmp2))
 
