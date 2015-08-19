@@ -730,7 +730,7 @@ class MixedNLGaussianSampled(RBPSBase):
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0]))) * 2
             tmp = scipy.linalg.cho_solve(P0cho, l1, check_finite=False)
             lpz0[i] = -0.5 * (ld + numpy.trace(tmp))
-        return lpxi0 + lpz0
+        return (lpxi0 + lpz0)
 
     def eval_logp_x0_val_grad(self, particles, t):
         """
@@ -766,8 +766,8 @@ class MixedNLGaussianSampled(RBPSBase):
                 dl1 = -tmp - tmp.T
                 lpz0_grad[j] -= 0.5 * mlnlg_compute.compute_logprod_derivative(P0cho, P0_grad[i][j], l1, dl1)
 
-        return (lpxi0 + lpz0,
-                lpxi0_grad + lpz0_grad)
+        return ((lpxi0 + lpz0) / N,
+                (lpxi0_grad + lpz0_grad) / N)
 
 
     def calc_l2(self, xin, zn, Pn, zl, Pl, A, f, M):

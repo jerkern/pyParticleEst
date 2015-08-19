@@ -8,6 +8,8 @@ import numpy
 import math
 import matplotlib.pyplot as plt
 import pyparticleest.paramest.paramest as param_est
+import pyparticleest.paramest.interfaces as pestinf
+import pyparticleest.paramest.gradienttest as gradienttest
 import sys
 
 import pyparticleest.models.mlnlg as mlnlg
@@ -60,7 +62,9 @@ def generate_dataset(params, length):
 
     return (y.T.tolist(), e_vec, z_vec)
 
-class ParticleLS2(mlnlg.MixedNLGaussianSampledInitialGaussian):
+class ParticleLS2(mlnlg.MixedNLGaussianSampledInitialGaussian,
+                  pestinf.ParamEstBaseNumericGrad,
+                  pestinf.ParamEstInterface_GradientSearch):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """
@@ -206,7 +210,7 @@ if __name__ == '__main__':
             Q_it = numpy.zeros((max_iter))
             it = 0
 
-            def callback(params, Q):
+            def callback(params, Q, cur_iter):
                 global it
                 params_it[it, :] = params
                 Q_it[it] = Q
@@ -225,7 +229,7 @@ if __name__ == '__main__':
                 plt.plot((0.0, it), (theta_true[4], theta_true[4]), 'k--')
                 plt.show()
                 plt.draw()
-                return
+                return (cur_iter > max_iter)
 
             # Create an array for our particles
             model = ParticleLS2(theta_guess)
@@ -234,8 +238,7 @@ if __name__ == '__main__':
             # ParamEstimator.simulate(num, nums, False)
 
             (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                                 callback=callback, smoother='rsas',
-                                                 analytic_gradient=True, tol=0.0)
+                                                 callback=callback, smoother='rsas', tol=0.0)
 
             svals = numpy.zeros((4, nums, steps + 1))
 
@@ -245,10 +248,12 @@ if __name__ == '__main__':
             fig6 = plt.figure()
 
 
+            sest = ParamEstimator.straj.get_smoothed_estimates()
+
             for i in range(steps + 1):
                 for j in range(nums):
-                    svals[0, j, i] = ParamEstimator.straj.traj[i, j, 0]
-                    svals[1:, j, i] = ParamEstimator.straj.traj[i, j, 1:4]
+                    svals[0, j, i] = sest[i, j, 0]
+                    svals[1:, j, i] = sest[i, j, 1:4]
 
             plt.figure(fig3.number)
             plt.clf()
@@ -349,8 +354,7 @@ if __name__ == '__main__':
             # ParamEstimator.simulate(num, nums, False)
 
             (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
-                                                 callback=None, smoother='rsas',
-                                                 analytic_gradient=True, tol=0.0)
+                                                 callback=None, smoother='rsas', tol=0.0)
 
             print "%.4f %.4f %.4f %.4f %.4f" % tuple(param)
 
@@ -374,7 +378,7 @@ if __name__ == '__main__':
 
         model = ParticleLS2(theta_true)
         # Create an array for our particles
-        gt = param_est.GradientTest(model=model, u=None, y=y)
+        gt = gradienttest.GradientTest(model=model, u=None, y=y)
         gt.set_params(theta_true)
 
         param_id = 4

@@ -44,21 +44,21 @@ class ParamEstimation(Simulator):
 
         params_local = numpy.copy(param0)
         Q = -numpy.Inf
-        for _i in xrange(max_iter):
+        for i in xrange(max_iter):
             Q_old = Q
             self.set_params(params_local)
             if (numpy.isscalar(num_part)):
                 nump = num_part
             else:
-                if (_i < len(num_part)):
-                    nump = num_part[_i]
+                if (i < len(num_part)):
+                    nump = num_part[i]
                 else:
                     nump = num_part[-1]
             if (numpy.isscalar(num_traj)):
                 numt = num_traj
             else:
-                if (_i < len(num_traj)):
-                    numt = num_traj[_i]
+                if (i < len(num_traj)):
+                    numt = num_traj[i]
                 else:
                     numt = num_traj[-1]
 
@@ -77,7 +77,7 @@ class ParamEstimation(Simulator):
             #Q = -Q
             # Q_grad = -Q_grad
             if (callback is not None):
-                callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i) #, Q=Q)
 #            if (numpy.abs(Q - Q_old) < tol):
 #                break
         #return (params_local, Q)
@@ -176,7 +176,7 @@ class ParamEstimationSAEM(Simulator):
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback is not None):
-                callback(params=params_local, Q=-numpy.Inf) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i) #, Q=Q)
         return (params_local, -numpy.Inf)
 
 class ParamEstimationPSAEM(Simulator):

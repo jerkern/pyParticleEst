@@ -288,7 +288,7 @@ class RBPFBase(interfaces.ParticleFiltering):
         self.set_states(particles, xi_next, zl, Pl)
 
 
-class RBPSBase(RBPFBase, interfaces.FFBSi):
+class RBPSBase(RBPFBase, interfaces.FFBSiRS):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
