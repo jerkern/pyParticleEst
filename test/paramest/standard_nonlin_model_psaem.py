@@ -189,8 +189,8 @@ if __name__ == '__main__':
         plt.draw()
         plt.show()
 
-    params_it = numpy.zeros((max_iter + 2, 2))
-    Q_it = numpy.zeros((max_iter + 2))
+    params_it = numpy.zeros((max_iter + 1, 2))
+    Q_it = numpy.zeros((max_iter + 1))
 
     theta_true = numpy.asarray((1.0, 0.1))
 
@@ -208,6 +208,8 @@ if __name__ == '__main__':
         plt.draw()
         plt.show()
 
+        return (cur_iter >= max_iter)
+
     theta0 = numpy.asarray((2.0, 2.0))
     #theta0 = numpy.asarray((2.0,))
     model = Model(P0, Q, R)
@@ -224,7 +226,7 @@ if __name__ == '__main__':
                        callback=callback,
                        callback_sim=callback_sim)[0]
     plt.ioff()
-    callback(param, None)
+    callback(param, None, max_iter)
 
 #     plt.ion()
 #     estimator.maximize(theta0, num, M, smoother='full', meas_first=True, max_iter=len(iterations),
