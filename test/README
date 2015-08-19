@@ -1,0 +1,14 @@
+The tests are organized as follows
+
+debug:
+contains scripts useful during the development testing of the framework,
+stored here for future reuse
+
+manual:
+test cases where the output has to be manuallt verified, e.g. compared with
+other published results or by visual sanity checking
+
+unittest:
+Unit tests, these should be quick and fully automatic and are therefore 
+generally tests deterministic subparts of the framework.
+
