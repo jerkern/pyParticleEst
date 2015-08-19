@@ -191,24 +191,20 @@ if __name__ == '__main__':
 
     params_it = numpy.zeros((max_iter + 2, 2))
     Q_it = numpy.zeros((max_iter + 2))
-    it = 0
 
     theta_true = numpy.asarray((1.0, 0.1))
 
-    def callback(params, Q):
-        global it
-
-        params_it[it, :] = params
-        Q_it[it] = Q
-        it = it + 1
+    def callback(params, Q, cur_iter):
+        params_it[cur_iter] = params
+        Q_it[cur_iter] = Q
 
         plt.figure(2)
         plt.clf()
         for i in xrange(len(theta_true)):
-            plt.plot((0.0, it), (theta_true[i], theta_true[i]), 'k--')
+            plt.plot((0.0, cur_iter + 1), (theta_true[i], theta_true[i]), 'k--')
 
         for i in xrange(len(params)):
-            plt.plot(range(it), params_it[:it, i], '-')
+            plt.plot(range(cur_iter + 1), params_it[:cur_iter + 1, i], '-')
         plt.draw()
         plt.show()
 
@@ -217,8 +213,10 @@ if __name__ == '__main__':
     model = Model(P0, Q, R)
     estimator = param_est.ParamEstimationPSAEM(model, u=None, y=y)
     plt.ion()
-    callback(theta0, None)
-    filter_options = {'cond_traj': numpy.zeros((steps + 1, 1, 1))}
+    callback(theta0, None, 0)
+    estimator.simulate(num, 1, filter='pf', smoother='full', meas_first=True)
+    ctraj = numpy.copy(estimator.straj.traj)
+    filter_options = {'cond_traj': ctraj}
 
     param = estimator.maximize(theta0, num, filter='cpfas',
                        meas_first=True, max_iter=max_iter,
