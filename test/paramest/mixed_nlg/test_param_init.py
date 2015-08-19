@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
 import pyparticleest.paramest.paramest as param_est
 
-gradient_test = True
+gradient_test = False
 
 ptrue = 1.0
 x0 = numpy.array([[ptrue, ], [-ptrue, ]])
