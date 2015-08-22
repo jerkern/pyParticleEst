@@ -101,7 +101,7 @@ class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
                                  repeats=M, axis=1)
         return numpy.sum(kalman.lognormpdf_scalar(diff.ravel(), self.R)) / M
 
-def callback(params, Q):
+def callback(params, Q, cur_iter):
     print "params = %s" % numpy.exp(params)
 
 
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     theta0 = numpy.log(numpy.asarray((2.0, 2.0)))
     model = Model(P0, Q, R)
     estimator = param_est.ParamEstimation(model, u=None, y=y)
-    callback(theta0, None)
+    callback(theta0, None, -1)
     estimator.maximize(theta0, num, M, smoother='mcmc', meas_first=True, max_iter=len(iterations),
                        callback=callback)
 #     plt.ion()
