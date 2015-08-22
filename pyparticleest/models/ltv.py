@@ -251,13 +251,18 @@ class LTV(FFBSi, ParticleFiltering):
         Update sufficient statistics based on the future states
 
         Args:
-
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N

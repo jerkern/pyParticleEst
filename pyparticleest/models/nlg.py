@@ -302,16 +302,19 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
 
     def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
-        Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
+        Sample from a distribution q(x_t | x_{0:t-1}, x_{t+1:T}, y_t:T)
 
         Args:
-         - partp (array-like): particle estimate of t-1
-         - up (array-like): input signal at time t-1
-         - tp (float): time stamp for time t-1
-         - ut (array-like): input signal at time t
-         - yt (array-like): measurement at time t
-         - tt (array-like): time stamps for {t+1:T}
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) of dimension N, wher N is the dimension of partp and/or
@@ -333,13 +336,16 @@ class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
         Args:
          - prop_part (array-like): Proposed particle estimate, first dimension
            has length = N
-         - partp (array-like): particle estimate of t-1
-         - up (array-like): input signal at time t-1
-         - tp (float): time stamp for time t-1
-         - ut (array-like): input signal at time t
-         - yt (array-like): measurement at time t
-         - tt (array-like): time stamps for {t+1:T}
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns
          (array-like) with first dimension = N,

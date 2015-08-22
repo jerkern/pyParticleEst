@@ -78,10 +78,11 @@ class ParticleFilteringNonMarkov():
         Sample process noise
 
         Args:
-         - particles  (array-like): Model specific representation
-           of all particles, with first dimension = N (number of particles)
-         - u (array-like):  input signal
-         - t (float): time-stamp
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - ancestors (array-like): index of the ancestor of each particle in part
+         - ut (array-like): input signals for {0:T}
+         - tt (array-like): time stamps for {0:T}
 
         Returns:
          (array-like) with first dimension = N
@@ -132,13 +133,18 @@ class ParticleFilteringNonMarkov():
         calculating "ancestor" trajectories
 
         Args:
-
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N
@@ -155,6 +161,21 @@ class ParticleFilteringNonMarkov():
         we need to propagate forward in time conditioned on the nonlinear state,
         but we want to recompute the additional data stored, e.g to exclude
         measurements present in the sufficient statistics for future_parts.
+
+        Args:
+         - part  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
+
         """
 
         # Just return the conditional values, if some others statistics need to
@@ -166,6 +187,10 @@ class ParticleFilteringNonMarkov():
         Sample from initial distribution conditioned on the states being 'part'
         This is used for e.g. Rao-Blackwellized MHIPS, where we need to recompute
         the sufficient statistics without being affected by the intial measurement
+
+        Args:
+        part: particles
+        t: time-step
         """
 
         # Just return the conditional values, if some others statistics need to
@@ -298,13 +323,18 @@ class FFBSi(FFBSiNonMarkov):
         Markovian models
 
         Args:
-
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - past_trajs: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - pind (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
@@ -375,11 +405,14 @@ class FFBSiRSNonMarkov(FFBSiNonMarkov):
 
         Args:
 
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
-         - next_part (array-like): particle estimate for t+1
-         - u (array-like): input signal
-         - t (float): time stamps
+         - past_trajs: Trajectory leading up to current time
+         - pind: Indices relating part to past_trajs
+         - uvec (array-like): input signals for {1:T}
+         - yvec (array-like): measurements for {1:T}
+         - tvec (array-like): time stamps for {1:T}
+         - cur_ind: index for current time
 
         Returns:
          (array-like) with first dimension = N, argmax_{x_{t+1}} logp(x_{t+1}|x_t)
@@ -427,13 +460,16 @@ class SampleProposer(object):
         Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
 
         Args:
-         - partp (array-like): particle estimate of t-1
-         - up (array-like): input signal at time t-1
-         - tp (float): time stamp for time t-1
-         - ut (array-like): input signal at time t
-         - yt (array-like): measurement at time t
-         - tt (array-like): time stamps for {t+1:T}
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) of dimension N, wher N is the dimension of partp and/or
@@ -449,13 +485,16 @@ class SampleProposer(object):
         Args:
          - prop_part (array-like): Proposed particle estimate, first dimension
            has length = N
-         - partp (array-like): particle estimate of t-1
-         - up (array-like): input signal at time t-1
-         - tp (float): time stamp for time t-1
-         - ut (array-like): input signal at time t
-         - yt (array-like): measurement at time t
-         - tt (array-like): time stamps for {t+1:T}
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns
          (array-like) with first dimension = N,

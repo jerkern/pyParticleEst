@@ -66,8 +66,7 @@ class Simulator():
             - 'ancestor': return forward trajectories from particle filtier
               (no extra smoothing step)
             - 'full': Backward simulation evaluating all particle weights
-            - 'rs': Rejection sampling
-            - 'rses': Rejection sampling with early stopping.
+            - 'rs': Rejection sampling (with early stopping)
                Options:
                 - R: number of rejection sampling steps before
                   falling back to 'full'

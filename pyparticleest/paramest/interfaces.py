@@ -196,7 +196,8 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
         Args:
          - particles  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
-         - x_next (array-like): future states
+         - particles_next (array-like): future states
+         - u (array-like): input signal
          - t (float): time stamp
 
         The gradient is an array where each element is the derivative with

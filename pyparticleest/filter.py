@@ -42,19 +42,30 @@ class ParticleFilter(object):
 
 
     def create_initial_estimate(self, N):
+        """
+        Create initial particle estimate
+
+        Args:
+         - N (int): Number of particles
+
+        Returns:
+        (array-like): Sampled particles
+
+        """
         return self.model.create_initial_estimate(N)
 
     def forward(self, traj, yvec, uvec, tvec, cur_ind):
         """
-        Forward the estimate stored in pa from t to t+1 using the motion model
+        Forward the estimate stored in traj from t to t+1 using the motion model
         with input u=uvec[cur_ind] at time t=tvec[cur_ind] and measurement
         y=yvec[cur_ind+1] at t=tvec[cur_ind+1]
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -87,9 +98,12 @@ class ParticleFilter(object):
         Update particle approximation of x_t to x_{t+1} using u as input.
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - ancestors (array-like): indices which to propagate estimates from
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
          - inplace (bool): if True the particles are updated then returned,
            otherwise a new ParticleApproximation is first created
            leaving the original one intact
@@ -119,8 +133,12 @@ class ParticleFilter(object):
 
         Args:
          - pa (ParticleApproximation): approximation for time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time 0:t-1
+         - ancestors (array-like): indices which to propagate estimates from
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
          - inplace (bool): if True the particles are updated then returned,
            otherwise a new ParticleApproximation is first created
            leaving the original one intact
@@ -171,6 +189,16 @@ class SIR(object):
 
 
     def create_initial_estimate(self, N):
+        """
+        Create initial particle estimate
+
+        Args:
+         - N (int): Number of particles
+
+        Returns:
+        (array-like): Sampled particles
+
+        """
         return self.model.create_initial_estimate(N)
 
     def forward(self, traj, yvec, uvec, tvec, cur_ind):
@@ -180,10 +208,11 @@ class SIR(object):
         y=yvec[cur_ind+1] at t=tvec[cur_ind+1]
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -235,9 +264,12 @@ class SIR(object):
         Update particle approximation of x_t to x_{t+1} using u as input.
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - ancestors (array-like): indices which to propagate estimates from
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
          - inplace (bool): if True the particles are updated then returned,
            otherwise a new ParticleApproximation is first created
            leaving the original one intact
@@ -256,8 +288,12 @@ class SIR(object):
 
         Args:
          - pa (ParticleApproximation): approximation for time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time 0:t-1
+         - ancestors (array-like): indices which to propagate estimates from
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
          - inplace (bool): if True the particles are updated then returned,
            otherwise a new ParticleApproximation is first created
            leaving the original one intact
@@ -301,10 +337,11 @@ class CSIRAS(SIR):
         with input u at time time and measurement y at time t+1
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -376,6 +413,16 @@ class FFPropY(object):
         self.N = N
 
     def create_initial_estimate(self, N):
+        """
+        Create initial particle estimate
+
+        Args:
+         - N (int): Number of particles
+
+        Returns:
+        (array-like): Sampled particles
+
+        """
         self.N = N
         return self.model.create_initial_estimate(N)
 
@@ -386,10 +433,11 @@ class FFPropY(object):
         cur_ind is at time t
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -437,8 +485,12 @@ class FFPropY(object):
 
         Args:
          - pa (ParticleApproximation): approximation for time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time 0:t-1
+         - ancestors (array-like): indices which to propagate estimates from
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
          - inplace (bool): if True the particles are updated then returned,
            otherwise a new ParticleApproximation is first created
            leaving the original one intact
@@ -470,6 +522,16 @@ class CPF(ParticleFilter):
         self.model = model
 
     def create_initial_estimate(self, N):
+        """
+        Create initial particle estimate
+
+        Args:
+         - N (int): Number of particles
+
+        Returns:
+        (array-like): Sampled particles
+
+        """
         part = self.model.create_initial_estimate(N)
         part[-1] = self.ctraj[0].pa.part[0]
         return part
@@ -480,10 +542,11 @@ class CPF(ParticleFilter):
         with input u at time time and measurement y at time t+1
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -532,10 +595,11 @@ class CPFAS(CPF):
         with input u at time time and measurement y at time t+1
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -597,10 +661,11 @@ class AuxiliaryParticleFilter(ParticleFilter):
         the particles before propagating them forward in time
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -655,10 +720,11 @@ class CPFYAS(CPFAS):
         with input u at time time and measurement y at time t+1
 
         Args:
-         - pa (ParticleApproximation): approximation for time t
-         - u (array-like): input at time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time t
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec
 
         Returns (pa, resampled, ancestors)
          - pa (ParticleApproximation): approximation for time t+1
@@ -716,8 +782,12 @@ class CPFYAS(CPFAS):
 
         Args:
          - pa (ParticleApproximation): approximation for time t
-         - y (array-like): measurement at time t +1
-         - t (float): time stamp for time t
+         - traj (array-like): approximation for time 0:t-1
+         - ancestors (array-like): indices which to propagate estimates from
+         - uvec (array-like): input signals
+         - yvec (array-like): measurements
+         - tvec (array-like): time stamps
+         - cur_ind (int): index of current time-step in (uvec, uvec, tvec)
          - inplace (bool): if True the particles are updated then returned,
            otherwise a new ParticleApproximation is first created
            leaving the original one intact

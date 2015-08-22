@@ -258,6 +258,27 @@ class RBPFBase(interfaces.ParticleFiltering):
         return particles
 
     def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Calculate estimates of the next time step using particle 'part', conditioned
+        on the non-linear parts of the first step of the future trajectory.
+
+        Args:
+         - part  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         xin = future_parts[find, :self.lxi]
         particles = numpy.copy(part)
         self.cond_predict(particles=particles, xi_next=xin,
@@ -266,7 +287,7 @@ class RBPFBase(interfaces.ParticleFiltering):
 
     def cond_predict(self, particles, xi_next, u, t):
         """
-        Calculate estimate of z_{t+1} given iformation of xi_{t+1}
+        Calculate estimate of z_{t+1} given information of xi_{t+1}
 
         Args:
          - particles  (array-like): Model specific representation
@@ -360,6 +381,18 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
         return straj
 
     def pre_mhips_pass(self, st):
+        """
+        Calculated sufficient statistics for the filtering problem.
+        Used to make sure all particles are in the expected state when using
+        MHIPS/MHBP
+
+        Args:
+         - st (SmoothTrajectory): Smoothed estimate
+
+        Returns:
+         (array-like): Filtered estimate with sufficient statistics for linear
+         states
+        """
         T = len(st.traj)
         M = len(st.traj[0].pa.part)
 
