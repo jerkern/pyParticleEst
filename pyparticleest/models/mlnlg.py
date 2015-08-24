@@ -10,7 +10,7 @@ import math
 try:
     import pyparticleest.utils.ckalman as kalman
     import pyparticleest.utils.cmlnlg_compute as mlnlg_compute
-except ImportError:
+except Exception:
     print("Falling back to pure python implementaton, expect horrible performance")
     import pyparticleest.utils.kalman as kalman
     import pyparticleest.utils.mlnlg_compute as mlnlg_compute

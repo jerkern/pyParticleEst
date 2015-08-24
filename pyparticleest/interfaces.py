@@ -65,10 +65,43 @@ class ParticleFilteringNonMarkov():
 
     @abc.abstractmethod
     def update_full(self, particles, traj, uvec, yvec, tvec, ancestors, noise):
+        """
+        Propagate estimate forward in time
+
+        Args:
+         - particles (array-like): Model specific representation of all particles,
+           with first dimension = N (number of particles)
+         - traj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - ancestors (array-like): index of the ancestor of each particle in part
+         - uvec (array-like): input signals for {0:t}
+         - yvec (array-like): measurements for {0:t}
+         - tvec (array-like): time stamps for {0:t}
+         - noise (array-like): samples noise for time t
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         pass
 
     @abc.abstractmethod
     def measure_full(self, particles, traj, uvec, yvec, tvec, ancestors):
+        """
+        Return the log-pdf value of the measurement
+
+        Args:
+         - particles (array-like): Model specific representation of all particles,
+           with first dimension = N (number of particles)
+         - traj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - ancestors (array-like): index of the ancestor of each particle in part
+         - uvec (array-like): input signals for {0:t}
+         - yvec (array-like): measurements for {0:t}
+         - tvec (array-like): time stamps for {0:t}
+
+        Returns:
+         (array-like) with first dimension = N
+        """
         pass
 
     @abc.abstractmethod
