@@ -61,7 +61,7 @@ if __name__ == '__main__':
         sim = simulator.Simulator(model, u=None, y=y)
         plt.clf()
         plt.plot(range(T + 1), x, 'r-', linewidth=2.0, label='True')
-        sim.simulate(N, M, filter='PF', smoother='rsas', meas_first=True)
+        sim.simulate(N, M, filter='PF', smoother='mcmc', meas_first=True)
 
         (est_filt, w_filt) = sim.get_filtered_estimates()
         mean_filt = sim.get_filtered_mean()

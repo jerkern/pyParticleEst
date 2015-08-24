@@ -21,7 +21,7 @@ class Simulator():
     """
 
     def __init__(self, model, u, y):
-        if (u != None):
+        if (u is not None):
             self.u = u
         else:
             self.u = [None] * len(y)
@@ -41,8 +41,10 @@ class Simulator():
         self.params = numpy.copy(params)
         self.model.set_params(self.params)
 
-    def simulate(self, num_part, num_traj, filter='PF', smoother='full',
-                 smoother_options=None, res=0.67, meas_first=False):
+    def simulate(self, num_part, num_traj,
+                 filter='PF', filter_options=None,
+                 smoother='full', smoother_options=None,
+                 res=0.67, meas_first=False):
         """
         Solve the estimation problem
 
@@ -64,8 +66,7 @@ class Simulator():
             - 'ancestor': return forward trajectories from particle filtier
               (no extra smoothing step)
             - 'full': Backward simulation evaluating all particle weights
-            - 'rs': Rejection sampling
-            - 'rses': Rejection sampling with early stopping.
+            - 'rs': Rejection sampling (with early stopping)
                Options:
                 - R: number of rejection sampling steps before
                   falling back to 'full'
@@ -91,7 +92,8 @@ class Simulator():
 
         # Initialise a particle filter with our particle approximation of the initial state,
         # set the resampling threshold to 0.67 (effective particles / total particles )
-        self.pt = ParticleTrajectory(self.model, num_part, res, filter=filter)
+        self.pt = ParticleTrajectory(self.model, num_part, res, filter=filter,
+                                     filter_options=filter_options)
 
         offset = 0
         # Run particle filter
@@ -104,7 +106,7 @@ class Simulator():
                 resamplings = resamplings + 1
 
         # Use the filtered estimates above to created smoothed estimates
-        if (smoother != None):
+        if (smoother is not None and num_traj > 0):
             self.straj = self.pt.perform_smoothing(num_traj, method=smoother,
                                                    smoother_options=smoother_options)
         return resamplings
@@ -155,6 +157,7 @@ class Simulator():
             mean[t] = numpy.sum((w[t].ravel() * est[t].T).T, 0)
 
         return mean
+
     def get_smoothed_estimates(self):
         """
         Return smoothed estimates (must first have called 'simulate')
@@ -166,7 +169,7 @@ class Simulator():
         N is the number of particles
         D is the dimension of each particle
         """
-        return self.straj.traj
+        return self.straj.get_smoothed_estimates()
 
     def get_smoothed_mean(self):
         """
@@ -179,4 +182,4 @@ class Simulator():
         T is the length of the dataset, N is the number of particles and
         D is the dimension of each particle
         """
-        return numpy.mean(self.straj.traj, 1)
+        return numpy.mean(self.get_smoothed_estimates(), 1)

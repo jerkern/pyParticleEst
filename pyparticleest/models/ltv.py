@@ -1,7 +1,7 @@
 """Model definition for base class for Linear Time-varying systems
 @author: Jerker Nordh
 """
-from pyparticleest.interfaces import FFBSi
+from pyparticleest.interfaces import FFBSi, ParticleFiltering
 
 try:
     import pyparticleest.utils.ckalman as kalman
@@ -14,7 +14,7 @@ except ImportError:
 import numpy
 import scipy.linalg
 
-class LTV(FFBSi):
+class LTV(FFBSi, ParticleFiltering):
     """
     Base class for particles of the type linear time varying with additive gaussian noise.
 
@@ -37,15 +37,16 @@ class LTV(FFBSi):
     """
 
     def __init__(self, z0, P0, A=None, C=None, Q=None,
-             R=None, f=None, h=None, params=None):
+                 R=None, f=None, h=None, params=None, **kwargs):
         self.z0 = numpy.copy(z0).reshape((-1, 1))
         self.P0 = numpy.copy(P0)
-        if (f == None):
+        if (f is None):
             f = numpy.zeros_like(self.z0)
         self.kf = kalman.KalmanSmoother(lz=len(self.z0),
                                         A=A, C=C,
                                         Q=Q, R=R,
                                         f_k=f, h_k=h)
+        super(LTV, self).__init__(**kwargs)
 
     def create_initial_estimate(self, N):
         """Sample particles from initial distribution
@@ -156,6 +157,7 @@ class LTV(FFBSi):
 
         # Predict next states conditioned on eta_next
         self.set_states(particles, zl, Pl)
+        return particles
 
     def get_meas_dynamics(self, y, t):
         """
@@ -245,32 +247,37 @@ class LTV(FFBSi):
         """
         return None
 
-    def sample_smooth(self, particle, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Update sufficient statistics based on the future states
 
         Args:
-
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N
         """
 
-        (zl, Pl) = self.get_states(particle)
-        M = len(particle)
+        (zl, Pl) = self.get_states(part)
+        M = len(part)
         lz = len(self.z0)
         lzP = lz + lz * lz
         res = numpy.empty((M, lz + 2 * lz ** 2))
         for j in xrange(M):
-            if (future_trajs != None):
-                zn = future_trajs[0, j, :lz].reshape((lz, 1))
-                Pn = future_trajs[0, j, lz:lzP].reshape((lz, lz))
+            if (future_trajs is not None):
+                zn = future_trajs[0].pa.part[j, :lz].reshape((lz, 1))
+                Pn = future_trajs[0].pa.part[j, lz:lzP].reshape((lz, lz))
                 (A, f, Q) = self.get_pred_dynamics(u=ut[0], t=tt[0])
                 self.kf.set_dynamics(A=A, Q=Q, f_k=f)
                 (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A,
@@ -333,7 +340,7 @@ class LTV(FFBSi):
         lpz0_grad = numpy.zeros(lparam)
         (zl, Pl) = self.get_states(particles)
         (z0_grad, P0_grad) = self.get_initial_grad()
-        if (z0_grad == None and P0_grad == None):
+        if (z0_grad is None and P0_grad is None):
             lpz0 = self.eval_logp_x0(particles, t)
         else:
             lpz0 = 0.0
@@ -401,7 +408,7 @@ class LTV(FFBSi):
         (A, f, Q) = self.get_pred_dynamics(u=u, t=t)
         (A_grad, f_grad, Q_grad) = self.get_pred_dynamics_grad(u=u, t=t)
         lpxn_grad = numpy.zeros(lparam)
-        if (A_grad == None and f_grad == None and Q_grad == None):
+        if (A_grad is None and f_grad is None and Q_grad is None):
             lpxn = self.eval_logp_xnext(particles, x_next, u, t)
         else:
             self.kf.set_dynamics(A=A, Q=Q, f_k=f)
@@ -409,7 +416,7 @@ class LTV(FFBSi):
             Qcho = scipy.linalg.cho_factor(self.kf.Q, check_finite=False)
             ld = numpy.sum(numpy.log(numpy.diagonal(Qcho[0]))) * 2
 
-            if (Q_grad == None):
+            if (Q_grad is None):
                 Q_grad = numpy.zeros((len(self.params), self.kf.lz, self.kf.lz))
 
             for k in xrange(N):
@@ -470,7 +477,7 @@ class LTV(FFBSi):
         (y, C, h, R) = self.get_meas_dynamics(y=y, t=t)
         (C_grad, h_grad, R_grad) = self.get_meas_dynamics_grad(y=y, t=t)
         logpy_grad = numpy.zeros(lparam)
-        if (C_grad == None and h_grad == None and R_grad == None):
+        if (C_grad is None and h_grad is None and R_grad is None):
             logpy = self.eval_logp_y(particles, y, t)
         else:
 
@@ -480,7 +487,7 @@ class LTV(FFBSi):
             (zl, Pl) = self.get_states(particles)
             logpy = 0.0
 
-            if (R_grad == None):
+            if (R_grad is None):
                 R_grad = numpy.zeros((len(self.params), len(y), len(y)))
 
             for i in xrange(N):
@@ -557,7 +564,7 @@ class LTV(FFBSi):
         z0_diff = z - z0
         l1 = z0_diff.dot(z0_diff.T) + P
         l1_diff = numpy.zeros((lparams, self.kf.lz, self.kf.lz))
-        if (z0_grad != None):
+        if (z0_grad is not None):
             for j in xrange(lparams):
                 tmp = -z0_grad[j].dot(z0_diff.T)
                 l1_diff[j] += tmp + tmp.T
@@ -579,11 +586,11 @@ class LTV(FFBSi):
         l2 = predict_err.dot(predict_err.T)
         l2 += Pn + A.dot(P).dot(A.T) - AM.T - AM
         l2_grad = numpy.zeros((lparam, self.kf.lz, self.kf.lz))
-        if (f_grad != None):
+        if (f_grad is not None):
             for j in xrange(lparam):
                 tmp = -f_grad[j].dot(predict_err.T)
                 l2_grad[j] += tmp + tmp.T
-        if (A_grad != None):
+        if (A_grad is not None):
             for j in xrange(lparam):
                 tmp = -A_grad[j].dot(z).dot(predict_err.T)
                 l2_grad[j] += tmp + tmp.T
@@ -613,11 +620,11 @@ class LTV(FFBSi):
         l3 = meas_diff.dot(meas_diff.T)
         l3 += self.kf.C.dot(P).dot(self.kf.C.T)
         l3_grad = numpy.zeros((lparam, len(y), len(y)))
-        if (h_grad != None):
+        if (h_grad is not None):
             for j in xrange(lparam):
                 tmp = -h_grad[j].dot(meas_diff)
                 l3_grad[j] += tmp + tmp.T
-        if (C_grad != None):
+        if (C_grad is not None):
             for j in xrange(lparam):
                 tmp = -C_grad[j].dot(z).dot(meas_diff)
                 l3_grad[j] += tmp + tmp.T

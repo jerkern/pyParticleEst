@@ -4,26 +4,31 @@ import numpy
 import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
 import pyparticleest.paramest.paramest as param_est
+import pyparticleest.paramest.interfaces as pestinf
+import pyparticleest.paramest.gradienttest as gradienttest
 
-gradient_test = True
+gradient_test = False
 
-x0 = numpy.array([[1.0, ], [1.0, ]])
+ptrue = 1.0
+x0 = numpy.array([[ptrue, ], [-ptrue, ]])
 P0 = numpy.eye(2)
-Q = numpy.diag([ 0.01, 0.01])
-B = numpy.array([[0.0, ],
-                 [1.0, ]])
-R = numpy.array([[1.0]])
+
 A = numpy.asarray(((1.0, 1.0),
                    (0.0, 1.0)))
+B = numpy.array([[0.0, ],
+                 [1.0, ]])
+C = numpy.array([[1.0, 0.0]])
 
-def generate_reference(uvec, steps, c_true):
 
-    C = numpy.array([[c_true, 0.0]])
+Q = numpy.diag([ 0.1, 0.1])
+R = numpy.array([[1.0]])
 
+def generate_reference(uvec, steps, ptrue):
     x = numpy.zeros((steps + 1, 2, 1))
     u = numpy.zeros((steps, 1, 1))
     y = numpy.zeros((steps, 1, 1))
     xo = numpy.random.multivariate_normal(x0.ravel(), P0).reshape((-1, 1))
+    print "xo = %s" % xo
     x[0, :] = numpy.copy(xo)
     for i in range(steps):
         # Calc linear states
@@ -36,7 +41,9 @@ def generate_reference(uvec, steps, c_true):
     return (u, y, x)
 
 
-class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian):
+class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian,
+                          pestinf.ParamEstBaseNumericGrad,
+                          pestinf.ParamEstInterface_GradientSearch):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params):
         """ Define all model variables """
@@ -44,8 +51,8 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian):
 
         self.params = numpy.copy(params)
 
-        xi0 = x0[0, 0].reshape((1, 1))
-        z0 = x0[1, 0].reshape((1, 1))
+        xi0 = 1.0 * numpy.asarray(((params[0],),))
+        z0 = 1.0 * numpy.asarray(((-params[0],),))
         Pxi0 = P0[0, 0].reshape((1, 1))
         Pz0 = P0[1, 1].reshape((1, 1))
         Qxi = Q[0, 0].reshape((1, 1))
@@ -74,36 +81,47 @@ class ParticleParamOutput(mlnlg.MixedNLGaussianSampledInitialGaussian):
 
     def get_meas_dynamics(self, y, particles, t):
         xil = particles[:, 0]
-        h = self.params[0] * xil[:, numpy.newaxis, numpy.newaxis]
+        h = xil[:, numpy.newaxis, numpy.newaxis]
         return (numpy.asarray(y).reshape((-1, 1)), None, h, None)
 
     def set_params(self, params):
         """ New set of parameters """
         self.params = numpy.copy(params)
+        self.xi0 = 1.0 * numpy.asarray(((params[0],),))
+        self.z0 = 1.0 * numpy.asarray(((-params[0],),))
 
-    def get_meas_dynamics_grad(self, particles, y, t):
-        h_grad = particles[:, numpy.newaxis, 0:1]
-        return (None, h_grad, None)
+    def get_rb_initial_grad(self, xi0):
+        """ Default implementation has no dependence on xi, override if needed """
+        N = len(xi0)
+        z0_grad = 1.0 * numpy.asarray(((-1.0,),))
+        Pz0_grad = numpy.zeros((len(self.params), self.kf.lz, self.kf.lz))
+        return (numpy.repeat(z0_grad[numpy.newaxis, numpy.newaxis], N, 0),
+                numpy.repeat(Pz0_grad[numpy.newaxis], N, 0))
+
+    def get_xi_intitial_grad(self, N):
+        xi0_grad = 1.0 * numpy.asarray(((1.0,),))
+        Pxi0_grad = numpy.zeros((len(self.params), self.lxi, self.lxi))
+        return (numpy.repeat(xi0_grad[numpy.newaxis, numpy.newaxis], N, 0),
+                numpy.repeat(Pxi0_grad[numpy.newaxis], N, 0))
 
 
 if __name__ == '__main__':
-    theta_true = 2.5
     # How many steps forward in time should our simulation run
-    steps = 200
-
+    steps = 40
     uvec = -10.0 * numpy.hstack((-1.0 * numpy.ones(steps / 4), 1.0 * numpy.ones(steps / 2), -1.0 * numpy.ones(steps / 4)))
 
     if (gradient_test):
+        numpy.random.seed(0)
         num = 50
         nums = 5
         # numpy.random.seed(1)
-        model = ParticleParamOutput((theta_true,))
-        (u, y, x) = generate_reference(uvec, steps, theta_true)
-        gt = param_est.GradientTest(model, u=u, y=y)
-        gt.set_params(numpy.array((theta_true,)))
+        model = ParticleParamOutput((ptrue,))
+        (u, y, x) = generate_reference(uvec, steps, ptrue)
+        gt = gradienttest.GradientTest(model, u=u, y=y)
+        gt.set_params(numpy.array((ptrue,)))
         gt.simulate(num, nums)
-        param_steps = 101
-        param_vals = numpy.linspace(-10.0, 10.0, param_steps)
+        param_steps = 51
+        param_vals = numpy.linspace(-3.0, 3.0, param_steps)
         gt.test(0, param_vals, num=num, nums=nums)
         plt.ion()
         plt.figure(1)
@@ -111,19 +129,19 @@ if __name__ == '__main__':
         plt.plot(range(steps + 1), x[:, 0], 'r-')
         plt.plot(range(steps + 1), x[:, 1], 'b-')
 
-
+        sest = gt.straj.get_smoothed_estimates()
         for j in xrange(nums):
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 0], 'g--')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1], 'k--')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1] - numpy.sqrt(gt.straj.traj[:, j, 2]), 'k-.')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1] + numpy.sqrt(gt.straj.traj[:, j, 2]), 'k-.')
+            plt.plot(range(steps + 1), sest[:, j, 0], 'g--')
+            plt.plot(range(steps + 1), sest[:, j, 1], 'k--')
+            plt.plot(range(steps + 1), sest[:, j, 1] - numpy.sqrt(sest[:, j, 2]), 'k-.')
+            plt.plot(range(steps + 1), sest[:, j, 1] + numpy.sqrt(sest[:, j, 2]), 'k-.')
 
         plt.show()
 
         plt.draw()
         plt.ioff()
-        gt.plot_y.plot(2)
-        gt.plot_xn.plot(3)
+        # gt.plot_y.plot(2)
+        # gt.plot_xn.plot(3)
         gt.plot_x0.plot(4)
         plt.show()
 
@@ -146,43 +164,40 @@ if __name__ == '__main__':
 
 
         for k in range(sims):
+            numpy.random.seed(k)
             # Create reference
-            (u, y, x) = generate_reference(uvec, steps, theta_true)
+            (u, y, x) = generate_reference(uvec, steps, ptrue)
 
             print "estimation start"
-            # Initial guess (-5, 5)
-            theta_guess = 10.0 * numpy.random.uniform() - 5.0
+            # Initial guess (-3, 3)
+            theta_guess = 6.0 * numpy.random.uniform() - 3.0
             print theta_guess
             model = ParticleParamOutput((theta_guess,))
             pe = param_est.ParamEstimation(model, u=u, y=y)
             pe.set_params(numpy.array((theta_guess,)).reshape((-1, 1)))
 
             params_it = numpy.zeros((max_iter + 1))
-            Q_it = numpy.zeros((max_iter + 1))
-            it = 0
-            def callback(params, Q):
-                global it
-                params_it[it] = params[0]
-                Q_it[it] = Q
-                it = it + 1
+            Q_it = numpy.zeros((max_iter))
+            def callback(params, Q, cur_iter):
+                params_it[cur_iter] = params[0]
+                Q_it[cur_iter] = Q
                 plt.figure(3)
                 plt.clf()
-                plt.plot(range(it), params_it[:it], 'b-')
-                plt.plot((0.0, it), (theta_true, theta_true), 'b--')
-                if (Q != None):
+                plt.plot(range(cur_iter + 1), params_it[:cur_iter + 1], 'b-')
+                plt.plot((0.0, cur_iter + 1), (ptrue, ptrue), 'b--')
+                if (Q is not None):
                     plt.figure(4)
-                    plt.plot(range(it), Q_it[:it], 'r-')
+                    plt.plot(range(cur_iter + 1), Q_it[:cur_iter + 1], 'r-')
                 plt.show()
                 plt.draw()
-                return
+                return (cur_iter > max_iter)
 
-            callback((theta_guess,), None)
+            callback((theta_guess,), None, 0)
 
             (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)),
                                         num_part=num,
                                         num_traj=nums,
                                         callback=callback,
-                                        analytic_gradient=True,
                                         max_iter=max_iter,
                                         )
             estimate[0, k] = param
@@ -192,12 +207,12 @@ if __name__ == '__main__':
             plt.plot(range(steps + 1), x[:, 0], 'r-')
             plt.plot(range(steps + 1), x[:, 1], 'b-')
 
-
-            for j in xrange(nums[-1]):
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 0], 'g--')
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 1], 'k--')
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 1] - numpy.sqrt(pe.straj.traj[:, j, 2]), 'k-.')
-                plt.plot(range(steps + 1), pe.straj.traj[:, j, 1] + numpy.sqrt(pe.straj.traj[:, j, 2]), 'k-.')
+            sest = pe.straj.get_smoothed_estimates()
+            for j in xrange(sest.shape[1]):
+                plt.plot(range(steps + 1), sest[:, j, 0], 'g--')
+                plt.plot(range(steps + 1), sest[:, j, 1], 'k--')
+                plt.plot(range(steps + 1), sest[:, j, 1] - numpy.sqrt(sest[:, j, 2]), 'k-.')
+                plt.plot(range(steps + 1), sest[:, j, 1] + numpy.sqrt(sest[:, j, 2]), 'k-.')
 
             plt.show()
 

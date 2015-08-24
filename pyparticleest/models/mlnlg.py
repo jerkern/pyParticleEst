@@ -44,20 +44,21 @@ class MixedNLGaussianSampled(RBPSBase):
      - params (array-like): model parameters (if any)
     """
     def __init__(self, lxi, lz, Az=None, C=None, Qz=None, R=None, fz=None,
-                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None):
-        if (Axi != None):
+                 Axi=None, Qxi=None, Qxiz=None, fxi=None, h=None, params=None,
+                 **kwargs):
+        if (Axi is not None):
             self.Axi = numpy.copy(Axi)
         else:
             self.Axi = None
-        if (fxi != None):
+        if (fxi is not None):
             self.fxi = numpy.copy(fxi)
         else:
             self.fxi = numpy.zeros((lxi, 1))
-        if (Qxi != None):
+        if (Qxi is not None):
             self.Qxi = numpy.copy(Qxi)
         else:
             self.Qxi = None
-        if (Qxiz != None):
+        if (Qxiz is not None):
             self.Qxiz = numpy.copy(Qxiz)
         else:
             self.Qxiz = None
@@ -67,7 +68,7 @@ class MixedNLGaussianSampled(RBPSBase):
         return super(MixedNLGaussianSampled, self).__init__(lz=lz,
                                                      Az=Az, C=C,
                                                      Qz=Qz, R=R,
-                                                     hz=h, fz=fz)
+                                                     hz=h, fz=fz, **kwargs)
 
     def set_dynamics(self, Az=None, fz=None, Qz=None, R=None,
                      Axi=None, fxi=None, Qxi=None, Qxiz=None,
@@ -92,19 +93,19 @@ class MixedNLGaussianSampled(RBPSBase):
         """
         super(MixedNLGaussianSampled, self).set_dynamics(Az=Az, C=C, Qz=Qz, R=R, fz=fz, hz=h)
 
-        if (Axi != None):
+        if (Axi is not None):
             self.Axi = numpy.copy(Axi)
-        if (Az != None):
+        if (Az is not None):
             self.Az = numpy.copy(Az)
-        if (Qxi != None):
+        if (Qxi is not None):
             self.Qxi = numpy.copy(Qxi)
-        if (Qxiz != None):
+        if (Qxiz is not None):
             self.Qxiz = numpy.copy(Qxiz)
-        if (Qz != None):
+        if (Qz is not None):
             self.Qz = numpy.copy(self.kf.Q)
-        if (fz != None):
+        if (fz is not None):
             self.fz = numpy.copy(self.kf.f_k)
-        if (fxi != None):
+        if (fxi is not None):
             self.fxi = numpy.copy(fxi)
 
     def sample_process_noise(self, particles, u, t):
@@ -248,9 +249,9 @@ class MixedNLGaussianSampled(RBPSBase):
         (Az, fz, Qz, _, _, _) = self.get_lin_pred_dynamics_int(particles=particles, u=u, t=t)
 
         Qxiz = self.get_cross_covariance(particles=particles, u=u, t=t)
-        if (Qxiz == None and self.Qxiz == None):
+        if (Qxiz is None and self.Qxiz is None):
             return (Az, fz, Qz)
-        if (Qxiz == None):
+        if (Qxiz is None):
             Qxiz = N * (self.Qxiz,)
 
         (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
@@ -313,7 +314,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
         lyz = numpy.empty(N)
         if (Rz_identical):
-            if (Cz_identical and Cz[0] == None):
+            if (Cz_identical and Cz[0] is None):
                 diff = y - hz
                 dim = Rz[0].shape[0]
                 if (dim == 1):
@@ -374,9 +375,9 @@ class MixedNLGaussianSampled(RBPSBase):
         f_identical = False
         Q_identical = False
 
-        if (Qxiz == None):
+        if (Qxiz is None):
             Qxiz_identical = True
-            if (self.Qxiz == None):
+            if (self.Qxiz is None):
                 Qxiz = N * (numpy.zeros((Qxi[0].shape[0], Qz[0].shape[0])),)
             else:
                 Qxiz = N * (self.Qxiz,)
@@ -477,7 +478,56 @@ class MixedNLGaussianSampled(RBPSBase):
 
         return lpx
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def logp_xnext_singlestep(self, part, past_trajs, pind,
+                              future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Return the log-pdf value for the first step of the future trajectory.
+        Needed in e.g MHIPS
+
+        Args:
+
+         - part  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - past_trajs: Trajectory leading up to current time
+         - pind: Indices relating part to past_trajs
+         - future_parts (array-like): particle estimate for {t+1},
+           stored using 'filtered' particle representation, ie. sample_smooth
+           has not been performed on them
+         - find: Indices relatin part and future_parts
+         - ut (array-like): input signals for {1:T}
+         - yt (array-like): measurements for {1:T}
+         - tt (array-like): time stamps for {1:T}
+         - cur_ind: index for current time
+
+        Returns:
+         (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
+        """
+
+        # This only needs to consider the future nonlinear state
+        # Default implemenation for markovian models, just look at the next state
+        particles = part
+        next_part = future_parts[find]
+        u = ut[cur_ind]
+        t = tt[cur_ind]
+
+        N = len(particles)
+
+        lpx = numpy.empty(N)
+        (_, zl, Pl) = self.get_states(particles)
+
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        N = len(particles)
+
+        for i in xrange(N):
+            x_next = next_part[i, :self.lxi].reshape((self.lxi, 1))
+            xp = fxi[i] + Axi[i].dot(zl[i])
+            Sigma = Qxi[i] + Axi[i].dot(Pl[i]).dot(Axi[i].T)
+            Schol = scipy.linalg.cho_factor(Sigma, check_finite=False)
+            lpx[i] = kalman.lognormpdf_cho(x_next - xp, Schol)
+
+        return lpx
+
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Create sampled estimates for the smoothed trajectory. Allows the update
         representation of the particles used in the forward step to include
@@ -489,35 +539,43 @@ class MixedNLGaussianSampled(RBPSBase):
         calculating "ancestor" trajectories
 
         Args:
-
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N
         """
-        M = len(particles)
-        res = numpy.zeros((M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
-        part = numpy.copy(particles)
+
+        M = len(part)
+        res = numpy.zeros((M, self.lxi + self.kf.lz))
+        part = numpy.copy(part)
         (xil, zl, Pl) = self.get_states(part)
 
-        if (future_trajs != None):
-            (xinl, znl, _unused) = self.get_states(future_trajs[0])
-            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=ut[0],
-                                                            t=tt[0])
+        if (future_trajs is not None):
+            xinl = future_trajs[0].pa.part[find, :self.lxi].reshape((M, self.lxi, 1))
+            znl = future_trajs[0].pa.part[find, self.lxi:].reshape((M, self.kf.lz, 1))
+            #(xinl, znl, _unused) = self.get_states(future_trajs[0])
+            (Acond, fcond, Qcond) = self.calc_cond_dynamics(part, xinl, u=ut[cur_ind],
+                                                            t=tt[cur_ind])
 
-            self.meas_xi_next(part, xinl, u=ut[0], t=tt[0])
+            self.meas_xi_next(part, xinl, u=ut[cur_ind], t=tt[cur_ind])
 
             (xil, zl, Pl) = self.get_states(part)
 
             for j in range(M):
                 self.kf.measure_full(znl[j], zl[j], Pl[j],
                                      C=Acond[j], h_k=fcond[j], R=Qcond[j])
-            self.set_states(particles, xil, zl, Pl)
+            #self.set_states(particles, xil, zl, Pl)
 
         # During the backward smoothing the next_part contain sampled
         # z-variables, the full distrubition for the z_1:T conditioned on xi_1:T
@@ -527,8 +585,74 @@ class MixedNLGaussianSampled(RBPSBase):
             xi = numpy.copy(xil[j]).ravel()
             z = numpy.random.multivariate_normal(zl[j].ravel(),
                                                  Pl[j]).ravel()
-            res[j, :self.lxi + self.kf.lz] = numpy.hstack((xi, z))
+            res[j] = numpy.hstack((xi, z))
         return res
+
+    def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
+        """
+        Sample from a distribution q(x_t | x_{0:t-1}, x_{t+1:T}, y_0:T)
+
+        Args:
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
+
+
+        Returns:
+         (array-like) of dimension N, wher N is the dimension of partp and/or
+         future_trajs (one of which may be 'None' at the start/end of the dataset)
+        """
+        # Trivial choice of q, discard y_T and x_{t+1}
+        if (ptraj is not None):
+            prop_part = numpy.copy(ptraj[-1].pa.part[anc])
+            noise = self.sample_process_noise(prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
+            prop_part = self.update(prop_part, ut[cur_ind - 1], tt[cur_ind - 1], noise)
+        else:
+            prop_part = self.create_initial_estimate(len(find))
+        return prop_part
+
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
+        """
+        Eval the log-propability of the proposal distribution
+
+        Args:
+         - prop_part (array-like): Proposed particle estimate, first dimension
+           has length = N
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
+
+        Returns
+         (array-like) with first dimension = N,
+         log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
+        """
+
+
+
+        if (ptraj is not None):
+            return self.logp_xnext_singlestep(part=ptraj[-1].pa.part[anc],
+                                              past_trajs=ptraj[:-1],
+                                              pind=ptraj[-1].ancestors[anc],
+                                              future_parts=prop_part,
+                                              find=find,
+                                              ut=ut, yt=yt, tt=tt,
+                                              cur_ind=cur_ind - 1)
+        else:
+            return self.eval_logp_x0(prop_part, t=tt[0])
 
     def set_params(self, params):
         """
@@ -582,7 +706,7 @@ class MixedNLGaussianSampled(RBPSBase):
         Args:
          - xil (list): Initial xi states
         """
-        return 0.0
+        return numpy.zeros(len(xil))
 
     def eval_logp_xi0_grad(self, xil):
         """
@@ -610,7 +734,7 @@ class MixedNLGaussianSampled(RBPSBase):
         (xil, zl, Pl) = self.get_states(particles)
         (z0, P0) = self.get_rb_initial(xil)
         lpxi0 = self.eval_logp_xi0(xil)
-        lpz0 = 0.0
+        lpz0 = numpy.empty((N,))
         for i in xrange(N):
             z0_diff = zl[i] - z0[i]
             l1 = z0_diff.dot(z0_diff.T) + Pl[i]
@@ -618,8 +742,8 @@ class MixedNLGaussianSampled(RBPSBase):
 
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0]))) * 2
             tmp = scipy.linalg.cho_solve(P0cho, l1, check_finite=False)
-            lpz0 -= 0.5 * (ld + numpy.trace(tmp))
-        return lpxi0 + lpz0
+            lpz0[i] = -0.5 * (ld + numpy.trace(tmp))
+        return (lpxi0 + lpz0)
 
     def eval_logp_x0_val_grad(self, particles, t):
         """
@@ -655,8 +779,8 @@ class MixedNLGaussianSampled(RBPSBase):
                 dl1 = -tmp - tmp.T
                 lpz0_grad[j] -= 0.5 * mlnlg_compute.compute_logprod_derivative(P0cho, P0_grad[i][j], l1, dl1)
 
-        return (lpxi0 + lpz0,
-                lpxi0_grad + lpz0_grad)
+        return ((lpxi0 + lpz0) / N,
+                (lpxi0_grad + lpz0_grad) / N)
 
 
     def calc_l2(self, xin, zn, Pn, zl, Pl, A, f, M):
@@ -683,10 +807,10 @@ class MixedNLGaussianSampled(RBPSBase):
         diff_l2 = numpy.zeros((N, len(self.params), perr.shape[1], perr.shape[1]), dtype=numpy.double, order='C')
         tmp1 = numpy.zeros((self.lxi + self.kf.lz, self.lxi + self.kf.lz), dtype=numpy.double, order='C')
         tmp2 = numpy.zeros((self.lxi + self.kf.lz, self.kf.lz), dtype=numpy.double, order='C')
-        if (f_grad != None):
+        if (f_grad is not None):
             mlnlg_compute.compute_l2_grad_f(N, len(self.params), self.lxi + self.kf.lz, diff_l2,
                               perr, f_grad, tmp1)
-        if (A_grad != None):
+        if (A_grad is not None):
             mlnlg_compute.compute_l2_grad_A(N, len(self.params), self.lxi + self.kf.lz, diff_l2,
                               perr, self.lxi, Pn, zl, Pl, M, A, A_grad, tmp1, tmp2)
         return (l2, diff_l2)
@@ -752,7 +876,7 @@ class MixedNLGaussianSampled(RBPSBase):
         lpxn_grad = numpy.zeros(self.params.shape)
 
         (A_grad, f_grad, Q_grad) = self.get_pred_dynamics_grad(particles=particles, u=u, t=t)
-        if (A_grad == None and f_grad == None and Q_grad == None):
+        if (A_grad is None and f_grad is None and Q_grad is None):
             lpxn = self.eval_logp_xnext(particles, x_next, u, t)
         else:
 
@@ -765,7 +889,7 @@ class MixedNLGaussianSampled(RBPSBase):
 
             dim = self.lxi + self.kf.lz
 
-            if (Q_grad == None):
+            if (Q_grad is None):
                 Q_grad = N * (numpy.zeros((len(self.params), dim, dim)),)
 
             (l2, l2_grad) = self.calc_l2_grad(xin, zn, Pn, zl, Pl, A, f, Mzl, f_grad, A_grad)
@@ -811,13 +935,13 @@ class MixedNLGaussianSampled(RBPSBase):
             meas_diff = self.kf.measurement_diff(y, zl[i], Cl[i], hl[i])
             l3[i] = meas_diff.dot(meas_diff.T) + Cl[i].dot(Pl[i]).dot(Cl[i].T)
 
-            if (C_grad != None):
+            if (C_grad is not None):
                 C_grad = N * (numpy.zeros((len(self.params), len(y), self.kf.lz)),)
                 for j in xrange(len(self.params)):
                     tmp2 = C_grad[i][j].dot(Pl[i]).dot(Cl[i].T)
                     tmp = C_grad[i][j].dot(zl[i]).dot(meas_diff.T)
                     diff_l3[i][j] += -tmp - tmp.T + tmp2 + tmp2.T
-            if (h_grad != None):
+            if (h_grad is not None):
                 for j in xrange(len(self.params)):
                     tmp = h_grad[i][j].dot(meas_diff.T)
                     diff_l3[i][j] += -tmp - tmp.T
@@ -877,10 +1001,10 @@ class MixedNLGaussianSampled(RBPSBase):
         lpy_grad = numpy.zeros(self.params.shape)
         (y, Cz, hz, Rz, _, _, Rz_identical) = self.get_meas_dynamics_int(particles, y, t)
         (C_grad, h_grad, R_grad) = self.get_meas_dynamics_grad(particles=particles, y=y, t=t)
-        if (C_grad == None and h_grad == None and R_grad == None):
+        if (C_grad is None and h_grad is None and R_grad is None):
             logpy = self.eval_logp_y(particles, y, t)
         else:
-            if (R_grad == None):
+            if (R_grad is None):
                 R_grad = N * (numpy.zeros((len(self.params), len(y), len(y))),)
 
             (_xil, zl, Pl) = self.get_states(particles)
@@ -916,11 +1040,11 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
 
                 # No uncertainty in initial state
         self.xi0 = numpy.copy(xi0).reshape((-1, 1))
-        if (Pxi0 == None):
+        if (Pxi0 is None):
             self.Pxi0 = numpy.zeros((len(self.xi0), len(self.xi0)))
         else:
             self.Pxi0 = numpy.copy((Pxi0))
-        if (Pz0 == None):
+        if (Pz0 is None):
             self.Pz0 = numpy.zeros((len(self.z0), len(self.z0)))
         else:
             self.Pz0 = numpy.copy((Pz0))
@@ -968,6 +1092,13 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
         P_list = numpy.repeat(self.Pz0.reshape((1, self.kf.lz, self.kf.lz)), N, 0)
         return (z_list, P_list)
 
+    def cond_sampled_initial(self, part, t):
+        xi = part[:, :self.lxi]
+        (z, P) = self.get_rb_initial(xi)
+        particles = numpy.zeros_like(part)
+        self.set_states(particles, xi, z, P)
+        return particles
+
     def get_rb_initial_grad(self, xi0):
         """
         Default implementation has no dependence on xi, override if needed
@@ -996,10 +1127,10 @@ class MixedNLGaussianSampledInitialGaussian(MixedNLGaussianSampled):
          - xil (list): Initial xi states
         """
         N = len(xil)
-        res = 0.0
+        res = numpy.empty((N,))
         Pchol = scipy.linalg.cho_factor(self.Pxi0, check_finite=False)
         for i in xrange(N):
-            res += kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
+            res[i] = kalman.lognormpdf_cho(xil[i] - self.xi0, Pchol)
         return res
 
     def get_xi_intitial_grad(self, N):
@@ -1060,10 +1191,11 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         OHind = lxi
         OHlen = lz * lz
         LHind = lxi + OHlen
+        LHlen = lz
 
         xinl = next_part[:, :lxi]
         OHnl = next_part[:, OHind:OHind + OHlen].reshape((M, lz, lz))
-        LHnl = next_part[:, LHind:].reshape((M, lz, 1))
+        LHnl = next_part[:, LHind:LHind + LHlen].reshape((M, lz, 1))
 
         logZ = numpy.zeros(M)
         Omega = numpy.zeros_like(OHnl)
@@ -1115,8 +1247,9 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
                        tmp.T.dot(numpy.linalg.solve(L[j], tmp)))
         return (eta, L)
 
-
-    def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
+    def logp_xnext_full(self, part, past_trajs, pind,
+                        future_trajs, find, ut, yt, tt, cur_ind):
+    #def logp_xnext_full(self, particles, future_trajs, ut, yt, tt):
         """
         Return the log-pdf value for the entire future trajectory.
         Useful for non-markovian modeles, that result from e.g
@@ -1127,27 +1260,31 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         Args:
 
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - past_trajs: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - pind (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N, logp(x_{t+1:T}|x_t^i)
         """
 
-        N = len(particles)
-        Nn = future_trajs.shape[1]
-        if (N > 1 and Nn == 1):
-            future_trajs = numpy.repeat(future_trajs[0:1], N, 1)
+        N = len(part)
+
         lpx = numpy.empty(N)
         # (_, zl, Pl) = self.get_states(particles)
 
-        (logZ, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0],
-                                                ut[0], tt[0])
-        (eta, L) = self.calc_prop3(particles, Omega, Lambda, ut[0], tt[0])
+        (logZ, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].pa.part[find],
+                                                ut[cur_ind], tt[cur_ind])
+        (eta, L) = self.calc_prop3(part, Omega, Lambda, ut[cur_ind], tt[cur_ind])
 
         for i in xrange(N):
             lpx[i] = logZ[i] - 0.5 * (numpy.linalg.slogdet(L[i])[1] + eta[i])
@@ -1155,30 +1292,36 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
 
         return lpx
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
         """
         Calculate statistics needed when evaluating the logp_xnext_full for
         the marginalized trajectory
 
         Args:
 
-         - particles  (array-like): Model specific representation
+         - part  (array-like): Model specific representation
            of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) with first dimension = N
         """
-        M = len(particles)
+        M = len(part)
         lxi = self.lxi
         lz = self.kf.lz
 
-        if (future_trajs != None):
-            (_, Omega, Lambda) = self.calc_prop1(particles, future_trajs[0],
-                                                 ut[0], tt[0])
+        if (future_trajs is not None):
+            (_, Omega, Lambda) = self.calc_prop1(part, future_trajs[0].pa.part[find],
+                                                 ut[cur_ind], tt[cur_ind])
 
         OHind = lxi
         OHlen = lz * lz
@@ -1187,24 +1330,25 @@ class MixedNLGaussianMarginalized(MixedNLGaussianSampled):
         LHind = lxi + OHlen
         res = numpy.zeros((M, lxi + OHlen + LHlen))
 
-        (y, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=particles, y=yt[0], t=tt[0])
+        (_, Cz, hz, Rz, _, _, _) = self.get_meas_dynamics_int(particles=part, y=yt[cur_ind], t=tt[cur_ind])
 
-        res[:, :lxi] = particles[:, :lxi]
+        res[:, :lxi] = part[:, :lxi]
 
-        if (future_trajs != None):
+        if (future_trajs is not None):
             for j in range(M):
                 res[j, OHind:OHind + OHlen] = Omega[j].ravel()
                 res[j, LHind:] = Lambda[j].ravel()
 
         for j in range(M):
-            if (Cz != None and Cz[j] != None):
+            if (Cz is not None and Cz[j] is not None):
                 tmp = numpy.linalg.solve(Rz[j], Cz[j])
                 res[j, OHind:OHind + OHlen] += (Cz[j].T.dot(tmp)).ravel()
-            if (yt != None and yt[0] != None):
-                res[j, LHind:] += (tmp.T.dot(numpy.asarray(yt[0]).reshape((-1, 1)) -
+            if (yt is not None and yt[cur_ind] is not None):
+                res[j, LHind:] += (tmp.T.dot(numpy.asarray(yt[cur_ind]).reshape((-1, 1)) -
                                              hz[j])).ravel()
 
         return res
+
 
 class MixedNLGaussianMarginalizedInitialGaussian(MixedNLGaussianMarginalized,
                                                  MixedNLGaussianSampledInitialGaussian):

@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     model = Model(P0, Q, R)
     sim = simulator.Simulator(model, None, y)
-    sim.simulate(num, M, 'PF', 'ancestor', smoother_options={'R': 50}, meas_first=False)
+    sim.simulate(num, M, filter='PF', smoother='ancestor', smoother_options={'R': 50}, meas_first=False)
     plt.plot(range(steps + 1), x, 'r-')
     plt.plot(range(1, steps + 1), y, 'bx')
     plt.plot(range(steps + 1), sim.get_smoothed_estimates()[:, :, 0], 'g.')
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         plt.plot(range(1, steps + 1), y, 'bx')
         plt.plot(range(steps + 1), sim.get_smoothed_estimates()[:, :, 0], 'g.')
         plt.draw()
-        sim.straj.perform_mhips_pass(None)
+        sim.straj.traj = sim.straj.perform_mhips_pass(None, reduced=False)
         time.sleep(1)
 
     plt.ioff()

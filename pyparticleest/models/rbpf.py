@@ -6,12 +6,15 @@
 
 import abc
 import pyparticleest.interfaces as interfaces
+from pyparticleest.filter import ParticleApproximation, TrajectoryStep
+
 try:
     import pyparticleest.utils.ckalman as kalman
 except ImportError:
     print("Falling back to pure python implementaton, expect horrible performance")
     import pyparticleest.utils.kalman as kalman
 import numpy
+
 
 
 class RBPFBase(interfaces.ParticleFiltering):
@@ -30,11 +33,12 @@ class RBPFBase(interfaces.ParticleFiltering):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, lz, Az=None, fz=None, Qz=None,
-                 C=None , hz=None, R=None):
+                 C=None , hz=None, R=None, **kwargs):
 
         self.kf = kalman.KalmanSmoother(lz, A=Az, C=C,
                                         Q=Qz, R=R,
                                         f_k=fz, h_k=hz)
+        super(RBPFBase, self).__init__(**kwargs)
 
     def set_dynamics(self, Az=None, C=None, Qz=None, R=None, fz=None, hz=None):
         """
@@ -97,13 +101,13 @@ class RBPFBase(interfaces.ParticleFiltering):
         Qxi_identical = False
         # This is probably not so nice performance-wise, but will
         # work initially to profile where the bottlenecks are.
-        if (Axi == None):
+        if (Axi is None):
             Axi = N * (self.Axi,)
             Axi_identical = True
-        if (fxi == None):
+        if (fxi is None):
             fxi = N * (self.fxi,)
             fxi_identical = True
-        if (Qxi == None):
+        if (Qxi is None):
             Qxi = N * (self.Qxi,)
             Qxi_identical = True
         return (Axi, fxi, Qxi, Axi_identical, fxi_identical, Qxi_identical)
@@ -152,15 +156,15 @@ class RBPFBase(interfaces.ParticleFiltering):
         Az_identical = False
         fz_identical = False
         Qz_identical = False
-        if (Az == None):
+        if (Az is None):
             # Az=numpy.repeat(self.kf.A[numpy.newaxis,:,:], N, axis=0)
             Az = N * (self.kf.A,)
             Az_identical = True
-        if (fz == None):
+        if (fz is None):
             # fz=numpy.repeat(self.kf.f_k[numpy.newaxis,:,:], N, axis=0)
             fz = N * (self.kf.f_k,)
             fz_identical = True
-        if (Qz == None):
+        if (Qz is None):
             # Qz=numpy.repeat(self.kf.Q[numpy.newaxis,:,:], N, axis=0)
             Qz = N * (self.kf.Q,)
             Qz_identical = True
@@ -212,17 +216,17 @@ class RBPFBase(interfaces.ParticleFiltering):
         Cz_identical = False
         hz_identical = False
         Rz_identical = False
-        if (Cz == None):
-            if (self.kf.C == None and hz != None):
+        if (Cz is None):
+            if (self.kf.C is None and hz is not None):
                 Cz = N * (numpy.zeros((len(hz[0]), self.kf.lz)),)
             else:
                 Cz = N * (self.kf.C,)
             # Cz=N*(self.kf.C,)
             Cz_identical = True
-        if (hz == None):
+        if (hz is None):
             hz = N * (self.kf.h_k,)
             hz_identical = True
-        if (Rz == None):
+        if (Rz is None):
             Rz = N * (self.kf.R,)
             Rz_identical = True
         return (y, Cz, hz, Rz, Cz_identical, hz_identical, Rz_identical)
@@ -246,14 +250,44 @@ class RBPFBase(interfaces.ParticleFiltering):
         Returns:
          (array-like) with first dimension = N, particle estimate at time t+1
         """
+
         # Calc (xi_{t+1} | xi_t, z_t, y_t)
         xin = self.calc_xi_next(particles=particles, u=u, t=t, noise=noise)
         # Calc (z_{t+1} | xi_{t+1}, y_t)
         self.cond_predict(particles=particles, xi_next=xin, u=u, t=t)
+        return particles
+
+    def cond_predict_single_step(self, part, past_trajs, pind, future_parts, find, ut, yt, tt, cur_ind):
+        """
+        Calculate estimates of the next time step using particle 'part', conditioned
+        on the non-linear parts of the first step of the future trajectory.
+
+        Args:
+         - part  (array-like): Model specific representation
+           of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
+         - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           particle in part
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
+
+        Returns:
+         (array-like) with first dimension = N
+        """
+        xin = future_parts[find, :self.lxi]
+        particles = numpy.copy(part)
+        self.cond_predict(particles=particles, xi_next=xin,
+                          u=ut[cur_ind], t=tt[cur_ind])
+        return particles
 
     def cond_predict(self, particles, xi_next, u, t):
         """
-        Calculate estimate of z_{t+1} given iformation of xi_{t+1}
+        Calculate estimate of z_{t+1} given information of xi_{t+1}
 
         Args:
          - particles  (array-like): Model specific representation
@@ -275,7 +309,7 @@ class RBPFBase(interfaces.ParticleFiltering):
         self.set_states(particles, xi_next, zl, Pl)
 
 
-class RBPSBase(RBPFBase, interfaces.FFBSi):
+class RBPSBase(RBPFBase, interfaces.FFBSiRS):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
@@ -302,46 +336,93 @@ class RBPSBase(RBPFBase, interfaces.FFBSi):
          - st (SmoothTrajectory): Smoothed estimate (with post processing step)
 
         Returns:
-         (array-like): Smoothed estimate with sufficent statistics for linear
+         (array-like): Smoothed estimate with sufficient statistics for linear
          states
         """
-        T = st.traj.shape[0]
-        M = st.traj.shape[1]
+        T = len(st.traj)
+        M = len(st.traj[0].pa.part)
 
-        particles = numpy.copy(st.traj[0])
-        lx = particles.shape[1]
-        straj = numpy.zeros((T, M, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
-        (xil, _zl, _Pl) = self.get_states(particles)
+
+        lx_filt = self.lxi + self.kf.lz + self.kf.lz ** 2
+        # Allocate extra space for Mz
+        lx = lx_filt + self.kf.lz ** 2
+
+
+        straj = numpy.empty((T,), dtype=object)
+
+        # Forward filtering
+        ftraj = self.pre_mhips_pass(st)
+
+        particles = numpy.zeros((M, lx))
+        particles[:, :lx_filt] = ftraj[-1].pa.part
+
+        straj[-1] = TrajectoryStep(ParticleApproximation(particles),
+                                      ftraj[-1].ancestors)
+
+        # Backward smoothing
+        for i in reversed(xrange(T - 1)):
+            (xin, zn, Pn) = self.get_states(straj[i + 1].pa.part)
+            particles = numpy.zeros((M, lx))
+            particles[:, :lx_filt] = ftraj[i].pa.part
+            straj[i] = TrajectoryStep(ParticleApproximation(particles),
+                                      ftraj[i].ancestors)
+
+            # Condition on future nonlinear state
+            self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
+            (xi, z, P) = self.get_states(particles)
+            (Al, fl, Ql) = self.calc_cond_dynamics(particles, xin, u=st.u[i], t=st.t[i])
+            # Update distribution for linear states
+            for j in xrange(M):
+                (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
+                                              Al[j], fl[j], Ql[j])
+                self.set_states(straj[i].pa.part[j:j + 1, :], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
+                self.set_Mz(straj[i].pa.part[j:j + 1, :], Ms[numpy.newaxis])
+
+        return straj
+
+    def pre_mhips_pass(self, st):
+        """
+        Calculated sufficient statistics for the filtering problem.
+        Used to make sure all particles are in the expected state when using
+        MHIPS/MHBP
+
+        Args:
+         - st (SmoothTrajectory): Smoothed estimate
+
+        Returns:
+         (array-like): Filtered estimate with sufficient statistics for linear
+         states
+        """
+        T = len(st.traj)
+        M = len(st.traj[0].pa.part)
+
+        lx = self.lxi + self.kf.lz + self.kf.lz ** 2
+
+        straj = numpy.empty((T,), dtype=object)
+
+        particles = numpy.empty((M, lx))
+        #(xil, _zl, _Pl) = self.get_states(particles)
+        xil = st.traj[0].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
+
         (z0, P0) = self.get_rb_initial(xil)
         self.set_states(particles, xil, z0, P0)
 
         for i in xrange(T - 1):
-            if (st.y[i] != None):
+            if (st.y[i] is not None):
                 self.measure(particles, y=st.y[i], t=st.t[i])
-            (xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
-            straj[i, :, :lx] = particles
 
+            straj[i] = TrajectoryStep(ParticleApproximation(particles),
+                                      st.traj[i].ancestors)
+
+            #(xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
+            xin = st.traj[i + 1].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
 
-        if (st.y[-1] != None):
+        if (st.y[-1] is not None):
             self.measure(particles, y=st.y[-1], t=st.t[-1])
 
-        straj[-1, :, :lx] = particles
-
-        # Backward smoothing
-        for i in reversed(xrange(T - 1)):
-            (xin, zn, Pn) = self.get_states(straj[i + 1])
-            particles = straj[i]
-            self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
-            (xi, z, P) = self.get_states(particles)
-            (Al, fl, Ql) = self.calc_cond_dynamics(particles, xin, u=st.u[i], t=st.t[i])
-            for j in xrange(M):
-
-                (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
-                                              Al[j], fl[j], Ql[j])
-                self.set_states(straj[i, j:j + 1, :], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
-                self.set_Mz(straj[i, j:j + 1, :], Ms[numpy.newaxis])
-
+        straj[-1] = TrajectoryStep(ParticleApproximation(particles),
+                                   st.traj[-1].ancestors)
         return straj
 
     def set_states(self, particles, xi_list, z_list, P_list):

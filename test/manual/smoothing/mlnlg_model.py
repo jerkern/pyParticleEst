@@ -22,6 +22,7 @@ def generate_dataset(steps, P0_xi, P0_z, Qxi, Qz, Qxiz, R):
 
 
 class Model(mlnlg.MixedNLGaussianMarginalizedInitialGaussian):
+#class Model(mlnlg.MixedNLGaussianSampledInitialGaussian):
     """ xi_{k+1} = xi_k + z_k + v_xi_k, v_xi ~ N(0,Q_xi)
         z_{k+1} = z_{k} + v_z, v_z_k ~ N(0, Q_z)
         y_k = xi_k + +z_k + e_k, e_k ~ N(0,R_z),
@@ -63,11 +64,13 @@ if __name__ == '__main__':
     Q_z = 1.0 * numpy.eye(1)
     Q_xiz = 0.0 * numpy.eye(1)
     R = 0.1 * numpy.eye(1)
+    numpy.random.seed(0)
     (x, y) = generate_dataset(steps, P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
 
     model = Model(P0_xi, P0_z, Q_xi, Q_z, Q_xiz, R)
     sim = simulator.Simulator(model, None, y)
-    sim.simulate(num, nums, 'PF', 'full', meas_first=False)
+    sim.simulate(num_part=num, num_traj=nums, filter='PF', smoother='mhips_reduced', meas_first=False)
+
 
     if (True):
         plt.plot(range(steps + 1), x[0, :], 'r-')
@@ -84,9 +87,6 @@ if __name__ == '__main__':
         smean = sim.get_smoothed_mean()
 
         for j in xrange(nums):
-            tmp = numpy.hstack(sim.straj.traj[:, j])
-            xi = sim.straj.traj[:, j, 0]
-            z = sim.straj.traj[:, j, 1]
             plt.plot(range(steps + 1), sest[:, j, 0], 'r--')
             plt.plot(range(steps + 1), sest[:, j, 1], 'b--')
 

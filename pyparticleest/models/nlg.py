@@ -15,7 +15,7 @@ except ImportError:
 
 from exceptions import ValueError
 
-class NonlinearGaussian(interfaces.FFBSiRS):
+class NonlinearGaussian(interfaces.ParticleFiltering, interfaces.FFBSiRS):
     """
     Base class for particles of the type mixed linear/non-linear with
     additive gaussian noise.
@@ -99,24 +99,34 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         return None
 
     def __init__(self, lxi, f=None, g=None, Q=None, R=None):
-        if (f != None):
+        if (f is not None):
             self.f = numpy.copy(f)
         else:
             self.f = None
-        if (g != None):
+        if (g is not None):
             self.g = numpy.copy(g)
         else:
             self.g = None
-        if (Q != None):
+        if (Q is not None):
             self.Qchol = scipy.linalg.cho_factor(Q)
             self.Qcholtri = numpy.triu(self.Qchol[0])
             ld = numpy.sum(numpy.log(numpy.diag(self.Qchol[0]))) * 2
             self.logpdfmax = -0.5 * (lxi * math.log(2 * math.pi) + ld)
-        if (R != None):
+        if (R is not None):
             self.Rchol = scipy.linalg.cho_factor(R)
             self.Rcholtri = numpy.triu(self.Rchol[0])
 
         self.lxi = lxi
+
+    def set_Q(self, Q):
+        self.Qchol = scipy.linalg.cho_factor(Q)
+        self.Qcholtri = numpy.triu(self.Qchol[0])
+        ld = numpy.sum(numpy.log(numpy.diag(self.Qchol[0]))) * 2
+        self.logpdfmax = -0.5 * (self.lxi * math.log(2 * math.pi) + ld)
+
+    def set_R(self, R):
+        self.Rchol = scipy.linalg.cho_factor(R)
+        self.Rcholtri = numpy.triu(self.Rchol[0])
 
     def sample_process_noise(self, particles, u, t):
         """
@@ -134,12 +144,12 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         N = len(particles)
         Q = self.calc_Q(particles=particles, u=u, t=t)
         noise = numpy.random.normal(size=(self.lxi, N))
-        if (Q == None):
-            noise = self.Qcholtri.dot(noise)
+        if (Q is None):
+            noise = self.Qcholtri.T.dot(noise)
         else:
             for i in xrange(N):
                 Qchol = numpy.triu(scipy.linalg.cho_factor(Q[i], check_finite=False)[0])
-                noise[:, i] = Qchol.dot(noise[:, i])
+                noise[:, i] = Qchol.T.dot(noise[:, i])
 
         return noise.T
 
@@ -159,7 +169,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
          (array-like) with first dimension = N, particle estimate at time t+1
         """
         f = self.calc_f(particles=particles, u=u, t=t)
-        if (f == None):
+        if (f is None):
             f = self.f
         particles[:] = f + noise
         return particles
@@ -178,14 +188,18 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         Returns:
          (array-like) with first dimension = N, logp(y|x^i)
         """
-        g = self.calc_g(particles=particles, t=t)
-        R = self.calc_R(particles=particles, t=t)
         N = len(particles)
         lpy = numpy.empty(N)
-        if (g == None):
-            g = numpy.repeat(self.g, N, 0)
-        diff = y - g
-        if (R == None):
+        g = self.calc_g(particles=particles, t=t)
+        R = self.calc_R(particles=particles, t=t)
+
+        if (g is None):
+            g = numpy.repeat(self.g.reshape((1, -1, 1)), N, 0)
+        else:
+            g = g.reshape((N, -1, 1))
+        yrep = numpy.repeat(numpy.asarray(y).reshape((1, -1, 1)), N, 0)
+        diff = yrep - g
+        if (R is None):
             if (self.Rcholtri.shape[0] == 1):
                 lpy = kalman.lognormpdf_scalar(diff, self.Rcholtri)
             else:
@@ -239,7 +253,7 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         Q = self.calc_Q(particles, u, t)
         dim = self.lxi
         l2pi = math.log(2 * math.pi)
-        if (Q == None):
+        if (Q is None):
             return self.logpdfmax
         else:
             N = len(particles)
@@ -268,11 +282,11 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         """
 
         f = self.calc_f(particles, u, t)
-        if (f == None):
+        if (f is None):
             f = self.f
         diff = next_part - f
         Q = self.calc_Q(particles, u, t)
-        if (Q == None):
+        if (Q is None):
             if (self.Qcholtri.shape[0] == 1):
                 lpx = kalman.lognormpdf_scalar(diff, self.Qcholtri)
             else:
@@ -286,80 +300,62 @@ class NonlinearGaussian(interfaces.FFBSiRS):
 
         return lpx
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
+    def propose_smooth(self, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
-        Create sampled estimates for the smoothed trajectory. Allows the update
-        representation of the particles used in the forward step to include
-        additional data in the backward step, can also for certain models be
-        used to update the points estimates based on the future information.
-
-        Default implementation uses the same format as forward in time it
-        ss part of the ParticleFiltering interface since it is used also when
-        calculating "ancestor" trajectories
+        Sample from a distribution q(x_t | x_{0:t-1}, x_{t+1:T}, y_t:T)
 
         Args:
-
-         - particles  (array-like): Model specific representation
-           of all particles, with first dimension = N (number of particles)
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
-         - ut (array-like): input signals for {t:T}
-         - yt (array-like): measurements for {t:T}
-         - tt (array-like): time stamps for {t:T}
-
-        Returns:
-         (array-like) with first dimension = N
-        """
-        return particles
-
-    def propose_smooth(self, partp, up, tp, ut, yt, tt, future_trajs):
-        """
-        Sample from a distribution q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
-
-        Args:
-         - partp (array-like): particle estimate of t-1
-         - up (array-like): input signal at time t-1
-         - tp (float): time stamp for time t-1
-         - ut (array-like): input signal at time t
-         - yt (array-like): measurement at time t
-         - tt (array-like): time stamps for {t+1:T}
-         - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns:
          (array-like) of dimension N, wher N is the dimension of partp and/or
          future_trajs (one of which may be 'None' at the start/end of the dataset)
         """
         # Trivial choice of q, discard y_T and x_{t+1}
-        if (partp != None):
-            noise = self.sample_process_noise(partp, up, tp)
-            prop_part = numpy.copy(partp)
-            prop_part = self.update(prop_part, up, tp, noise)
+        if (ptraj is not None):
+            prop_part = numpy.copy(ptraj[-1].pa.part[anc])
+            noise = self.sample_process_noise(prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
+            prop_part = self.update(prop_part, ut[cur_ind - 1], tt[cur_ind - 1], noise)
         else:
-            prop_part = self.create_initial_estimate(future_trajs.shape[1])
+            prop_part = self.create_initial_estimate(len(find))
         return prop_part
 
-    def logp_proposal(self, prop_part, partp, up, tp, ut, yt, tt, future_trajs):
+    def logp_proposal(self, prop_part, ptraj, anc, future_trajs, find, yt, ut, tt, cur_ind):
         """
         Eval the log-propability of the proposal distribution
 
         Args:
          - prop_part (array-like): Proposed particle estimate, first dimension
            has length = N
-         - partp (array-like): particle estimate of t-1
-         - up (array-like): input signal at time t-1
-         - tp (float): time stamp for time t-1
-         - ut (array-like): input signal at time t
-         - yt (array-like): measurement at time t
-         - tt (array-like): time stamps for {t+1:T}
+         - ptraj: array of trajectory step objects from previous time-steps,
+           last index is step just before the current
+         - anc (array-like): index of the ancestor of each particle in part
          - future_trajs (array-like): particle estimate for {t+1:T}
+         - find (array-like): index in future_trajs corresponding to each
+           generated sample
+         - ut (array-like): input signals for {0:T}
+         - yt (array-like): measurements for {0:T}
+         - tt (array-like): time stamps for {0:T}
+         - cur_ind (int): index of current timestep (in ut, yt and tt)
 
         Returns
          (array-like) with first dimension = N,
          log q(x_t | x_{t-1}, x_{t+1:T}, y_t:T)
         """
-        if (partp != None):
-            return self.logp_xnext(partp, prop_part, up, tp)
+        if (ptraj is not None):
+            return self.logp_xnext(ptraj[-1].pa.part[anc], prop_part, ut[cur_ind - 1], tt[cur_ind - 1])
         else:
             return self.eval_logp_x0(prop_part, t=tt[0])
+
 
     def set_params(self, params):
         """
@@ -372,7 +368,11 @@ class NonlinearGaussian(interfaces.FFBSiRS):
         """
         self.params = numpy.copy(params).reshape((-1, 1))
 
+    def post_smoothing(self, st):
+        return self.pre_mhips_pass(st)
 
+    def pre_mhips_pass(self, st):
+        return st.traj
 
 class NonlinearGaussianInitialGaussian(NonlinearGaussian):
     """
@@ -385,16 +385,16 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
     """
     def __init__(self, x0=None, Px0=None, lxi=None, **kwargs):
 
-        if (x0 != None):
+        if (x0 is not None):
             self.x0 = numpy.copy(x0).reshape((-1, 1))
-        elif (lxi != None):
+        elif (lxi is not None):
             self.x0 = numpy.zeros((lxi, 1))
-        elif (Px0 != None):
+        elif (Px0 is not None):
             self.x0 = numpy.zeros((Px0.shape[0], 1))
         else:
             raise ValueError()
 
-        if (Px0 == None):
+        if (Px0 is None):
             self.Px0 = numpy.zeros((len(self.x0), len(self.x0)))
         else:
             self.Px0 = numpy.copy((Px0))
@@ -441,6 +441,6 @@ class NonlinearGaussianInitialGaussian(NonlinearGaussian):
         else:
             Pchol = scipy.linalg.cho_factor(self.Px0, check_finite=False)
             for i in xrange(N):
-                res[i] = kalman.lognormpdf_cho(particles[i] - self.x0, Pchol)
+                res[i] = kalman.lognormpdf_cho(particles[i].ravel() - self.x0.ravel(), Pchol)
 
         return res

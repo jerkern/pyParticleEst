@@ -100,7 +100,7 @@ class ParticleLSB(mlnlg.MixedNLGaussianMarginalizedInitialGaussian):
         return (Axi, fxi, None)
 
     def get_meas_dynamics(self, particles, y, t):
-        if (y == None):
+        if (y is None):
             return (y, None, None, None)
         else:
             tmp = numpy.vstack(particles)

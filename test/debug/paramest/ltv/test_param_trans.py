@@ -1,14 +1,16 @@
 #!/usr/bin/python
 
 import numpy
-import pyparticleest.paramest.paramest as param_est
+import pyparticleest.paramest.paramest as paramest
+import pyparticleest.paramest.gradienttest as gradienttest
+import pyparticleest.paramest.interfaces as pestinf
 
 import matplotlib.pyplot as plt
 from pyparticleest.models.ltv import LTV
 
 R = numpy.array([[0.1]])
 Q = numpy.diag([ 0.1, 0.1])
-gradient_test = False
+gradient_test = True
 
 def generate_reference(z0, P0, theta_true, steps):
     A = numpy.asarray(((1.0, theta_true), (0.0, 1.0)))
@@ -30,7 +32,8 @@ def generate_reference(z0, P0, theta_true, steps):
 
     return (y, states)
 
-class ParticleParamTrans(LTV):
+class ParticleParamTrans(LTV, pestinf.ParamEstBaseNumericGrad,
+                         pestinf.ParamEstInterface_GradientSearch):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, z0, P0, params):
         """ Define all model variables """
@@ -76,17 +79,18 @@ if __name__ == '__main__':
         plt.clf()
         plt.plot(range(steps + 1), x[:, 0], 'r-')
         plt.plot(range(steps + 1), x[:, 1], 'b-')
-        plt.plot(range(steps + 1), pe.straj.traj[:, 0, 0], 'r--')
-        plt.plot(range(steps + 1), pe.straj.traj[:, 0, 1], 'b--')
-        plt.plot(range(steps + 1), pe.straj.traj[:, 0, 0] - numpy.sqrt(pe.straj.traj[:, 0, 2]), 'r--')
-        plt.plot(range(steps + 1), pe.straj.traj[:, 0, 0] + numpy.sqrt(pe.straj.traj[:, 0, 2]), 'r--')
-        plt.plot(range(steps + 1), pe.straj.traj[:, 0, 1] - numpy.sqrt(pe.straj.traj[:, 0, 5]), 'b--')
-        plt.plot(range(steps + 1), pe.straj.traj[:, 0, 1] + numpy.sqrt(pe.straj.traj[:, 0, 5]), 'b--')
+        sest = pe.straj.get_smoothed_estimates()
+        plt.plot(range(steps + 1), sest[:, 0, 0], 'r--')
+        plt.plot(range(steps + 1), sest[:, 0, 1], 'b--')
+        plt.plot(range(steps + 1), sest[:, 0, 0] - numpy.sqrt(sest[:, 0, 2]), 'r--')
+        plt.plot(range(steps + 1), sest[:, 0, 0] + numpy.sqrt(sest[:, 0, 2]), 'r--')
+        plt.plot(range(steps + 1), sest[:, 0, 1] - numpy.sqrt(sest[:, 0, 5]), 'b--')
+        plt.plot(range(steps + 1), sest[:, 0, 1] + numpy.sqrt(sest[:, 0, 5]), 'b--')
         plt.draw()
 
     if (gradient_test):
         (y, x) = generate_reference(z0, P0, theta_true, steps)
-        gt = param_est.GradientTest(model, u=None, y=y)
+        gt = gradienttest.GradientTest(model, u=None, y=y)
 
         gt.set_params(numpy.array((theta_true,)))
 
@@ -129,7 +133,7 @@ if __name__ == '__main__':
 
 
             # Create an array for our particles
-            pe = param_est.ParamEstimation(model=model, u=None, y=y)
+            pe = paramest.ParamEstimation(model=model, u=None, y=y)
             pe.set_params(numpy.array((theta_guess,)).reshape((-1, 1)))
 
             # ParamEstimator.simulate(num_part=num, num_traj=nums)
@@ -137,8 +141,9 @@ if __name__ == '__main__':
 #            (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
 #                                        max_iter=max_iter, callback_sim=callback_sim, tol=tol, callback=callback,
 #                                        analytic_gradient=False)
-            (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)), num_part=num, num_traj=nums,
-                                        max_iter=max_iter, tol=tol, analytic_gradient=True)
+            (param, Qval) = pe.maximize(param0=numpy.array((theta_guess,)),
+                                        num_part=num, num_traj=nums,
+                                        max_iter=max_iter, tol=tol)
             estimate[0, k] = param
 
             plt.figure(fig2.number)

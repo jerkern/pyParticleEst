@@ -2,6 +2,8 @@
 
 import numpy
 import pyparticleest.paramest.paramest as param_est
+import pyparticleest.paramest.interfaces as pestinf
+import pyparticleest.paramest.gradienttest as gradienttest
 from pyparticleest.models.mlnlg import MixedNLGaussianSampledInitialGaussian
 import matplotlib.pyplot as plt
 
@@ -33,7 +35,9 @@ def generate_reference(z0, P0, theta_true, steps):
     return (y, states)
 
 
-class ParticleParamTrans(MixedNLGaussianSampledInitialGaussian):
+class ParticleParamTrans(MixedNLGaussianSampledInitialGaussian,
+                         pestinf.ParamEstBaseNumericGrad,
+                         pestinf.ParamEstInterface_GradientSearch):
     """ Implement a simple system by extending the MixedNLGaussian class """
     def __init__(self, params, R, Qxi, Qz):
         """ Define all model variables """
@@ -97,30 +101,31 @@ if __name__ == '__main__':
         # numpy.random.seed(1)
         x0 = numpy.vstack((xi0_true, z0_true))
         (y, x) = generate_reference(x0, P0, theta_true, steps)
-        gt = param_est.GradientTest(model, u=None, y=y)
+        gt = gradienttest.GradientTest(model, u=None, y=y)
         gt.set_params(numpy.array((theta_true,)))
         gt.simulate(num, nums)
         param_steps = 101
         param_vals = numpy.linspace(-0.1, 0.4, param_steps)
         gt.test(0, param_vals, num=num, nums=nums)
         plt.ion()
+        plt.figure(1)
         plt.clf()
         plt.plot(range(steps + 1), x[:, 0], 'r-')
         plt.plot(range(steps + 1), x[:, 1], 'b-')
 
-
+        sest = gt.straj.get_smoothed_estimates()
         for j in xrange(nums):
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 0], 'g--')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1], 'k--')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1] - numpy.sqrt(gt.straj.traj[:, j, 2]), 'k-.')
-            plt.plot(range(steps + 1), gt.straj.traj[:, j, 1] + numpy.sqrt(gt.straj.traj[:, j, 2]), 'k-.')
+            plt.plot(range(steps + 1), sest[:, j, 0], 'g--')
+            plt.plot(range(steps + 1), sest[:, j, 1], 'k--')
+            plt.plot(range(steps + 1), sest[:, j, 1] - numpy.sqrt(sest[:, j, 2]), 'k-.')
+            plt.plot(range(steps + 1), sest[:, j, 1] + numpy.sqrt(sest[:, j, 2]), 'k-.')
 
         plt.show()
 
         plt.draw()
         plt.ioff()
         # gt.plot_y.plot(1)
-        gt.plot_xn.plot(1)
+        gt.plot_xn.plot(2)
         # gt.plot_x0.plot(3)
         plt.show()
     else:
@@ -196,7 +201,6 @@ if __name__ == '__main__':
                                                     num_part=num,
                                                     num_traj=nums,
                                                     # callback=callback,
-                                                    analytic_gradient=True,
                                                     max_iter=max_iter,
                                                     )
 

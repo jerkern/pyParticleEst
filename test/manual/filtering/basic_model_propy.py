@@ -17,7 +17,8 @@ def generate_dataset(steps, P0, Q, R):
 
     return (x, y)
 
-class Model(interfaces.ParticleFiltering):
+class Model(interfaces.FFProposeFromMeasure,
+            interfaces.FFBSi):
     """ x_{k+1} = x_k + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
         x(0) ~ N(0,P0) """
@@ -27,33 +28,48 @@ class Model(interfaces.ParticleFiltering):
         self.Q = numpy.copy(Q)
         self.R = numpy.copy(R)
 
+    def propose_from_y(self, N, y, t):
+        return numpy.random.normal(y, numpy.sqrt(self.R), (N,)).reshape((-1, 1))
+
     def create_initial_estimate(self, N):
-        return numpy.random.normal(0.0, self.P0, (N,)).reshape((-1, 1))
+        return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)).reshape((-1, 1))
 
-    def sample_process_noise(self, particles, u, t):
-        """ Return process noise for input u """
-        N = len(particles)
-        return numpy.random.normal(0.0, self.Q, (N,)).reshape((-1, 1))
+    def logp_xnext(self, particles, next_part, u, t):
+        diff = next_part - particles
+        return kalman.lognormpdf_scalar(diff, self.Q)
+#
+#    def sample_process_noise(self, particles, u, t):
+#        """ Return process noise for input u """
+#        N = len(particles)
+#        return numpy.random.normal(0.0, self.Q, (N,)).reshape((-1, 1))
+#
+#    def update(self, particles, u, t, noise):
+#        """ Update estimate using 'data' as input """
+#        particles += noise
+#
+#    def measure(self, particles, y, t):
+#        """ Return the log-pdf value of the measurement """
+#        logyprob = numpy.empty(len(particles), dtype=float)
+#        for k in range(len(particles)):
+#            logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1, 1) - y, self.R)
+#        return logyprob
+#
 
-    def update(self, particles, u, t, noise):
-        """ Update estimate using 'data' as input """
-        particles += noise
+    def sample_smooth(self, part, ptraj, anc, future_trajs, find, ut, yt, tt, cur_ind):
+        return numpy.copy(part)
 
-    def measure(self, particles, y, t):
-        """ Return the log-pdf value of the measurement """
-        logyprob = numpy.empty(len(particles), dtype=float)
-        for k in range(len(particles)):
-            logyprob[k] = kalman.lognormpdf(particles[k].reshape(-1, 1) - y, self.R)
-        return logyprob
+    def copy_ind(self, particles, new_ind=None):
 
-    def sample_smooth(self, particles, future_trajs, ut, yt, tt):
-        return particles
+        if (new_ind is not None):
+            return numpy.copy(particles[new_ind])
+        else:
+            return numpy.copy(particles)
 
 if __name__ == '__main__':
     steps = 50
     num = 50
     P0 = 1.0
-    Q = 1.0
+    Q = numpy.asarray(((1.0,),))
     R = numpy.asarray(((1.0,),))
 
     # Make realization deterministic
@@ -62,7 +78,7 @@ if __name__ == '__main__':
 
     model = Model(P0, Q, R)
     sim = simulator.Simulator(model, u=None, y=y)
-    sim.simulate(num, num, smoother='ancestor')
+    sim.simulate(num, num, filter='pfy', smoother='ancestor')
 
     plt.plot(range(steps + 1), x, 'r-')
     plt.plot(range(1, steps + 1), y, 'bx')
@@ -76,6 +92,7 @@ if __name__ == '__main__':
     # Plot "smoothed" trajectories to illustrate that the particle filter
     # suffers from degeneracy when considering the full trajectories
     plt.plot(range(steps + 1), svals[:, :, 0], 'b--')
+    plt.plot(range(steps + 1), x, 'r-')
     plt.xlabel('t')
     plt.ylabel('x')
 
