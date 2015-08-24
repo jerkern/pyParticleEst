@@ -157,6 +157,7 @@ class LTV(FFBSi, ParticleFiltering):
 
         # Predict next states conditioned on eta_next
         self.set_states(particles, zl, Pl)
+        return particles
 
     def get_meas_dynamics(self, y, t):
         """
