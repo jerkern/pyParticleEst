@@ -14,28 +14,16 @@
 
 import sys
 import os
+from unittest.mock import MagicMock
 
-class Mock(object):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return Mock()
-
+class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
-        if name in ('__file__', '__path__'):
-            return '/dev/null'
-        elif name[0] == name[0].upper():
-            mockType = type(name, (), {})
-            mockType.__module__ = __name__
-            return mockType
-        else:
             return Mock()
 
 MOCK_MODULES = [
-#		'pyparticleest.utils.kalman',
-#		'pyparticleest.models.mlnlg_compute',
+		'pyparticleest.utils.kalman',
+		'pyparticleest.models.mlnlg_compute',
 		'scipy', 'scipy.linalg', 'scipy.optimize',
 		'matplotlib', 'matplotlib.pyplot'
 		]
