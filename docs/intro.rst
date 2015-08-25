@@ -49,18 +49,18 @@ Hierarchical,
 Linear Time-Varying (LTV)
 
 
-You are encourage to study the examples under test/ in the source code. 
+You are encourage to study the examples in the documentation, more can be under test/manual in the source code. 
 They demonstrate how the framework is instended to be used.
 
 A good starting point is
-        test/filtering/basic_model.py
+        test/manual/filtering/basic_model.py
 
 followed by
-        test/filtering/nonlin_model.py
+        test/manual/filtering/nonlin_model.py
 
 For an example of a simple MLNLG model see
-        test/smoothing/mlnlg_model.py
+        test/manual/smoothing/mlnlg_model.py
 
 and for the commonly used "standard nonlinear model" see
-        test/smoothing/standard_nonlin_model.py
+        test/manual/smoothing/standard_nonlin_model.py
 
