@@ -12,8 +12,10 @@ else:
 ext = '.pyx' if USE_CYTHON else '.c'
 
 if (not on_rtd):
+    import numpy
     extensions = [Extension("pyparticleest/utils/ckalman", ["pyparticleest/utils/ckalman" + ext]),
-                  Extension("pyparticleest/utils/cmlnlg_compute", ["pyparticleest/utils/cmlnlg_compute" + ext])]
+                  Extension("pyparticleest/utils/cmlnlg_compute", ["pyparticleest/utils/cmlnlg_compute" + ext],
+                            include_dirs=[numpy.get_include()])]
 else:
     extensions = None
 
