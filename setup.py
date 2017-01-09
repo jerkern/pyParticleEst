@@ -4,7 +4,7 @@ import os
 
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
-if (os.environ.has_key('USE_CYTHON')):
+if ('USE_CYTHON' in os.environ):
     USE_CYTHON = int(os.environ['USE_CYTHON'])
 else:
     USE_CYTHON = False
