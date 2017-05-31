@@ -187,6 +187,7 @@ if __name__ == '__main__':
         plt.plot(range(steps + 1), x, 'r-')
         plt.plot(range(steps + 1), y, 'bx')
         plt.draw()
+        plt.pause(0.0001)
         plt.show()
 
     params_it = numpy.zeros((max_iter + 1, 2))
@@ -206,6 +207,7 @@ if __name__ == '__main__':
         for i in xrange(len(params)):
             plt.plot(range(cur_iter + 1), params_it[:cur_iter + 1, i], '-')
         plt.draw()
+        plt.pause(0.0001)
         plt.show()
 
         return (cur_iter >= max_iter)

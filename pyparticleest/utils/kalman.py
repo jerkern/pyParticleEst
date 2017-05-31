@@ -11,7 +11,8 @@ def lognormpdf(err, S):
     """
     Calculate gaussian probability density of err, when err ~ N(0,sigma)
     """
-    return -0.5 * (S.shape[0] * l2pi + np.linalg.slogdet(S)[1] + np.linalg.solve(S, err).T.dot(err))
+    tmp = err.reshape(-1, 1)
+    return -0.5 * (S.shape[0] * l2pi + np.linalg.slogdet(S)[1] + np.linalg.solve(S, tmp).T.dot(tmp))
 
 def lognormpdf_cho(err, Schol):
     """

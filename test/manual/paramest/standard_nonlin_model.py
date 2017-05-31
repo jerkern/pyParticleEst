@@ -127,6 +127,7 @@ def callback_sim(estimator):
     # plt.plot(range(steps+1), y, 'bx')
     plt.draw()
     plt.show()
+    plt.pause(0.0001)
 
 if __name__ == '__main__':
     numpy.random.seed(1)

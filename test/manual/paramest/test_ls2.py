@@ -229,6 +229,7 @@ if __name__ == '__main__':
                 plt.plot((0.0, it), (theta_true[4], theta_true[4]), 'k--')
                 plt.show()
                 plt.draw()
+                plt.pause(0.0001)
                 return (cur_iter > max_iter)
 
             # Create an array for our particles
