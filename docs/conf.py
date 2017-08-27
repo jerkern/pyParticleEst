@@ -23,14 +23,12 @@ class Mock(MagicMock):
             return Mock()
 
 MOCK_MODULES = [
-		'pyparticleest.utils.kalman',
-		'pyparticleest.models.mlnlg_compute',
+		'numpy', 'numpy.random',
 		'scipy', 'scipy.linalg', 'scipy.optimize',
 		'matplotlib', 'matplotlib.pyplot'
 		]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
-
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
