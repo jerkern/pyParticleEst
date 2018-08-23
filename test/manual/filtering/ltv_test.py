@@ -4,27 +4,34 @@ import pyparticleest.simulator as simulator
 import matplotlib.pyplot as plt
 from pyparticleest.models.ltv import LTV
 
+from builtins import range
+
+
 def generate_dataset(steps, z0, P0, Q, R):
     x = numpy.zeros((steps + 1, 2, 1))
     y = numpy.zeros((steps + 1, 2, 1))
     A = numpy.asarray(((1.0, 1.0), (0.0, 1.0)))
     C = numpy.asarray(((1.0, 0.0), (0.0, 0.0)))
     x[0] = numpy.random.multivariate_normal(z0, P0).reshape((-1, 1))
-    y[0] = C.dot(x[0]) + numpy.random.multivariate_normal((0.0, 0.0), R).reshape((-1, 1))
+    y[0] = C.dot(x[0]) + numpy.random.multivariate_normal((0.0,
+                                                           0.0), R).reshape((-1, 1))
 
     for k in range(0, steps):
         C = numpy.asarray(((math.cos(k + 1), 0.0),
                            (math.sin(k + 1), 0.0))).reshape((2, -1))
 
-        x[k + 1] = A.dot(x[k]) + numpy.random.multivariate_normal((0.0, 0.0), Q).reshape((-1, 1))
-        y[k + 1] = C.dot(x[k + 1]) + numpy.random.multivariate_normal((0.0, 0.0), R).reshape((-1, 1))
+        x[k + 1] = A.dot(x[k]) + \
+            numpy.random.multivariate_normal((0.0, 0.0), Q).reshape((-1, 1))
+        y[k + 1] = C.dot(x[k + 1]) + \
+            numpy.random.multivariate_normal((0.0, 0.0), R).reshape((-1, 1))
 
     return (x, y)
 
 # def calc_stuff(out, y, particles, N, R):
-#    for k in xrange(N):
+#    for k in range(N):
 #        out[k] = kalman.lognormpdf(particles[k].reshape(-1,1), y, R)
 #    return out
+
 
 class Model(LTV):
 
@@ -35,7 +42,6 @@ class Model(LTV):
                                     z0=z0, P0=P0,
                                     Q=Q, R=R)
 
-
     def get_meas_dynamics(self, y, t):
         C = numpy.asarray(((math.cos(t), 0.0),
                            (math.sin(t), 0.0))).reshape((2, 2))
@@ -43,7 +49,7 @@ class Model(LTV):
 
 
 def callback(params, Q):
-    print "params = %s" % numpy.exp(params)
+    print("params = %s" % numpy.exp(params))
 
 
 def callback_sim(estimator):
@@ -67,6 +73,7 @@ def callback_sim(estimator):
     plt.draw()
     plt.show()
 
+
 if __name__ == '__main__':
     steps = 50
     num = 1
@@ -87,6 +94,3 @@ if __name__ == '__main__':
     plt.plot(range(steps + 1), sest[:, 0, 0], 'r--')
     plt.plot(range(steps + 1), sest[:, 0, 1], 'g--')
     plt.show()
-
-
-

@@ -7,6 +7,7 @@ import pyparticleest.interfaces as interfaces
 import matplotlib.pyplot as plt
 import pyparticleest.simulator as simulator
 
+
 def generate_dataset(steps, P0, Q, R):
     x = numpy.zeros((steps + 1,))
     y = numpy.zeros((steps,))
@@ -16,6 +17,7 @@ def generate_dataset(steps, P0, Q, R):
         y[k - 1] = x[k] + numpy.random.normal(0.0, R)
 
     return (x, y)
+
 
 class Model(interfaces.FFProposeFromMeasure,
             interfaces.FFBSi):
@@ -29,10 +31,10 @@ class Model(interfaces.FFProposeFromMeasure,
         self.R = numpy.copy(R)
 
     def propose_from_y(self, N, y, t):
-        return numpy.random.normal(y, numpy.sqrt(self.R), (N,)).reshape((-1, 1))
+        return numpy.random.normal(y, numpy.sqrt(self.R).ravel(), (N,)).reshape((-1, 1))
 
     def create_initial_estimate(self, N):
-        return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,)).reshape((-1, 1))
+        return numpy.random.normal(0.0, numpy.sqrt(self.P0).ravel(), (N,)).reshape((-1, 1))
 
     def logp_xnext(self, particles, next_part, u, t):
         diff = next_part - particles
@@ -64,6 +66,7 @@ class Model(interfaces.FFProposeFromMeasure,
             return numpy.copy(particles[new_ind])
         else:
             return numpy.copy(particles)
+
 
 if __name__ == '__main__':
     steps = 50

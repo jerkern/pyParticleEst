@@ -2,6 +2,7 @@
 Utilities for evalutating probability density functions
 """
 
+
 class unifsum(object):
     """
     pdf for sum of two uniform variables
@@ -10,6 +11,7 @@ class unifsum(object):
      a: lower limits (1st, 2nd)
      a: upper limits (1st, 2nd)
     """
+
     def __init__(self, a, b):
         #a1 = numpy.min(a)
         #b1 = numpy.max(a)
@@ -62,7 +64,7 @@ class unifsum(object):
         elif (p < (self.c + self.w_diff / 2)):
             v = self.t
         elif (p < self.h):
-            v = self.t * (self.c + self.w_diff / 2 - p + self.w_min) / self.w_min;
+            v = self.t * (self.c + self.w_diff / 2 - p + self.w_min) / self.w_min
         else:
-            v = 0.0;
+            v = 0.0
         return v

@@ -6,6 +6,9 @@ models
 import scipy.linalg as lalg
 import numpy as np
 
+from builtins import range
+
+
 def compute_logprod_derivative(Alup, dA, B, dB):
     """ I = logdet(A)+Tr(inv(A)*B)
         dI/dx = Tr(inv(A)*(dA - dA*inv(A)*B + dB) """
@@ -14,7 +17,7 @@ def compute_logprod_derivative(Alup, dA, B, dB):
     tmp2 = dA + dB - dA.dot(tmp)
     return np.trace(lalg.cho_solve(Alup, tmp2, check_finite=False))
 
-#def compute_l2_grad_f_slow(N, lenp, dim, out, perr, f_grad, tmp):
+# def compute_l2_grad_f_slow(N, lenp, dim, out, perr, f_grad, tmp):
 #    diff_l2 = np.zeros((N, lenp, dim, dim))
 #    if (f_grad is not None):
 #        for i in xrange(N):
@@ -43,8 +46,8 @@ def compute_l2_grad_A(N, lenp, dim,
     # tmp1 ~ (dim, dim)
     # tmp2 ~(dim, dim-lxi)
 
-    for i in xrange(N):
-        for j in xrange(lenp):
+    for i in range(N):
+        for j in range(lenp):
 
             #A_grad[i,j].dot(zl[i],tmp2[:,0]) (dim,1)
             for k in range(dim):
@@ -76,7 +79,6 @@ def compute_l2_grad_A(N, lenp, dim,
                     for m in range(dim - lxi):
                         tmp1[k, l] += tmp2[k, m] * A[i, l, m]
 
-
             #diff_l2[i,j,:,:] += tmp1 + tmp1.T
             for k in range(dim):
                 for l in range(dim):
@@ -101,12 +103,14 @@ def compute_l2_grad_A(N, lenp, dim,
 #                for l in range(dim-lxi):
 #                    out[i,j,<unsigned int>(lxi+k),<unsigned int>(lxi+l)] += Pn[i,k,l]
 
+
 def compute_pred_err(N, dim, xn, f, A, zl, out):
-    for i in xrange(N):
+    for i in range(N):
         out[i] = xn[i] - f[i] - A[i].dot(zl[i])
 
+
 def compute_l2(N, lxi, dim, perr, Pn, A, Pl, M, out):
-    for i in xrange(N):
+    for i in range(N):
 
         out[i] = perr[i].dot(perr[i].T) + A[i].dot(Pl[i]).dot(A[i].T)
 
@@ -119,7 +123,6 @@ def compute_l2(N, lxi, dim, perr, Pn, A, Pl, M, out):
         tmp = -A[i].dot(M[i])
         out[i, :, lxi:] += tmp
         out[i, lxi:, :] += tmp.T
-
 
         #tmp2 = Pn[i] - M[i].T.dot(Pl[i]) - Az.dot(M[i])
         #out[i, lxi:,lxi:] += tmp2

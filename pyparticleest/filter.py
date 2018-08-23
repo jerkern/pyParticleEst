@@ -355,7 +355,7 @@ class CSIRAS(SIR):
         ancestors[:-1] = sample(tmp, N - 1)
 
         #select ancestor for conditional trajectory
-        pind = numpy.asarray(range(N), dtype=numpy.int)
+        pind = numpy.arange(N, dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
 
         wtrans = self.model.logp_xnext(particles=traj[cur_ind].pa.part,
@@ -613,7 +613,7 @@ class CPFAS(CPF):
         ancestors[:-1] = sample(tmp, N - 1)
 
         #select ancestor for conditional trajectory
-        pind = numpy.asarray(range(N), dtype=numpy.int)
+        pind = numpy.arange(N, dtype=numpy.int)
         find = numpy.zeros((N,), dtype=numpy.int)
 
         wtrans = self.model.logp_xnext_singlestep(part=traj[cur_ind].pa.part[pind],
@@ -761,7 +761,7 @@ class CPFYAS(CPFAS):
         partn = self.model.propose_from_y(self.N, y=yvec[cur_ind + 1], t=tvec[cur_ind + 1])
         partn[-1] = self.ctraj[cur_ind + 1].pa.part
 
-        find = numpy.asarray(range(self.N))
+        find = numpy.arange(self.N)
 
         wn = self.model.logp_xnext_singlestep(part=traj[-1].pa.part[ancestors],
                                               past_trajs=traj[:cur_ind],
@@ -852,7 +852,7 @@ class ParticleTrajectory(object):
             assert(ytype is not None)
             self.uvec = numpy.empty(T, dtype=utype)
             self.yvec = numpy.empty(T, dtype=ytype)
-            self.tvec = numpy.asarray(range(T))
+            self.tvec = numpy.arange(T)
             self.T = T
         else:
             self.uvec = numpy.empty(1, dtype=utype)
@@ -1013,7 +1013,7 @@ class ParticleTrajectory(object):
         Returns:
          SmoothTrajectory object containing the smoothed estimates
         """
-        from smoother import SmoothTrajectory
+        from .smoother import SmoothTrajectory
 
         options = {}
         if (method == 'rs' or method == 'rsas'):

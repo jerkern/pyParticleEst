@@ -6,6 +6,9 @@ import pyparticleest.utils.kalman as kalman
 import matplotlib.pyplot as plt
 import scipy.stats
 
+from builtins import range
+
+
 def generate_dataset(steps, P0_xi, P0_z, Q_xi, Q_z, R_xi, R_z):
     xi = numpy.zeros((1, steps + 1))
     z = numpy.zeros((2, steps + 1))
@@ -17,7 +20,8 @@ def generate_dataset(steps, P0_xi, P0_z, Q_xi, Q_z, R_xi, R_z):
         Ak = numpy.asarray(((math.cos(xi[:, k - 1]), math.sin(xi[:, k - 1])),
                             (-math.sin(xi[:, k - 1]), math.cos(xi[:, k - 1]))
                             ))
-        z[:, k] = Ak.dot(z[:, k - 1]) + numpy.random.multivariate_normal(numpy.zeros((2,)), Q_z)
+        z[:, k] = Ak.dot(z[:, k - 1]) + \
+            numpy.random.multivariate_normal(numpy.zeros((2,)), Q_z)
         C = numpy.asarray(((math.cos(xi[:, k - 1]), math.sin(xi[:, k - 1]))))
         y[k - 1, 0] = xi[:, k] + numpy.random.normal(0.0, math.sqrt(R_xi))
         y[k - 1, 1] = C.dot(z[:, k]) + numpy.random.normal(0.0, math.sqrt(R_z))
@@ -29,7 +33,7 @@ def generate_dataset(steps, P0_xi, P0_z, Q_xi, Q_z, R_xi, R_z):
 class Model(HierarchicalRSBase):
     """ xi_{k+1} = xi_k + v_xi_k, v_xi_k ~ N(0,Q_xi)
         z_{k+1} = ((cos(xi_k) sin(xi_k)),
-                   (-sin(xi_k) cos(xi_k)) * z_{k} + v_z_k, v_z_k ~ N(0, Q_z) 
+                   (-sin(xi_k) cos(xi_k)) * z_{k} + v_z_k, v_z_k ~ N(0, Q_z)
         y_z_k = ((cos(xi_k) sin(xi_k))*z_k + e_k, e_k ~ N(0,R_z),
         y_xi_k = xi_k + e_xi_k, e_xi_k ~ N(0,R_xi)
         x(0) ~ N(0,P0) """
@@ -43,12 +47,14 @@ class Model(HierarchicalRSBase):
         fz = numpy.zeros((2, 1))
         hz = numpy.zeros((1, 1))
         self.pn_count = 0
-        super(Model, self).__init__(len_xi=1, len_z=2, fz=fz, Qz=Q_z, hz=hz, R=R_z)
+        super(Model, self).__init__(
+            len_xi=1, len_z=2, fz=fz, Qz=Q_z, hz=hz, R=R_z)
 
     def create_initial_estimate(self, N):
-        particles = numpy.zeros((N, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
+        particles = numpy.zeros(
+            (N, self.lxi + self.kf.lz + 2 * self.kf.lz ** 2))
 
-        for i in xrange(N):
+        for i in range(N):
             particles[i, 0] = numpy.random.normal(0.0, math.sqrt(self.P0_xi))
             particles[i, 1:3] = numpy.zeros((1, 2))
             particles[i, 3:7] = numpy.copy(self.P0_z).ravel()
@@ -58,7 +64,8 @@ class Model(HierarchicalRSBase):
         N = len(xi0)
         z0 = numpy.zeros((self.kf.lz, 1))
         z_list = numpy.repeat(z0.reshape((1, self.kf.lz, 1)), N, 0)
-        P_list = numpy.repeat(self.P0_z.reshape((1, self.kf.lz, self.kf.lz)), N, 0)
+        P_list = numpy.repeat(self.P0_z.reshape(
+            (1, self.kf.lz, self.kf.lz)), N, 0)
         return (z_list, P_list)
 
     def sample_process_noise(self, particles, u, t):
@@ -69,7 +76,7 @@ class Model(HierarchicalRSBase):
     def calc_xi_next(self, particles, u, t, noise):
         N = len(particles)
         xi_next = numpy.empty(N)
-        for i in xrange(N):
+        for i in range(N):
             xi_next[i] = particles[i][0] + noise[i]
         return xi_next
 
@@ -84,7 +91,7 @@ class Model(HierarchicalRSBase):
     def measure_nonlin(self, particles, y, t):
         N = len(particles)
         lpy = numpy.empty((N,))
-        for i in xrange(N):
+        for i in range(N):
             lpy[i] = kalman.lognormpdf(y[0] - particles[i][0], self.R_xi)
         return lpy
 
@@ -94,27 +101,27 @@ class Model(HierarchicalRSBase):
 
             \z_{t+1]} = A_z * z_t + f_z + v_z, v_z ~ N(0,Q_z)
 
-            conditioned on the value of xi_{t+1}. 
+            conditioned on the value of xi_{t+1}.
             (Not the same as the dynamics unconditioned on xi_{t+1})
-            when for example there is a noise correlation between the 
-            linear and nonlinear state dynamics) 
+            when for example there is a noise correlation between the
+            linear and nonlinear state dynamics)
             """
         N = len(particles)
         Az = numpy.empty((N, 2, 2))
-        for i in xrange(N):
+        for i in range(N):
             Az[i] = numpy.asarray(((math.cos(particles[i][0]), math.sin(particles[i][0])),
-                                  (-math.sin(particles[i][0]), math.cos(particles[i][0])))
+                                   (-math.sin(particles[i][0]), math.cos(particles[i][0])))
                                   )
         return (Az, None, None)
 
     def get_lin_meas_dynamics(self, particles, y, t):
         N = len(particles)
         Cz = numpy.empty((N, 1, 2))
-        for i in xrange(N):
-            Cz[i] = numpy.asarray(((math.cos(particles[i][0]), math.sin(particles[i][0])),))
+        for i in range(N):
+            Cz[i] = numpy.asarray(
+                ((math.cos(particles[i][0]), math.sin(particles[i][0])),))
 
         return (y[1], Cz, None, None)
-
 
 
 if __name__ == '__main__':
@@ -147,7 +154,7 @@ if __name__ == '__main__':
     for k in range(steps + 1):
         plt.plot((k,) * num, parts[k, :, 0], 'r.', markersize=1.0)
 
-    for j in xrange(nums):
+    for j in range(nums):
         plt.plot(range(steps + 1), sest[:, j, 0], 'r--')
         plt.plot(range(steps + 1), sest[:, j, 1], 'g--')
         plt.plot(range(steps + 1), sest[:, j, 2], 'b--')

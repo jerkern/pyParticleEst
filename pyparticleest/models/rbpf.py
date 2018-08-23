@@ -15,6 +15,7 @@ except ImportError:
     import pyparticleest.utils.kalman as kalman
 import numpy
 
+from builtins import range
 
 
 class RBPFBase(interfaces.ParticleFiltering):
@@ -33,7 +34,7 @@ class RBPFBase(interfaces.ParticleFiltering):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, lz, Az=None, fz=None, Qz=None,
-                 C=None , hz=None, R=None, **kwargs):
+                 C=None, hz=None, R=None, **kwargs):
 
         self.kf = kalman.KalmanSmoother(lz, A=Az, C=C,
                                         Q=Qz, R=R,
@@ -299,12 +300,14 @@ class RBPFBase(interfaces.ParticleFiltering):
         # Calc (z_t | xi_{t+1}, y_t)
         self.meas_xi_next(particles=particles, xi_next=xi_next, u=u, t=t)
         # Compensate for noise correlation
-        (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
+        (Az, fz, Qz) = self.calc_cond_dynamics(
+            particles=particles, xi_next=xi_next, u=u, t=t)
         (_, zl, Pl) = self.get_states(particles)
         # Predict next states conditioned on xi_next
-        for i in xrange(len(zl)):
+        for i in range(len(zl)):
             # Predict z_{t+1}
-            (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
+            (zl[i], Pl[i]) = self.kf.predict_full(
+                z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
 
         self.set_states(particles, xi_next, zl, Pl)
 
@@ -342,11 +345,9 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
         T = len(st.traj)
         M = len(st.traj[0].pa.part)
 
-
         lx_filt = self.lxi + self.kf.lz + self.kf.lz ** 2
         # Allocate extra space for Mz
         lx = lx_filt + self.kf.lz ** 2
-
 
         straj = numpy.empty((T,), dtype=object)
 
@@ -357,10 +358,10 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
         particles[:, :lx_filt] = ftraj[-1].pa.part
 
         straj[-1] = TrajectoryStep(ParticleApproximation(particles),
-                                      ftraj[-1].ancestors)
+                                   ftraj[-1].ancestors)
 
         # Backward smoothing
-        for i in reversed(xrange(T - 1)):
+        for i in reversed(range(T - 1)):
             (xin, zn, Pn) = self.get_states(straj[i + 1].pa.part)
             particles = numpy.zeros((M, lx))
             particles[:, :lx_filt] = ftraj[i].pa.part
@@ -370,12 +371,14 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
             # Condition on future nonlinear state
             self.meas_xi_next(particles, xin, u=st.u[i], t=st.t[i])
             (xi, z, P) = self.get_states(particles)
-            (Al, fl, Ql) = self.calc_cond_dynamics(particles, xin, u=st.u[i], t=st.t[i])
+            (Al, fl, Ql) = self.calc_cond_dynamics(
+                particles, xin, u=st.u[i], t=st.t[i])
             # Update distribution for linear states
-            for j in xrange(M):
+            for j in range(M):
                 (zs, Ps, Ms) = self.kf.smooth(z[j], P[j], zn[j], Pn[j],
                                               Al[j], fl[j], Ql[j])
-                self.set_states(straj[i].pa.part[j:j + 1, :], xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
+                self.set_states(straj[i].pa.part[j:j + 1, :],
+                                xi[j], zs[numpy.newaxis], Ps[numpy.newaxis])
                 self.set_Mz(straj[i].pa.part[j:j + 1, :], Ms[numpy.newaxis])
 
         return straj
@@ -407,7 +410,7 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
         (z0, P0) = self.get_rb_initial(xil)
         self.set_states(particles, xil, z0, P0)
 
-        for i in xrange(T - 1):
+        for i in range(T - 1):
             if (st.y[i] is not None):
                 self.measure(particles, y=st.y[i], t=st.t[i])
 
@@ -415,7 +418,8 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
                                       st.traj[i].ancestors)
 
             #(xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
-            xin = st.traj[i + 1].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
+            xin = st.traj[i + 1].pa.part[:,
+                                         :self.lxi].reshape((M, self.lxi, 1))
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
 
         if (st.y[-1] is not None):
@@ -484,7 +488,8 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
         Pend = zend + self.kf.lz ** 2
         Mend = Pend + self.kf.lz ** 2
 
-        Mz = smooth_particles[:, Pend:Mend].reshape((N, self.kf.lz, self.kf.lz))
+        Mz = smooth_particles[:, Pend:Mend].reshape(
+            (N, self.kf.lz, self.kf.lz))
         return Mz
 
     def set_Mz(self, smooth_particles, Mz):

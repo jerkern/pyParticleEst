@@ -13,15 +13,19 @@ def generate_dataset(steps, P0, Q, R):
     x[0] = numpy.random.multivariate_normal((0.0,), P0)
     y[0] = 0.05 * x[0] ** 2 + numpy.random.multivariate_normal((0.0,), R)
     for k in range(0, steps):
-        x[k + 1] = 0.5 * x[k] + 25.0 * x[k] / (1 + x[k] ** 2) + 8 * math.cos(1.2 * k) + numpy.random.multivariate_normal((0.0,), Q)
-        y[k + 1] = 0.05 * x[k + 1] ** 2 + numpy.random.multivariate_normal((0.0,), R)
+        x[k + 1] = 0.5 * x[k] + 25.0 * x[k] / (1 + x[k] ** 2) + 8 * math.cos(
+            1.2 * k) + numpy.random.multivariate_normal((0.0,), Q)
+        y[k + 1] = 0.05 * x[k + 1] ** 2 + \
+            numpy.random.multivariate_normal((0.0,), R)
 
     return (x, y)
+
 
 def wmean(logw, val):
     w = numpy.exp(logw)
     w = w / sum(w)
     return numpy.sum(w * val.ravel())
+
 
 class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
             pestint.ParamEstInterface, pestint.ParamEstBaseNumeric):
@@ -37,16 +41,17 @@ class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
         super(Model, self).__init__()
 
     def create_initial_estimate(self, N):
-        return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,))
+        return numpy.random.normal(0.0, numpy.sqrt(self.P0).ravel(), (N,))
 
     def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
         N = len(particles)
-        return numpy.random.normal(0.0, numpy.sqrt(self.Q), (N,))
+        return numpy.random.normal(0.0, numpy.sqrt(self.Q).ravel(), (N,))
 
     def update(self, particles, u, noise, t):
         """ Update estimate using 'data' as input """
-        particles[:] = 0.5 * particles + 25.0 * particles / (1 + particles ** 2) + 8 * math.cos(1.2 * t) + noise
+        particles[:] = 0.5 * particles + 25.0 * particles / \
+            (1 + particles ** 2) + 8 * math.cos(1.2 * t) + noise
 
     def measure(self, particles, y, t):
         """ Return the log-pdf value of the measurement """
@@ -54,7 +59,8 @@ class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
 
     def logp_xnext(self, particles, next_part, u, t):
         """ Return the log-pdf value for the possible future state 'next' given input u """
-        pn = 0.5 * particles + 25.0 * particles / (1 + particles ** 2) + 8 * math.cos(1.2 * t)
+        pn = 0.5 * particles + 25.0 * particles / \
+            (1 + particles ** 2) + 8 * math.cos(1.2 * t)
         return kalman.lognormpdf_scalar(pn.ravel() - next_part.ravel(), self.Q)
 
     def logp_xnext_max(self, particles, u, t):
@@ -87,11 +93,11 @@ class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
         part = straj.get_smoothed_estimates()
         M = part.shape[1]
         cost = 8.0 * numpy.cos(1.2 * numpy.asarray(tt, dtype=float))
-        xp = 0.5 * part + 25.0 * part / (1 + part ** 2) + numpy.repeat(cost.reshape(-1, 1, 1), repeats=M, axis=1)
+        xp = 0.5 * part + 25.0 * part / \
+            (1 + part ** 2) + numpy.repeat(cost.reshape(-1, 1, 1), repeats=M, axis=1)
         diff = part[1:] - xp[:-1]
         logp = kalman.lognormpdf_scalar(diff.ravel(), self.Q)
         return numpy.sum(logp) / M
-
 
     def eval_logp_y_fulltraj(self, straj, yt, tt):
         sest = straj.get_smoothed_estimates()
@@ -101,8 +107,9 @@ class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
                                  repeats=M, axis=1)
         return numpy.sum(kalman.lognormpdf_scalar(diff.ravel(), self.R)) / M
 
+
 def callback(params, Q, cur_iter):
-    print "params = %s" % numpy.exp(params)
+    print("params = %s" % numpy.exp(params))
 
 
 def callback_sim(estimator):
@@ -118,7 +125,6 @@ def callback_sim(estimator):
 #        #plt.plot((k,)*num, vals[:,k], 'k.', markersize=0.5)
 #    plt.plot(range(steps+1), mvals, 'k-')
 
-
     sest = estimator.get_smoothed_estimates()
     for k in range(sest.shape[1]):
         plt.plot(range(steps + 1), sest[:, k], 'g-')
@@ -129,12 +135,15 @@ def callback_sim(estimator):
     plt.show()
     plt.pause(0.0001)
 
+
 if __name__ == '__main__':
     numpy.random.seed(1)
     steps = 1499
-    iterations = numpy.asarray(range(200))
-    num = numpy.ceil(500 + 4500.0 / (iterations[-1] ** 3) * iterations ** 3).astype(int)
-    M = numpy.ceil(50 + 450.0 / (iterations[-1] ** 3) * iterations ** 3).astype(int)
+    iterations = numpy.arange(1000)
+    num = numpy.ceil(
+        500 + 4500.0 / (iterations[-1] ** 3) * iterations ** 3).astype(int)
+    M = numpy.ceil(
+        50 + 450.0 / (iterations[-1] ** 3) * iterations ** 3).astype(int)
     P0 = 5.0 * numpy.eye(1)
     Q = 1.0 * numpy.eye(1)
     R = 0.1 * numpy.eye(1)
@@ -155,5 +164,3 @@ if __name__ == '__main__':
 #        traj.forward(u=None, y=y[k])
 #
 #    straj = traj.perform_smoothing(M, method='rs')
-
-

@@ -4,6 +4,9 @@ import pyparticleest.models.nlg
 import pyparticleest.simulator as simulator
 import matplotlib.pyplot as plt
 
+from builtins import range
+
+
 def generate_dataset(steps, P0, Q, R):
     x = numpy.zeros((steps + 1,))
     y = numpy.zeros((steps,))
@@ -13,6 +16,7 @@ def generate_dataset(steps, P0, Q, R):
         y[k - 1] = x[k] + numpy.random.normal(0.0, math.sqrt(R))
 
     return (x, y)
+
 
 def wmean(logw, val):
     w = numpy.exp(logw)
@@ -56,7 +60,7 @@ if __name__ == '__main__':
     vals = numpy.empty((num, steps + 1))
     (parts, _) = sim.get_filtered_estimates()
     mvals = sim.get_filtered_mean()
-    for k in xrange(len(parts)):
+    for k in range(len(parts)):
         plt.plot((k,) * num, parts[k, :, 0], 'k.', markersize=1.0)
 
     plt.plot(range(steps + 1), mvals, 'k-')

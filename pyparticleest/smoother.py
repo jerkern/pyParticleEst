@@ -4,9 +4,12 @@
 """
 
 import numpy
-import filter as pf
 import copy
-from filter import ParticleApproximation, TrajectoryStep
+
+from builtins import range
+
+from . import filter as pf
+from .filter import ParticleApproximation, TrajectoryStep
 
 def bsi_full(model, pa, ptraj, pind, future_trajs, find, ut, yt, tt, cur_ind):
     """
@@ -26,8 +29,8 @@ def bsi_full(model, pa, ptraj, pind, future_trajs, find, ut, yt, tt, cur_ind):
     M = len(find)
     N = len(pa.w)
     res = numpy.empty(M, dtype=int)
-    #pind = numpy.asarray(range(N))
-    for j in xrange(M):
+
+    for j in range(M):
         currfind = find[j] * numpy.ones((N,), dtype=int)
         p_next = model.logp_xnext_full(pa.part, ptraj, pind,
                                        future_trajs, currfind,
@@ -59,13 +62,13 @@ def bsi_rs(model, pa, ptraj, pind, future_trajs, find, ut, yt, tt, cur_ind, maxp
     """
 
     M = len(find)
-    todo = numpy.asarray(range(M))
+    todo = numpy.arange(M)
     res = numpy.empty(M, dtype=int)
     weights = numpy.copy(pa.w)
     weights -= numpy.max(weights)
     weights = numpy.exp(weights)
     weights /= numpy.sum(weights)
-    for _i in xrange(max_iter):
+    for _i in range(max_iter):
 
         ind = numpy.random.permutation(pf.sample(weights, len(todo)))
         pn = model.logp_xnext_full(pa.part[ind], ptraj, pind[ind],
@@ -113,7 +116,7 @@ def bsi_rsas(model, pa, ptraj, pind, future_trajs, find, ut, yt, tt, cur_ind, ma
        switching to the full bsi (D_0 / D_1)
     """
     M = len(find)
-    todo = numpy.asarray(range(M))
+    todo = numpy.arange(M)
     res = numpy.empty(M, dtype=int)
     weights = numpy.copy(pa.w)
     weights -= numpy.max(weights)
@@ -179,7 +182,7 @@ def bsi_mcmc(model, pa, ptraj, pind, future_trajs, find, ut, yt, tt, cur_ind, R,
     pcurr = model.logp_xnext_full(pa.part[ind], ptraj, pind[ind],
                                   future_trajs, find,
                                   ut=ut, yt=yt, tt=tt, cur_ind=cur_ind)
-    for _j in xrange(R):
+    for _j in range(R):
         propind = numpy.random.permutation(pf.sample(weights, M))
         pprop = model.logp_xnext_full(pa.part[propind], ptraj, pind[propind],
                                    future_trajs, find,
@@ -232,7 +235,7 @@ class SmoothTrajectory(object):
                 R = options['R']
             else:
                 R = 10
-            for _i in xrange(R):
+            for _i in range(R):
                 # Recover filtering statistics for linear states
                 if hasattr(self.model, 'pre_mhips_pass'):
                     self.traj = self.model.pre_mhips_pass(self)
@@ -283,7 +286,7 @@ class SmoothTrajectory(object):
         traj[T - 1] = TrajectoryStep(ParticleApproximation(last_part),
                                        numpy.arange(M, dtype=int))
 
-        for t in reversed(xrange(T - 1)):
+        for t in reversed(range(T - 1)):
 
             ind = ancestors
             ancestors = pt[t].ancestors[ind]
@@ -362,7 +365,7 @@ class SmoothTrajectory(object):
 
         find = numpy.arange(M, dtype=numpy.int)
 
-        for cur_ind in reversed(xrange(len(pt) - 1)):
+        for cur_ind in reversed(range(len(pt) - 1)):
 
             ft = self.traj[(cur_ind + 1):]
             ut = self.u
@@ -449,7 +452,7 @@ class SmoothTrajectory(object):
 #                                             ut=ut, yt=yt, tt=tt,
 #                                             cur_ind=T - 1)
 
-        for t in reversed(xrange(T)):
+        for t in reversed(range(T)):
 
             # Initialise from filtered estimate
             if (t < T - 1):
@@ -469,7 +472,7 @@ class SmoothTrajectory(object):
             else:
                 ptraj = None
 
-            for _ in xrange(R):
+            for _ in range(R):
 
                 if (t > 0):
                     # Propose new ancestors
@@ -548,7 +551,7 @@ class SmoothTrajectory(object):
         straj[T - 1] = TrajectoryStep(ParticleApproximation(tmp), pind)
 
 
-        for i in reversed(xrange(1, (T - 1))):
+        for i in reversed(range(1, (T - 1))):
             ft = straj[(i + 1):]
             pt = self.traj[:i]
             (part, _acc) = mc_step(model=self.model,
@@ -623,7 +626,7 @@ class SmoothTrajectory(object):
 
         est = numpy.empty((T, N, D))
 
-        for t in xrange(T):
+        for t in range(T):
             est[t] = self.traj[t].pa.part
 
         return est

@@ -12,9 +12,11 @@ import pyparticleest.simulator as simulator
 import scipy.linalg
 import sys
 
+from builtins import range
 
 pxi = 0.85
 pz = 0.9
+
 
 def generate_dataset(length, Qz, R, Qes, Qeb):
 
@@ -32,21 +34,26 @@ def generate_dataset(length, Qz, R, Qes, Qeb):
 
     for i in range(1, length + 1):
         a = 1 if (t % 2 == 0) else 0
-        e = pxi * e + (1 - a) * z + numpy.random.multivariate_normal(numpy.zeros((1,)), a * Qes + (1 - a) * Qeb)
+        e = pxi * e + (1 - a) * z + numpy.random.multivariate_normal(
+            numpy.zeros((1,)), a * Qes + (1 - a) * Qeb)
 
-        wz = numpy.random.multivariate_normal(numpy.zeros((1,)), Qz).ravel().reshape((-1, 1))
+        wz = numpy.random.multivariate_normal(
+            numpy.zeros((1,)), Qz).ravel().reshape((-1, 1))
 
         z = pz * z + wz
         t = t + 1
         a = 1 if (t % 2 == 0) else 0
-        y[:, i - 1] = (e ** 2 + (1 - a) * z + numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
+        y[:, i - 1] = (e ** 2 + (1 - a) * z +
+                       numpy.random.multivariate_normal(numpy.zeros((1,)), R)).ravel()
         e_vec[:, i] = e.ravel()
         z_vec[:, i] = z.ravel()
 
     return (y.T.tolist(), e_vec, z_vec)
 
+
 class ParticleAPF(mlnlg.MixedNLGaussianSampledInitialGaussian):
     """ Model 60 & 61 from Lindsten & Schon (2011) """
+
     def __init__(self, Qz, R, Qes, Qeb):
         """ Define all model variables """
 
@@ -60,7 +67,8 @@ class ParticleAPF(mlnlg.MixedNLGaussianSampledInitialGaussian):
         self.Qes = numpy.copy(Qes)
         self.Qeb = numpy.copy(Qeb)
 
-        super(ParticleAPF, self).__init__(xi0=xi0, z0=z0, Pz0=P0, R=R, Qz=Qz, Az=Az)
+        super(ParticleAPF, self).__init__(
+            xi0=xi0, z0=z0, Pz0=P0, R=R, Qz=Qz, Az=Az)
 
     def get_nonlin_pred_dynamics(self, particles, u, t):
         tmp = numpy.vstack(particles)[:, numpy.newaxis, :]
@@ -68,14 +76,15 @@ class ParticleAPF(mlnlg.MixedNLGaussianSampledInitialGaussian):
         xi = tmp[:, :, 0]
         Axi = (1.0 - a) * numpy.ones((len(particles), 1, 1))
         fxi = pxi * xi[:, numpy.newaxis, :]
-        Qxi = numpy.repeat((a * self.Qes + (1 - a) * self.Qeb)[numpy.newaxis], len(particles), axis=0)
+        Qxi = numpy.repeat((a * self.Qes + (1 - a) * self.Qeb)
+                           [numpy.newaxis], len(particles), axis=0)
         return (Axi, fxi, Qxi)
 
     def get_lin_pred_dynamics(self, particles, u, t):
-#         a = 1 if (t % 2 == 0) else 0
-#         Az = (1-a)*numpy.ones((len(particles),1,1))
-#         fz = math.cos(t)*numpy.eye(1)
-#         fz = numpy.repeat(fz[numpy.newaxis], len(particles), axis=0)
+        #         a = 1 if (t % 2 == 0) else 0
+        #         Az = (1-a)*numpy.ones((len(particles),1,1))
+        #         fz = math.cos(t)*numpy.eye(1)
+        #         fz = numpy.repeat(fz[numpy.newaxis], len(particles), axis=0)
         return (None, None, None)
 
     def get_meas_dynamics(self, particles, y, t):
@@ -90,6 +99,7 @@ class ParticleAPF(mlnlg.MixedNLGaussianSampledInitialGaussian):
         a = 1 if (t % 2 == 0) else 0
         C = (1 - a) * numpy.ones((N, 1, 1))
         return (numpy.asarray(y).reshape((-1, 1)), C, h, None)
+
 
 class ParticleAPF_EKF(ParticleAPF):
 
@@ -106,8 +116,8 @@ class ParticleAPF_EKF(ParticleAPF):
         Axi = (1.0 - a) * numpy.ones((len(particles), 1, 1))
         Az = pz
 
-        Qxi = numpy.repeat((a * self.Qes + (1 - a) * self.Qeb)[numpy.newaxis], len(particles), axis=0)
-
+        Qxi = numpy.repeat((a * self.Qes + (1 - a) * self.Qeb)
+                           [numpy.newaxis], len(particles), axis=0)
 
         # for next time (at measurement)
         a = 1 if ((t + 1) % 2 == 0) else 0
@@ -129,9 +139,11 @@ class ParticleAPF_EKF(ParticleAPF):
 
         lyz = numpy.empty(N)
         l2pi = math.log(2 * math.pi)
-        for i in xrange(N):
-            lyz[i] = -0.5 * (l2pi + logRext[i, 0, 0] + (diff[i].ravel() ** 2) / Rext[i, 0, 0])
+        for i in range(N):
+            lyz[i] = -0.5 * (l2pi + logRext[i, 0, 0] +
+                             (diff[i].ravel() ** 2) / Rext[i, 0, 0])
         return lyz
+
 
 class ParticleAPF_UKF(ParticleAPF):
 
@@ -139,7 +151,8 @@ class ParticleAPF_UKF(ParticleAPF):
         N = len(particles)
         # xin = self.pred_xi(part, u, t)
 
-        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(particles=particles, u=u, t=t)
+        (Axi, fxi, Qxi, _, _, _) = self.get_nonlin_pred_dynamics_int(
+            particles=particles, u=u, t=t)
         (_xil, zl, Pl) = self.get_states(particles)
 
         Rext = numpy.empty(N)
@@ -151,7 +164,7 @@ class ParticleAPF_UKF(ParticleAPF):
 
         Az = pz
 
-        for i in xrange(N):
+        for i in range(N):
             m = numpy.vstack((zl[i], numpy.zeros((3, 1))))
             K = scipy.linalg.block_diag(Pl[i], Qxi[i], self.kf.Q, self.kf.R)
             Na = len(K)
@@ -160,7 +173,7 @@ class ParticleAPF_UKF(ParticleAPF):
 
             ypred = numpy.empty(2 * Na)
             # Some ugly hard-coding here of the function g
-            for j in xrange(Na):
+            for j in range(Na):
                 val = m + Kroot[:, j:j + 1]
                 xin = fxi[i] + Axi[i].dot(val[:1]) + val[1]
                 zn = Az * val[0] + val[2]
@@ -179,14 +192,17 @@ class ParticleAPF_UKF(ParticleAPF):
 
         lyz = numpy.empty(N)
         l2pi = math.log(2 * math.pi)
-        for i in xrange(N):
-            lyz[i] = -0.5 * (l2pi + logRext[i] + (diff[i].ravel() ** 2) / Rext[i])
+        for i in range(N):
+            lyz[i] = -0.5 * (l2pi + logRext[i] +
+                             (diff[i].ravel() ** 2) / Rext[i])
         return lyz
+
 
 def wmean(logw, val):
     w = numpy.exp(logw - numpy.max(logw))
     w = w / sum(w)
     return numpy.sum(w * val.ravel())
+
 
 if __name__ == '__main__':
 
@@ -198,16 +214,16 @@ if __name__ == '__main__':
     R = 0.1 * numpy.eye(1)
     Qz = 0.1 * numpy.eye(1)
 
-
     if (len(sys.argv) > 1):
         if (sys.argv[1] == 'apf_compare'):
 
             mode = sys.argv[2]
 
-            print "Running tests for %s" % mode
+            print("Running tests for %s" % mode)
 
             sims = 1000
-            part_count = (25, 50, 75, 100, 125, 150, 200) # (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            # (5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 300, 500)
+            part_count = (25, 50, 75, 100, 125, 150, 200)
             rmse_eta = numpy.zeros((sims, len(part_count)))
             rmse_theta = numpy.zeros((sims, len(part_count)))
             filt = 'PF'
@@ -227,12 +243,14 @@ if __name__ == '__main__':
 
                 # Create reference
                 numpy.random.seed(k)
-                (y, e, z) = generate_dataset(steps, Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
+                (y, e, z) = generate_dataset(
+                    steps, Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
                 sim = simulator.Simulator(model=model, u=None, y=y)
 
                 for ind, pc in enumerate(part_count):
 
-                    sim.simulate(pc, num_traj=1, res=0.67, filter=filt, smoother=None)
+                    sim.simulate(pc, num_traj=1, res=0.67,
+                                 filter=filt, smoother=None)
                     avg = numpy.zeros((2, steps + 1))
 
                     avg = sim.get_filtered_mean()
@@ -282,15 +300,15 @@ if __name__ == '__main__':
 #                         plt.plot(range(sind,ind), numpy.asarray(y)[sind-1:ind-1].ravel()-e[sind:ind]**2-avec*z[sind:ind])
 #                         plt.show()
 
-
             for ind, pc in enumerate(part_count):
                 divind = (numpy.isnan(rmse_eta[:, ind]) | numpy.isinf(rmse_eta[:, ind]) |
                           numpy.isnan(rmse_theta[:, ind]) | numpy.isinf(rmse_theta[:, ind]) |
                           (rmse_eta[:, ind] > 10000.0) | (rmse_theta[:, ind] > 10000.0))
                 divcnt = numpy.count_nonzero(divind)
-                print "%d: (%f, %f) (%d diverged)" % (pc, numpy.mean(rmse_eta[~divind, ind]),
-                                                      numpy.mean(rmse_theta[~divind, ind]),
-                                                      divcnt)
+                print("%d: (%f, %f) (%d diverged)" % (pc, numpy.mean(rmse_eta[~divind, ind]),
+                                                      numpy.mean(
+                                                          rmse_theta[~divind, ind]),
+                                                      divcnt))
     else:
 
         num = 50
@@ -307,13 +325,11 @@ if __name__ == '__main__':
         (y, e, z) = generate_dataset(steps, Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Store values for last time-step aswell
 
-
         x = numpy.asarray(range(steps + 1))
         model = ParticleAPF_UKF(Qz=Qz, R=R, Qes=Qes, Qeb=Qeb)
         # Create an array for our particles
         sim = simulator.Simulator(model=model, u=None, y=y)
         sim.simulate(num, nums, res=0.67, filter='PF', smoother='ancestor')
-
 
         svals = sim.get_smoothed_estimates()
         (vals, _) = sim.get_filtered_estimates()
@@ -323,17 +339,23 @@ if __name__ == '__main__':
         plt.figure()
 
         for j in range(num):
-            plt.plot(range(steps + 1), vals[:, j, 0], '.', markersize=1.0, color='#000000')
-            plt.plot(range(steps + 1), svals_mean[:, 0], '--', markersize=1.0, color='#00FF00')
-        plt.plot(range(steps + 1), vals_mean[:, 0], '--', markersize=1.0, color='#0000FF')
+            plt.plot(range(steps + 1), vals[:, j, 0],
+                     '.', markersize=1.0, color='#000000')
+            plt.plot(range(steps + 1),
+                     svals_mean[:, 0], '--', markersize=1.0, color='#00FF00')
+        plt.plot(range(steps + 1),
+                 vals_mean[:, 0], '--', markersize=1.0, color='#0000FF')
         plt.plot(x, e.T, 'k--', markersize=1.0)
         plt.show()
 
         plt.figure()
         for j in range(num):
-            plt.plot(range(steps + 1), vals[:, j, 1], '.', markersize=1.0, color='#000000')
-            plt.plot(range(steps + 1), svals_mean[:, 1], '-', markersize=1.0, color='#00FF00')
-        plt.plot(range(steps + 1), vals_mean[:, 1], '--', markersize=1.0, color='#0000FF')
+            plt.plot(range(steps + 1), vals[:, j, 1],
+                     '.', markersize=1.0, color='#000000')
+            plt.plot(range(steps + 1),
+                     svals_mean[:, 1], '-', markersize=1.0, color='#00FF00')
+        plt.plot(range(steps + 1),
+                 vals_mean[:, 1], '--', markersize=1.0, color='#0000FF')
         plt.plot(x, z.ravel(), 'k--', markersize=1.0)
         plt.show()
 
@@ -342,4 +364,4 @@ if __name__ == '__main__':
         plt.ioff()
         plt.show()
         plt.draw()
-    print "exit"
+    print("exit")
