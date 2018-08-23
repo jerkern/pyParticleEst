@@ -4,8 +4,6 @@ import os
 
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
-USE_CYTHON = True
-
 if ('USE_CYTHON' in os.environ):
     USE_CYTHON = int(os.environ['USE_CYTHON'])
 else:
@@ -35,24 +33,24 @@ if USE_CYTHON:
     extensions = cythonize(extensions)
 
 
-# try:
-setup(name=name,
-      version=version,
-      packages=packages,
-      url=url,
-      author=author,
-      author_email=author_email,
-      description=description,
-      license=lic,
-      ext_modules=extensions,
-      )
-# except SystemExit:
-#     setup(name=name,
-#           version=version,
-#           packages=packages,
-#           url=url,
-#           author=author,
-#           author_email=author_email,
-#           description=description,
-#           license=lic,
-#           )
+try:
+    setup(name=name,
+          version=version,
+          packages=packages,
+          url=url,
+          author=author,
+          author_email=author_email,
+          description=description,
+          license=lic,
+          ext_modules=extensions,
+          )
+except SystemExit:
+    setup(name=name,
+          version=version,
+          packages=packages,
+          url=url,
+          author=author,
+          author_email=author_email,
+          description=description,
+          license=lic,
+          )

@@ -179,12 +179,10 @@ class ParamEstimationSAEM(Simulator):
             zero_ind = (weights == 0.0)
             weights = weights[~zero_ind]
             alltrajs = alltrajs[:, ~zero_ind]
-            params_local = self.model.maximize_weighted(
-                self.straj, alltrajs, weights)
+            params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback is not None):
-                callback(params=params_local, Q=-
-                         numpy.Inf, cur_iter=i)  # , Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i)  # , Q=Q)
         return (params_local, -numpy.Inf)
 
 
@@ -290,8 +288,7 @@ class ParamEstimationPSAEM(Simulator):
             # Make sure weights sum to one
             weights /= numpy.sum(weights)
 
-            params_local = self.model.maximize_weighted(
-                self.straj, alltrajs, weights)
+            params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback is not None):
                 rval = callback(params=params_local, Q=-numpy.Inf, cur_iter=i)
@@ -375,8 +372,7 @@ class ParamEstimationPSAEM2(Simulator):
             if (alltrajs is None):
                 alltrajs = numpy.copy(newtrajs)
             else:
-                alltrajs = numpy.concatenate(
-                    (alltrajs[:, :datalen], newtrajs), axis=1)
+                alltrajs = numpy.concatenate((alltrajs[:, :datalen], newtrajs), axis=1)
 
             datalen += 1
 
@@ -393,8 +389,7 @@ class ParamEstimationPSAEM2(Simulator):
                                                        :datalen][:, ~zero_ind]
             datalen -= zerolen
             weights[:datalen] /= numpy.sum(weights[:datalen])
-            params_local = self.model.maximize_weighted(
-                self.straj, alltrajs[:, :datalen], weights[:datalen])
+            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, :datalen], weights[:datalen])
 #            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, -1:], numpy.asarray((1.0,)))
 
             if (callback is not None):

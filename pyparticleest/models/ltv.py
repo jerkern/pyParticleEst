@@ -426,8 +426,7 @@ class LTV(FFBSi, ParticleFiltering):
                 lz = len(self.z0)
                 lzP = lz + lz * lz
                 Mz = particles[k][lzP:].reshape((lz, lz))
-                (l2, l2_grad) = self.calc_l2_grad(
-                    zn[k], Pn[k], zl[k], Pl[k], self.kf.A, self.kf.f_k, Mz, A_grad, f_grad)
+                (l2, l2_grad) = self.calc_l2_grad(zn[k], Pn[k], zl[k], Pl[k], self.kf.A, self.kf.f_k, Mz, A_grad, f_grad)
                 tmp = scipy.linalg.cho_solve(Qcho, l2)
                 lpxn += -0.5 * (ld + numpy.trace(tmp))
 
@@ -495,7 +494,6 @@ class LTV(FFBSi, ParticleFiltering):
                 R_grad = numpy.zeros((len(self.params), len(y), len(y)))
 
             for i in range(N):
-                # Calculate l3 according to (19b)
                 # Calculate l3 according to (19b)
                 (l3, l3_grad) = self.calc_l3_grad(y, zl[i], Pl[i])
                 tmp = scipy.linalg.cho_solve(Rcho, l3)
