@@ -133,8 +133,7 @@ class HierarchicalBase(RBPSBase):
         for i in range(N):
 
             # Predict z_{t+1}
-            (zln[i], Pln[i]) = self.kf.predict_full(
-                zl[i], Pl[i], Az[i], fz[i], Qz[i])
+            (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
 
             lpz[i] = kalman.lognormpdf(next_part[i][self.lxi:(
                 self.lxi + self.kf.lz)].reshape((-1, 1)) - zln[i], Pln[i])
@@ -265,8 +264,7 @@ class HierarchicalRSBase(HierarchicalBase, FFBSiRS):
         for i in range(N):
             # Predict z_{t+1}
             Pn = Az[i].dot(Pl[i]).dot(Az[i].T) + Qz[i]
-            lpz[i] = -0.5 * nx * \
-                math.log(2 * math.pi) + numpy.linalg.slogdet(Pn)[1]
+            lpz[i] = -0.5 * nx * math.log(2 * math.pi) + numpy.linalg.slogdet(Pn)[1]
         lpmax = numpy.max(lpxi + lpz)
         return lpmax
 

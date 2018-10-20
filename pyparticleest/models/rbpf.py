@@ -282,8 +282,7 @@ class RBPFBase(interfaces.ParticleFiltering):
         """
         xin = future_parts[find, :self.lxi]
         particles = numpy.copy(part)
-        self.cond_predict(particles=particles, xi_next=xin,
-                          u=ut[cur_ind], t=tt[cur_ind])
+        self.cond_predict(particles=particles, xi_next=xin, u=ut[cur_ind], t=tt[cur_ind])
         return particles
 
     def cond_predict(self, particles, xi_next, u, t):
@@ -300,14 +299,12 @@ class RBPFBase(interfaces.ParticleFiltering):
         # Calc (z_t | xi_{t+1}, y_t)
         self.meas_xi_next(particles=particles, xi_next=xi_next, u=u, t=t)
         # Compensate for noise correlation
-        (Az, fz, Qz) = self.calc_cond_dynamics(
-            particles=particles, xi_next=xi_next, u=u, t=t)
+        (Az, fz, Qz) = self.calc_cond_dynamics(particles=particles, xi_next=xi_next, u=u, t=t)
         (_, zl, Pl) = self.get_states(particles)
         # Predict next states conditioned on xi_next
         for i in range(len(zl)):
             # Predict z_{t+1}
-            (zl[i], Pl[i]) = self.kf.predict_full(
-                z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
+            (zl[i], Pl[i]) = self.kf.predict_full(z=zl[i], P=Pl[i], A=Az[i], f_k=fz[i], Q=Qz[i])
 
         self.set_states(particles, xi_next, zl, Pl)
 
@@ -418,8 +415,7 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
                                       st.traj[i].ancestors)
 
             #(xin, _zn, _Pn) = self.get_states(st.traj[i + 1])
-            xin = st.traj[i + 1].pa.part[:,
-                                         :self.lxi].reshape((M, self.lxi, 1))
+            xin = st.traj[i + 1].pa.part[:, :self.lxi].reshape((M, self.lxi, 1))
             self.cond_predict(particles, xin, u=st.u[i], t=st.t[i])
 
         if (st.y[-1] is not None):
@@ -488,8 +484,7 @@ class RBPSBase(RBPFBase, interfaces.FFBSiRS):
         Pend = zend + self.kf.lz ** 2
         Mend = Pend + self.kf.lz ** 2
 
-        Mz = smooth_particles[:, Pend:Mend].reshape(
-            (N, self.kf.lz, self.kf.lz))
+        Mz = smooth_particles[:, Pend:Mend].reshape((N, self.kf.lz, self.kf.lz))
         return Mz
 
     def set_Mz(self, smooth_particles, Mz):

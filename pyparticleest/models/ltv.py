@@ -282,8 +282,7 @@ class LTV(FFBSi, ParticleFiltering):
                 Pn = future_trajs[0].pa.part[j, lz:lzP].reshape((lz, lz))
                 (A, f, Q) = self.get_pred_dynamics(u=ut[0], t=tt[0])
                 self.kf.set_dynamics(A=A, Q=Q, f_k=f)
-                (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A,
-                                              self.kf.f_k, self.kf.Q)
+                (zs, Ps, Ms) = self.kf.smooth(zl[0], Pl[0], zn, Pn, self.kf.A, self.kf.f_k, self.kf.Q)
             else:
                 zs = zl[j]
                 Ps = Pl[j]
@@ -348,13 +347,11 @@ class LTV(FFBSi, ParticleFiltering):
             P0cho = scipy.linalg.cho_factor(self.P0)
             ld = numpy.sum(numpy.log(numpy.diagonal(P0cho[0]))) * 2
             for i in range(N):
-                (l1, l1_grad) = self.calc_l1_grad(
-                    zl[i], Pl[i], self.z0, self.P0, z0_grad)
+                (l1, l1_grad) = self.calc_l1_grad(zl[i], Pl[i], self.z0, self.P0, z0_grad)
                 tmp = scipy.linalg.cho_solve(P0cho, l1)
                 lpz0 += -0.5 * (ld + numpy.trace(tmp))
                 for j in range(len(self.params)):
-                    lpz0_grad[j] -= 0.5 * mlnlg_compute.compute_logprod_derivative(
-                        P0cho, P0_grad[j], l1, l1_grad[j])
+                    lpz0_grad[j] -= 0.5 * mlnlg_compute.compute_logprod_derivative(P0cho, P0_grad[j], l1, l1_grad[j])
         return (lpz0, lpz0_grad)
 
     def eval_logp_xnext(self, particles, x_next, u, t):
@@ -382,8 +379,7 @@ class LTV(FFBSi, ParticleFiltering):
             lz = len(self.z0)
             lzP = lz + lz * lz
             Mz = particles[k][lzP:].reshape((lz, lz))
-            (l2, _A, _M_ext, _predict_err) = self.calc_l2(
-                zn[k], Pn[k], zl[k], Pl[k], self.kf.A, self.kf.f_k, Mz)
+            (l2, _A, _M_ext, _predict_err) = self.calc_l2(zn[k], Pn[k], zl[k], Pl[k], self.kf.A, self.kf.f_k, Mz)
             (_tmp, ld) = numpy.linalg.slogdet(self.kf.Q)
             tmp = numpy.linalg.solve(self.kf.Q, l2)
             lpxn[k] = -0.5 * (ld + numpy.trace(tmp))
@@ -431,8 +427,7 @@ class LTV(FFBSi, ParticleFiltering):
                 lpxn += -0.5 * (ld + numpy.trace(tmp))
 
                 for j in range(len(self.params)):
-                    lpxn_grad[j] -= 0.5 * mlnlg_compute.compute_logprod_derivative(
-                        Qcho, Q_grad[j], l2, l2_grad[j])
+                    lpxn_grad[j] -= 0.5 * mlnlg_compute.compute_logprod_derivative(Qcho, Q_grad[j], l2, l2_grad[j])
 
         return (lpxn, lpxn_grad)
 

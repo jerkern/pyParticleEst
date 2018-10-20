@@ -79,8 +79,7 @@ class ParamEstimation(Simulator):
             #Q = -Q
             # Q_grad = -Q_grad
             if (callback is not None):
-                callback(params=params_local, Q=-
-                         numpy.Inf, cur_iter=i)  # , Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i)  # , Q=Q)
 #            if (numpy.abs(Q - Q_old) < tol):
 #                break
         # return (params_local, Q)
@@ -165,8 +164,7 @@ class ParamEstimationSAEM(Simulator):
             if (weights is None):
                 weights = w
             else:
-                weights = numpy.concatenate(
-                    ((1.0 - alpha) * weights, alpha * w))
+                weights = numpy.concatenate(((1.0 - alpha) * weights, alpha * w))
 
             if (callback_sim is not None):
                 callback_sim(self)
@@ -262,8 +260,7 @@ class ParamEstimationPSAEM(Simulator):
             if (weights is None):
                 weights = w
             else:
-                weights = numpy.concatenate(
-                    ((1.0 - alpha) * weights, alpha * w))
+                weights = numpy.concatenate(((1.0 - alpha) * weights, alpha * w))
 
             filter_options['cond_traj'] = numpy.copy(self.straj.traj)
             if (callback_sim is not None):
