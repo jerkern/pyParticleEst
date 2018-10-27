@@ -16,6 +16,9 @@ import numpy
 import copy
 import math
 
+from builtins import range
+
+
 class HierarchicalBase(RBPSBase):
     """
     Base class for Rao-Blackwellization of hierarchical models
@@ -58,7 +61,7 @@ class HierarchicalBase(RBPSBase):
             Rz = numpy.repeat(self.kf.R[numpy.newaxis, :, :], N, axis=0)
 
         lyz = numpy.empty_like(lyxi)
-        for i in xrange(len(zl)):
+        for i in range(len(zl)):
             lyz[i] = self.kf.measure_full(numpy.asarray(y).reshape((-1, 1)),
                                           zl[i], Pl[i], Cz[i], hz[i], Rz[i])
 
@@ -124,14 +127,16 @@ class HierarchicalBase(RBPSBase):
         zln = numpy.empty_like(zl)
         Pln = numpy.empty_like(Pl)
 
-        lpxi = self.logp_xnext_xi(particles, next_part[:, :self.lxi], u, t).ravel()
+        lpxi = self.logp_xnext_xi(
+            particles, next_part[:, :self.lxi], u, t).ravel()
 
-        for i in xrange(N):
+        for i in range(N):
 
             # Predict z_{t+1}
             (zln[i], Pln[i]) = self.kf.predict_full(zl[i], Pl[i], Az[i], fz[i], Qz[i])
 
-            lpz[i] = kalman.lognormpdf(next_part[i][self.lxi:(self.lxi + self.kf.lz)].reshape((-1, 1)) - zln[i], Pln[i])
+            lpz[i] = kalman.lognormpdf(next_part[i][self.lxi:(
+                self.lxi + self.kf.lz)].reshape((-1, 1)) - zln[i], Pln[i])
 
         return lpxi + lpz
 
@@ -256,7 +261,7 @@ class HierarchicalRSBase(HierarchicalBase, FFBSiRS):
         lpz = numpy.empty_like(lpxi)
         (_xil, _zl, Pl) = self.get_states(particles)
         nx = len(Qz[0])
-        for i in xrange(N):
+        for i in range(N):
             # Predict z_{t+1}
             Pn = Az[i].dot(Pl[i]).dot(Az[i].T) + Qz[i]
             lpz[i] = -0.5 * nx * math.log(2 * math.pi) + numpy.linalg.slogdet(Pn)[1]

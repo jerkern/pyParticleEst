@@ -6,13 +6,18 @@ import numpy as np
 import math
 import scipy.linalg
 
+from builtins import range
+
 l2pi = math.log(2 * math.pi)
+
+
 def lognormpdf(err, S):
     """
     Calculate gaussian probability density of err, when err ~ N(0,sigma)
     """
     tmp = err.reshape(-1, 1)
     return -0.5 * (S.shape[0] * l2pi + np.linalg.slogdet(S)[1] + np.linalg.solve(S, tmp).T.dot(tmp))
+
 
 def lognormpdf_cho(err, Schol):
     """
@@ -21,6 +26,7 @@ def lognormpdf_cho(err, Schol):
     dim = len(err)
     ld = np.sum(np.log(np.diag(Schol[0]))) * 2
     return -0.5 * (dim * l2pi + ld + scipy.linalg.cho_solve(Schol, err, check_finite=False).T.dot(err))
+
 
 def lognormpdf_cho_vec(err, Schol):
     """
@@ -31,9 +37,10 @@ def lognormpdf_cho_vec(err, Schol):
     dim = err.shape[1]
     ld = np.sum(np.log(np.diag(Schol[0]))) * 2
     res = np.ones((N,)) * (-0.5 * (dim * l2pi + ld))
-    for i in xrange(N):
+    for i in range(N):
         res[i] += -0.5 * scipy.linalg.cho_solve(Schol, err[i], check_finite=False).T.dot(err[i])
     return res
+
 
 def lognormpdf_vec(err, Sl):
     """
@@ -45,8 +52,10 @@ def lognormpdf_vec(err, Sl):
 
     for i in range(N):
         S = Sl[i]
-        res[i] = -0.5 * (S.shape[0] * l2pi + np.linalg.slogdet(S)[1] + np.linalg.solve(S, err[i]).T.dot(err[i]))
+        res[i] = -0.5 * (S.shape[0] * l2pi + np.linalg.slogdet(S)
+                         [1] + np.linalg.solve(S, err[i]).T.dot(err[i]))
     return res
+
 
 def lognormpdf_scalar(err, S):
     """
@@ -54,6 +63,7 @@ def lognormpdf_scalar(err, S):
     err[i] ~ N(0,S) and each element in err is a scalar
     """
     return -0.5 * (l2pi + math.log(S[0, 0]) + (err.ravel() ** 2) / S[0, 0])
+
 
 class KalmanFilter(object):
     """
@@ -70,14 +80,13 @@ class KalmanFilter(object):
 
         self.A = None
         self.C = None
-        self.R = None # Measurement noise covariance
-        self.Q = None # Process noise covariance
+        self.R = None  # Measurement noise covariance
+        self.Q = None  # Process noise covariance
         if (f_k is None):
             self.f_k = np.zeros((lz, 1))
         self.h_k = None
         self.lz = lz
         self.set_dynamics(A, C, Q, R, f_k, h_k)
-
 
     def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
         if (A is not None):
@@ -112,8 +121,8 @@ class KalmanFilter(object):
         """
         Update the estimates to time t+1, using the supplied matrices as the dynamics
         """
-        z[:] = f_k + A.dot(z) # Calculate the next state
-        P[:, :] = A.dot(P).dot(A.T) + Q # Calculate the estimated variance
+        z[:] = f_k + A.dot(z)  # Calculate the next state
+        P[:, :] = A.dot(P).dot(A.T) + Q  # Calculate the estimated variance
         return (z, P)
 
     def predict_full(self, z, P, A, f_k, Q):
@@ -121,8 +130,8 @@ class KalmanFilter(object):
         Calculate next state estimate without actually updating
         the internal variables, using the supplied matrices as the dynamics
         """
-        z = f_k + A.dot(z) # Calculate the next state
-        P = A.dot(P).dot(A.T) + Q # Calculate the estimated variance
+        z = f_k + A.dot(z)  # Calculate the next state
+        P = A.dot(P).dot(A.T) + Q  # Calculate the estimated variance
         return (z, P)
 
     def measurement_diff(self, y, z, C, h_k=None):

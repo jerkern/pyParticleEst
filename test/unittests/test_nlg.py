@@ -9,6 +9,7 @@ import numpy
 import numpy.testing as npt
 import math
 
+
 class Model(nlg.NonlinearGaussianInitialGaussian):
     """ x_{k+1} = sin(x_k) + v_k, v_k ~ N(0,Q)
         y_k = x_k + e_k, e_k ~ N(0,R),
@@ -27,15 +28,14 @@ class Model(nlg.NonlinearGaussianInitialGaussian):
     def calc_g(self, particles, t):
         return particles
 
-class Test(unittest.TestCase):
 
+class Test(unittest.TestCase):
 
     def setUp(self):
         self.model = Model(1.0, 1.0, 1.0)
 
     def tearDown(self):
         pass
-
 
     def testUpdate(self):
         N = 10
@@ -50,7 +50,8 @@ class Test(unittest.TestCase):
         particles = self.model.create_initial_estimate(N)
         y = 1.0
         logpy = self.model.measure(particles, y, None)
-        logpy_correct = -0.5 * math.log(2.0 * math.pi) - 0.5 * (y - particles.ravel()) ** 2
+        logpy_correct = -0.5 * \
+            math.log(2.0 * math.pi) - 0.5 * (y - particles.ravel()) ** 2
 
         npt.assert_array_equal(logpy, logpy_correct)
 
@@ -60,8 +61,8 @@ class Test(unittest.TestCase):
         m = numpy.mean(particles)
         s = numpy.std(particles)
 
-        self.assertAlmostEqual(m, 0.0, 3)
-        self.assertAlmostEqual(s, 1.0, 3)
+        self.assertAlmostEqual(m, 0.0, 2)
+        self.assertAlmostEqual(s, 1.0, 2)
 
 
 if __name__ == "__main__":

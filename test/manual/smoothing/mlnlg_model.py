@@ -86,7 +86,7 @@ if __name__ == '__main__':
         sest = sim.get_smoothed_estimates()
         smean = sim.get_smoothed_mean()
 
-        for j in xrange(nums):
+        for j in range(nums):
             plt.plot(range(steps + 1), sest[:, j, 0], 'r--')
             plt.plot(range(steps + 1), sest[:, j, 1], 'b--')
 

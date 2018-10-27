@@ -5,6 +5,8 @@
 from pyparticleest.simulator import Simulator
 import numpy
 
+from builtins import range
+
 
 class ParamEstimation(Simulator):
     """
@@ -44,7 +46,7 @@ class ParamEstimation(Simulator):
 
         params_local = numpy.copy(param0)
         Q = -numpy.Inf
-        for i in xrange(max_iter):
+        for i in range(max_iter):
             Q_old = Q
             self.set_params(params_local)
             if (numpy.isscalar(num_part)):
@@ -77,18 +79,20 @@ class ParamEstimation(Simulator):
             #Q = -Q
             # Q_grad = -Q_grad
             if (callback is not None):
-                callback(params=params_local, Q=-numpy.Inf, cur_iter=i) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i)  # , Q=Q)
 #            if (numpy.abs(Q - Q_old) < tol):
 #                break
-        #return (params_local, Q)
+        # return (params_local, Q)
         return (params_local, -numpy.Inf)
+
 
 def alpha_gen(it):
     offset = 100
     if (it <= offset):
         return 1
-    else :
+    else:
         return (it - offset) ** (-0.51)
+
 
 class ParamEstimationSAEM(Simulator):
     """
@@ -132,7 +136,7 @@ class ParamEstimationSAEM(Simulator):
         alltrajs = None
         weights = None
 
-        for i in xrange(max_iter):
+        for i in range(max_iter):
             self.set_params(params_local)
 
             if (numpy.isscalar(num_part)):
@@ -176,8 +180,9 @@ class ParamEstimationSAEM(Simulator):
             params_local = self.model.maximize_weighted(self.straj, alltrajs, weights)
 
             if (callback is not None):
-                callback(params=params_local, Q=-numpy.Inf, cur_iter=i) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf, cur_iter=i)  # , Q=Q)
         return (params_local, -numpy.Inf)
+
 
 class ParamEstimationPSAEM(Simulator):
     """
@@ -229,7 +234,7 @@ class ParamEstimationPSAEM(Simulator):
             callback = default_callback
 
         ind = numpy.asarray(range(num_part), dtype=numpy.int)
-        i = 0;
+        i = 0
         while (True):
             i += 1
             self.set_params(params_local)
@@ -288,6 +293,7 @@ class ParamEstimationPSAEM(Simulator):
                     break
         return (params_local, -numpy.Inf)
 
+
 class ParamEstimationPSAEM2(Simulator):
     """
     Extension of the Simulator class to iterative perform particle smoothing
@@ -331,7 +337,7 @@ class ParamEstimationPSAEM2(Simulator):
         weights = numpy.empty((max_iter * num_part,))
 
         datalen = 0
-        for i in xrange(max_iter):
+        for i in range(max_iter):
             self.set_params(params_local)
 
             self.simulate(num_part, 1, filter=filter, filter_options=filter_options,
@@ -345,7 +351,7 @@ class ParamEstimationPSAEM2(Simulator):
 
             newtrajs = numpy.empty((T, N, D))
 
-            for t in xrange(T):
+            for t in range(T):
                 newtrajs[t] = tmp[t].pa.part
 
             w = 1.0
@@ -369,21 +375,21 @@ class ParamEstimationPSAEM2(Simulator):
 
             # Discard at max the lowest 'discard_percentile' of the weights
             tmp = numpy.percentile(weights[:datalen], discard_percentile)
-            wlow = numpy.max(numpy.hstack((weights[:datalen][weights[:datalen] < tmp], 0.0)))
+            wlow = numpy.max(numpy.hstack(
+                (weights[:datalen][weights[:datalen] < tmp], 0.0)))
             threshold = min(discard_eps, wlow)
 
             zero_ind = (weights[:datalen] <= threshold)
             zerolen = numpy.count_nonzero(zero_ind)
             weights[:datalen - zerolen] = weights[:datalen][~zero_ind]
-            alltrajs[:, :datalen - zerolen] = alltrajs[:, :datalen][:, ~zero_ind]
+            alltrajs[:, :datalen - zerolen] = alltrajs[:,
+                                                       :datalen][:, ~zero_ind]
             datalen -= zerolen
             weights[:datalen] /= numpy.sum(weights[:datalen])
             params_local = self.model.maximize_weighted(self.straj, alltrajs[:, :datalen], weights[:datalen])
 #            params_local = self.model.maximize_weighted(self.straj, alltrajs[:, -1:], numpy.asarray((1.0,)))
 
             if (callback is not None):
-                callback(params=params_local, Q=-numpy.Inf, cur_iter=i + 1) #, Q=Q)
+                callback(params=params_local, Q=-numpy.Inf,
+                         cur_iter=i + 1)  # , Q=Q)
         return (params_local, -numpy.Inf)
-
-
-

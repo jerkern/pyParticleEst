@@ -61,7 +61,7 @@ class ParamEstInterface(ParamEstIntFullTraj):
         sest = straj.get_smoothed_estimates()
         M = sest.shape[1]
         T = straj.traj.shape[0]
-        for i in xrange(T - 1):
+        for i in range(T - 1):
             val = self.eval_logp_xnext(sest[i],
                                        sest[i + 1],
                                        ut[i], tt[i])
@@ -73,7 +73,7 @@ class ParamEstInterface(ParamEstIntFullTraj):
         sest = straj.get_smoothed_estimates()
         M = sest.shape[1]
         T = straj.traj.shape[0]
-        for i in xrange(T):
+        for i in range(T):
             if (yt[i] is not None):
                 val = self.eval_logp_y(sest[i], yt[i], tt[i])
                 logp_y += numpy.sum(val)
@@ -142,7 +142,7 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
         sest = straj.get_smoothed_estimates()
         M = sest.shape[1]
         T = len(straj)
-        for t in xrange(T):
+        for t in range(T):
             if (straj.y[t] is not None):
                 (val, grad) = self.eval_logp_y_val_grad(sest[t],
                                                         straj.y[t],
@@ -157,7 +157,7 @@ class ParamEstInterface_GradientSearch(ParamEstInterface_GradientSearchFullTraj)
         sest = straj.get_smoothed_estimates()
         M = sest.shape[1]
         T = len(straj)
-        for t in xrange(T - 1):
+        for t in range(T - 1):
             (val, grad) = self.eval_logp_xnext_val_grad(sest[t],
                                                         sest[t + 1],
                                                         straj.u[t],

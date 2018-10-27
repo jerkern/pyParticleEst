@@ -13,14 +13,14 @@ ext = '.pyx' if USE_CYTHON else '.c'
 
 if (not on_rtd):
     import numpy
-    extensions = [Extension("pyparticleest/utils/ckalman", ["pyparticleest/utils/ckalman" + ext]),
-                  Extension("pyparticleest/utils/cmlnlg_compute", ["pyparticleest/utils/cmlnlg_compute" + ext],
+    extensions = [Extension("pyparticleest.utils.ckalman", ["pyparticleest/utils/ckalman" + ext]),
+                  Extension("pyparticleest.utils.cmlnlg_compute", ["pyparticleest/utils/cmlnlg_compute" + ext],
                             include_dirs=[numpy.get_include()])]
 else:
     extensions = None
 
 name = 'pyParticleEst'
-version = '1.1.3'
+version = '1.1.4'
 packages = ['pyparticleest', 'pyparticleest/models', 'pyparticleest/paramest', 'pyparticleest/utils']
 url = 'http://www.control.lth.se/Staff/JerkerNordh/pyparticleest.html'
 author = 'Jerker Nordh'
@@ -31,7 +31,6 @@ lic = 'LGPL'
 if USE_CYTHON:
     from Cython.Build import cythonize
     extensions = cythonize(extensions)
-
 
 
 try:
