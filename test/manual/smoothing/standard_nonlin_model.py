@@ -55,7 +55,7 @@ if __name__ == '__main__':
     rmse_smooth = 0.0
     rmse2_filt = 0.0
     rmse2_smooth = 0.0
-    for it in xrange(iterations):
+    for it in range(iterations):
         numpy.random.seed(it)
         (x, y) = generate_dataset(T, P0, Q, R)
         sim = simulator.Simulator(model, u=None, y=y)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
         tmp = 0.0
         plt.plot((0,) * N, est_filt[0, :, 0].ravel(), 'k.', markersize=0.5, label='Particles')
-        for t in xrange(1, T + 1):
+        for t in range(1, T + 1):
             plt.plot((t,) * N, est_filt[t, :, 0].ravel(), 'k.', markersize=0.5)
             tmp += numpy.sum(w_filt[t] * (est_filt[t, :, 0] - x[t]) ** 2)
         rmse2_filt += numpy.sqrt(tmp / T)
@@ -84,7 +84,7 @@ if __name__ == '__main__':
             rmse_smooth += numpy.sqrt(numpy.mean(err ** 2))
 
             tmp = 0.0
-            for k in xrange(M):
+            for k in range(M):
                 tmp += 1.0 / M * numpy.sum((est_smooth[:, k, 0].ravel() - x) ** 2)
             rmse2_smooth += numpy.sqrt(tmp / T)
         plt.ioff()
@@ -94,8 +94,8 @@ if __name__ == '__main__':
         plt.draw()
         plt.show()
 
-    print "rmse filter = %f" % (rmse_filt / iterations)
-    print "rmse smooth = %f" % (rmse_smooth / iterations)
-    print "rmse2 filter = %f" % (rmse2_filt / iterations)
-    print "rmse2 smooth = %f" % (rmse2_smooth / iterations)
+    print("rmse filter = {}".format(rmse_filt / iterations))
+    print("rmse smooth = {}".format(rmse_smooth / iterations))
+    print("rmse2 filter = {}".format(rmse2_filt / iterations))
+    print("rmse2 smooth = {}".format(rmse2_smooth / iterations))
 

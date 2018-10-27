@@ -109,7 +109,7 @@ class Model(interfaces.FFBSiRS, interfaces.ParticleFiltering,
 
 
 def callback(params, Q, cur_iter):
-    print("params = %s" % numpy.exp(params))
+    print("params = {}".format(numpy.exp(params)))
 
 
 def callback_sim(estimator):

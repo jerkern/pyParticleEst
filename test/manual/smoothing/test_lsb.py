@@ -9,7 +9,6 @@ import math
 import matplotlib.pyplot as plt
 import pyparticleest.models.mlnlg as mlnlg
 import pyparticleest.simulator as simulator
-import scipy.linalg
 import sys
 
 C_theta = numpy.array([[ 0.0, 0.04, 0.044, 0.008], ])
@@ -143,7 +142,7 @@ if __name__ == '__main__':
 
                 rmse_eta = numpy.sqrt(numpy.mean(sqr_err_eta[k, :]))
                 rmse_theta = numpy.sqrt(numpy.mean(sqr_err_theta[k, :]))
-                print "%d %f %f" % (k, numpy.mean(rmse_eta), numpy.mean(rmse_theta))
+                print("{} {} {}".format(k, numpy.mean(rmse_eta), numpy.mean(rmse_theta)))
 
     else:
 
@@ -202,4 +201,4 @@ if __name__ == '__main__':
         plt.ioff()
         plt.show()
         plt.draw()
-    print "exit"
+    print("exit")

@@ -82,24 +82,24 @@ class KalmanFilter(object):
         self.C = None
         self.R = None      # Measurement noise covariance
         self.Q = None      # Process noise covariance
-        if (f_k == None):
+        if (f_k is None):
             self.f_k = np.zeros((lz, 1))
         self.h_k = None
         self.lz = lz
         self.set_dynamics(A, C, Q, R, f_k, h_k)
 
     def set_dynamics(self, A=None, C=None, Q=None, R=None, f_k=None, h_k=None):
-        if (A != None):
+        if (A is not None):
             self.A = A
-        if (C != None):
+        if (C is not None):
             self.C = C
-        if (Q != None):
+        if (Q is not None):
             self.Q = Q
-        if (R != None):
+        if (R is not None):
             self.R = R
-        if (f_k != None):
+        if (f_k is not None):
             self.f_k = f_k
-        if (h_k != None):
+        if (h_k is not None):
             self.h_k = h_k
 
     def time_update(self):
@@ -139,9 +139,9 @@ class KalmanFilter(object):
         Calculate different between measurement and predicted measurement
         """
         yhat = np.zeros_like(y)
-        if (C != None):
+        if (C is not None):
             yhat += C.dot(z)
-        if (h_k != None):
+        if (h_k is not None):
             yhat += h_k
         return (y-yhat)
 
@@ -158,17 +158,17 @@ class KalmanFilter(object):
         Do a measurement update, i.e correct the current estimate
         with information from a new measurement
         """
-        if (C != None):
+        if (C is not None):
             S = C.dot(P).dot(C.T)+R
             Schol = scipy.linalg.cho_factor(S, check_finite=False)
             err = y - C.dot(z)
-            if (h_k != None):
+            if (h_k is not None):
                 err -= h_k
             Sinv_err = scipy.linalg.cho_solve(Schol, err, check_finite=False)
             z[:] = z + P.dot(C.T).dot(Sinv_err)
             P[:, :] = P - P.dot(C.T).dot(scipy.linalg.cho_solve(Schol, C.dot(P), check_finite=False))
         else:
-            if (h_k != None):
+            if (h_k is not None):
                 err = y - h_k
             else:
                 err = y
@@ -187,17 +187,17 @@ class KalmanFilter(object):
 
         Must be scalar measurement equation
         """
-        if (C != None):
+        if (C is not None):
             S = C.dot(P).dot(C.T)+R
             err = y - C.dot(z)
-            if (h_k != None):
+            if (h_k is not None):
                 err -= h_k
             z[:] = z + P.dot(C.T).dot(err)/S[0, 0]
             tmp = C.dot(P)
             P[:, :] = P - tmp.T.dot(tmp)/S[0, 0]
         else:
             S = R
-            if (h_k != None):
+            if (h_k is not None):
                 err = y - h_k
             else:
                 err = y

@@ -184,7 +184,7 @@ if __name__ == '__main__':
         max_iter = 1000
 
         for k in range(sims):
-            print k
+            print(k)
             theta_guess = numpy.array((numpy.random.uniform(0.0, 2.0),
                                        numpy.random.uniform(0.0, 2.0),
                                        numpy.random.uniform(0.0, 0.6),
@@ -197,7 +197,7 @@ if __name__ == '__main__':
             (y, e, z) = generate_dataset(theta_true, steps)
             # Store values for last time-step aswell
 
-            print "estimation start"
+            print("estimation start")
 
             plt.figure(fig1.number)
             plt.clf()
@@ -300,7 +300,7 @@ if __name__ == '__main__':
             plt.draw()
 
 
-            print "maximization start"
+            print("maximization start")
 
             estimate[:, k] = param
 
@@ -318,7 +318,7 @@ if __name__ == '__main__':
         plt.ioff()
         plt.show()
         plt.draw()
-        print "exit"
+        print("exit")
     elif (sys.argv[1].lower() == 'nogui'):
         num = 50
         nums = 10
@@ -357,9 +357,9 @@ if __name__ == '__main__':
             (param, Q) = ParamEstimator.maximize(param0=theta_guess, num_part=num, num_traj=nums, max_iter=max_iter,
                                                  callback=None, smoother='rsas', tol=0.0)
 
-            print "%.4f %.4f %.4f %.4f %.4f" % tuple(param)
+            print("{} {} {} {} {}") % tuple(round(param, 4))
 
-        print "exit"
+        print("exit")
     elif (sys.argv[1].lower() == 'gradient'):
         num = 50
         nums = 5
@@ -393,6 +393,6 @@ if __name__ == '__main__':
         gt.plot_x0.plot(3)
         plt.show()
     else:
-        print 'Unsupported option'
+        print('Unsupported option')
 
 

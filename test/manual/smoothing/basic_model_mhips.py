@@ -52,7 +52,7 @@ if __name__ == '__main__':
     plt.ion()
     plt.show()
     time.sleep(5)
-    for _ in xrange(30):
+    for _ in range(30):
 
         plt.clf()
         plt.plot(range(steps + 1), x, 'r-')

@@ -36,12 +36,12 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
         self.logxn_max = kalman.lognormpdf_scalar(numpy.zeros((1,)), self.Q)
 
     def create_initial_estimate(self, N):
-        return numpy.random.normal(0.0, numpy.sqrt(self.P0), (N,))
+        return numpy.random.normal(0.0, numpy.sqrt(self.P0.ravel()), (N,))
 
     def sample_process_noise(self, particles, u, t):
         """ Return process noise for input u """
         N = len(particles)
-        return numpy.random.normal(0.0, numpy.sqrt(self.Q), (N,))
+        return numpy.random.normal(0.0, numpy.sqrt(self.Q.ravel()), (N,))
 
     def update(self, particles, u, noise, t):
         """ Update estimate using 'data' as input """
@@ -115,7 +115,7 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
 
         werr = numpy.empty((len(alltrajs) - 1, M))
 
-        for j in xrange(len(weights)):
+        for j in range(len(weights)):
             werr[:, j:j + 1] = weights[j] * diff[:, j] ** 2
 
         Q = numpy.mean(numpy.sum(werr, axis=1))
@@ -126,7 +126,7 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
 
         werr = numpy.empty((len(alltrajs), M))
 
-        for j in xrange(len(weights)):
+        for j in range(len(weights)):
             werr[:, j:j + 1] = weights[j] * diff[:, j] ** 2
 
         R = numpy.mean(numpy.sum(werr, axis=1))
@@ -142,7 +142,7 @@ class Model(interfaces.ParticleFiltering, interfaces.FFBSiRS, pestint.ParamEstIn
             log_py = 0.0
             log_pxnext = 0.0
             log_px0 = 0.0
-            for i in xrange(len(weights)):
+            for i in range(len(weights)):
                 log_py += weights[i] * self.eval_logp_y_fulltraj(alltrajs[:, i:i + 1],
                                                                  straj.y,
                                                                  straj.t)
@@ -201,10 +201,10 @@ if __name__ == '__main__':
 
         plt.figure(2)
         plt.clf()
-        for i in xrange(len(theta_true)):
+        for i in range(len(theta_true)):
             plt.plot((0.0, cur_iter + 1), (theta_true[i], theta_true[i]), 'k--')
 
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             plt.plot(range(cur_iter + 1), params_it[:cur_iter + 1, i], '-')
         plt.draw()
         plt.pause(0.0001)
